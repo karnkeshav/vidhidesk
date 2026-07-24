@@ -1,0 +1,37 @@
+[
+  {
+    "id": "GT-01",
+    "facts": "Client's consignment of textiles worth Rs 3 lakh was damaged during transit from Delhi to Mumbai by a common carrier. Consignor wants to claim damages.",
+    "expected_acts": ["Carriage by Road Act, 2007", "Consumer Protection Act, 2019"],
+    "expected_sections": {"Carriage by Road Act, 2007": ["10", "16"], "Consumer Protection Act, 2019": ["35"]},
+    "domain": "consumer/carriage"
+  },
+  {
+    "id": "GT-02",
+    "facts": "Consumer bought a mobile phone from an authorised dealer for Rs 45,000. Phone stopped working within 3 months. Dealer refuses refund or replacement. Where should client file complaint and what is the claim value threshold?",
+    "expected_acts": ["Consumer Protection Act, 2019"],
+    "expected_sections": {"Consumer Protection Act, 2019": ["2", "34", "35"]},
+    "domain": "consumer"
+  },
+  {
+    "id": "GT-03",
+    "facts": "Common carrier lost a consignment of pharmaceutical goods during transit. Consignor gave written notice of loss to the carrier 5 months after learning of the loss. Can the consignor still sue for damages?",
+    "expected_acts": ["Carriage by Road Act, 2007"],
+    "expected_sections": {"Carriage by Road Act, 2007": ["16"]},
+    "domain": "carriage"
+  },
+  {
+    "id": "GT-04",
+    "facts": "A consumer's claim against a service provider is worth Rs 60 lakh. Which consumer commission has jurisdiction — District, State, or National?",
+    "expected_acts": ["Consumer Protection Act, 2019"],
+    "expected_sections": {"Consumer Protection Act, 2019": ["34", "47", "58"]},
+    "domain": "consumer"
+  },
+  {
+    "id": "GT-05",
+    "facts": "Common carrier refused to accept a consignment of goods for transport without giving any reason. Consignor wants to know if the carrier had a legal duty to accept.",
+    "expected_acts": ["Carriage by Road Act, 2007"],
+    "expected_sections": {"Carriage by Road Act, 2007": ["9"]},
+    "domain": "carriage"
+  }
+]
