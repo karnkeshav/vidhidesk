@@ -40,7 +40,18 @@ $$;
 -- FUNCTION does not reset existing permissions, so this revoke has to be
 -- unconditional and re-run every time for the migration to be idempotent
 -- regardless of the function's prior grant state.
+--
+-- Revoking from PUBLIC alone is NOT sufficient on Supabase — confirmed
+-- live: anon still had EXECUTE after a fresh apply of this exact
+-- migration with only the PUBLIC revoke in place. Supabase provisions
+-- every project with `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT
+-- EXECUTE ON FUNCTIONS TO anon, authenticated, service_role` — anon's
+-- access is a *direct* grant made automatically at CREATE FUNCTION time,
+-- separate from and in addition to vanilla Postgres's PUBLIC-default
+-- grant. Both revokes are mandatory, every time, for every function this
+-- project creates.
 revoke execute on function match_statute_chunks(vector, int) from public;
+revoke execute on function match_statute_chunks(vector, int) from anon;
 
 -- No grant to anon: it has no legitimate reason to call this, and RLS on
 -- statute_chunks would block it from seeing rows anyway — but "harmless"
