@@ -6,9 +6,16 @@ from app.auth import CurrentUser, get_current_user
 from app.db import service_client
 from app.models.schemas import MatterCreate, MatterOut, MessageCreate, MessageOut, MODULE_TASK_TYPE
 from app.services.llm_gateway import ProviderError, generate
-from app.services.pii_mask import SupabaseMaskStore
+from app.services.pii_mask import MaskMap, SupabaseMaskStore, mask_text
 
 router = APIRouter(prefix="/api/matters", tags=["matters"])
+
+# How many prior messages (user + assistant combined, not "turns") to
+# send as conversation history on every new message. Small on purpose:
+# this is a single-user tool with modest per-request latency budget, and
+# every extra assistant turn in history costs a re-mask pass (see
+# _build_history) on top of the tokens themselves.
+MAX_HISTORY_MESSAGES = 6
 
 
 @router.post("", response_model=MatterOut, status_code=201)
@@ -56,14 +63,63 @@ def list_messages(matter_id: str, user: CurrentUser = Depends(get_current_user))
     return resp.data
 
 
+def _fetch_recent_messages(user: CurrentUser, matter_id: str, limit: int) -> list[dict]:
+    resp = (
+        user.db.table("messages")
+        .select("*")
+        .eq("matter_id", matter_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return list(reversed(resp.data))  # chronological order
+
+
+def _build_history(rows: list[dict], mask_map: MaskMap) -> list[dict]:
+    """Turn stored message rows into masked {role, content} turns for the
+    LLM gateway.
+
+    User messages: use the persisted `masked_prompt` column — it's the
+    exact text that already went out over the wire for that turn, so
+    there's no reason to recompute it (and a fallback re-mask covers rows
+    from before this column was populated).
+
+    Assistant messages: `content` is deliberately stored unmasked (so the
+    lawyer can read their own matter history in plain language) — sending
+    that back to the LLM as-is would re-leak whatever names/PANs/etc. it
+    contained. Re-masking through the same, already-loaded `mask_map`
+    before it goes into history closes that off. This was one of two
+    options (the other: persist a second, pre-masked copy of every
+    assistant reply). Re-masking on the fly won by simplicity — no schema
+    migration, no second column that could drift out of sync with the
+    mask_map — at the cost of a few extra mask_text() calls per request
+    (bounded by MAX_HISTORY_MESSAGES, so at most a handful of short
+    re-masks, not a real latency concern for a single-user tool).
+    """
+    history: list[dict] = []
+    for row in rows:
+        if row["role"] == "user":
+            content = row.get("masked_prompt") or mask_text(row["content"], mask_map)
+            history.append({"role": "user", "content": content})
+        elif row["role"] == "assistant":
+            history.append({"role": "assistant", "content": mask_text(row["content"], mask_map)})
+    return history
+
+
 @router.post("/{matter_id}/messages", response_model=list[MessageOut], status_code=201)
 def send_message(
     matter_id: str, body: MessageCreate, user: CurrentUser = Depends(get_current_user)
 ):
-    """The 'hello matter' round trip: store the user message, mask it,
-    send it through the LLM gateway, unmask the reply, store that too.
+    """The 'hello matter' round trip: store the user message, mask it
+    (with recent conversation history for context), send it through the
+    LLM gateway, unmask the reply, store that too.
     Returns [user_message, assistant_message]."""
     matter = _get_matter_or_404(user, matter_id)
+
+    # Fetched *before* inserting the current message, so it never
+    # includes the message we're about to send — that goes in separately
+    # as the current turn.
+    prior_rows = _fetch_recent_messages(user, matter_id, MAX_HISTORY_MESSAGES)
 
     user_row = (
         user.db.table("messages")
@@ -80,11 +136,17 @@ def send_message(
     mask_store = SupabaseMaskStore(service_client())
     mask_map = mask_store.load(matter_id)
 
+    history = _build_history(prior_rows, mask_map)
+
     task_type = MODULE_TASK_TYPE.get(matter["module"], "chat")
 
     try:
         result = generate(
-            body.content, task_type=task_type, mask_map=mask_map, entities=entities
+            body.content,
+            task_type=task_type,
+            mask_map=mask_map,
+            entities=entities,
+            history=history,
         )
     except ProviderError as exc:
         raise HTTPException(

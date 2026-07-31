@@ -124,6 +124,114 @@ def test_outbound_request_never_contains_raw_pii(settings):
     assert result.text == "Drafted for Ramesh Kumar."
 
 
+def _capture_outbound_body(mock_target) -> dict:
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content.decode()
+        return _gemini_ok("ok")
+
+    mock_target.mock(side_effect=_capture)
+    return captured
+
+
+@respx.mock
+def test_outbound_body_never_contains_raw_person_name(settings):
+    captured = _capture_outbound_body(
+        respx.post(url__startswith="https://generativelanguage.googleapis.com")
+    )
+    mm = MaskMap(matter_id="m1")
+
+    # No explicit entities passed — this must be caught by automatic
+    # person-name detection alone.
+    generate("Ramesh Kumar signed the notice.", mask_map=mm, settings=settings)
+
+    assert "Ramesh Kumar" not in captured["body"]
+
+
+@respx.mock
+def test_outbound_body_never_contains_raw_postal_address(settings):
+    captured = _capture_outbound_body(
+        respx.post(url__startswith="https://generativelanguage.googleapis.com")
+    )
+    mm = MaskMap(matter_id="m1")
+
+    generate(
+        "The property is located at 12, MG Road, New Delhi 110001.",
+        mask_map=mm,
+        settings=settings,
+    )
+
+    assert "12, MG Road, New Delhi" not in captured["body"]
+
+
+@respx.mock
+def test_outbound_body_never_contains_raw_company_name(settings):
+    captured = _capture_outbound_body(
+        respx.post(url__startswith="https://generativelanguage.googleapis.com")
+    )
+    mm = MaskMap(matter_id="m1")
+
+    generate(
+        "The vendor, Sharma Enterprises Pvt Ltd, breached clause 4.",
+        mask_map=mm,
+        settings=settings,
+    )
+
+    assert "Sharma Enterprises Pvt Ltd" not in captured["body"]
+
+
+@respx.mock
+def test_outbound_body_never_contains_raw_mobile_number_10_digit(settings):
+    captured = _capture_outbound_body(
+        respx.post(url__startswith="https://generativelanguage.googleapis.com")
+    )
+    mm = MaskMap(matter_id="m1")
+
+    generate("Call the client at 9876543210.", mask_map=mm, settings=settings)
+
+    assert "9876543210" not in captured["body"]
+
+
+@respx.mock
+def test_outbound_body_never_contains_raw_mobile_number_plus91(settings):
+    captured = _capture_outbound_body(
+        respx.post(url__startswith="https://generativelanguage.googleapis.com")
+    )
+    mm = MaskMap(matter_id="m1")
+
+    generate("Call the client at +91 9876543210.", mask_map=mm, settings=settings)
+
+    assert "+91 9876543210" not in captured["body"]
+    assert "9876543210" not in captured["body"]
+
+
+@respx.mock
+def test_history_turns_are_included_in_outbound_request_in_order(settings):
+    captured = _capture_outbound_body(
+        respx.post(url__startswith="https://generativelanguage.googleapis.com")
+    )
+    mm = MaskMap(matter_id="m1")
+    history = [
+        {"role": "user", "content": "My client PARTY_A has PAN PAN_1."},
+        {"role": "assistant", "content": "Understood, PARTY_A's PAN is PAN_1."},
+    ]
+
+    generate("What is his PAN?", mask_map=mm, history=history, settings=settings)
+
+    import json
+
+    body = json.loads(captured["body"])
+    contents = body["contents"]
+    assert len(contents) == 3  # 2 history turns + current turn
+    assert contents[0]["role"] == "user"
+    assert contents[0]["parts"][0]["text"] == "My client PARTY_A has PAN PAN_1."
+    assert contents[1]["role"] == "model"  # assistant -> Gemini's "model" role
+    assert contents[1]["parts"][0]["text"] == "Understood, PARTY_A's PAN is PAN_1."
+    assert contents[2]["role"] == "user"
+    assert contents[2]["parts"][0]["text"] == "What is his PAN?"
+
+
 @respx.mock
 def test_retries_transient_network_error_before_failing_over(settings):
     call_count = {"gemini": 0}

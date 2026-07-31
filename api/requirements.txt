@@ -7,10 +7,12 @@ supabase==2.31.0
 python-dotenv==1.2.2
 tenacity==9.1.4
 python-multipart==0.0.32
+spacy==3.8.14
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
-# Sprint 1+ (statute RAG) — declared now, wired later
-# sentence-transformers==3.3.1
-# pymupdf==1.24.14
+# Sprint 1 (statute RAG)
+sentence-transformers==5.6.1
+pymupdf==1.28.0
 
 pytest==9.1.1
 pytest-asyncio==1.4.0

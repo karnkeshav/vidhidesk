@@ -84,15 +84,22 @@ _retry_transient = retry(
 
 
 @_retry_transient
-def _call_gemini(settings: Settings, system_prompt: str, prompt: str) -> tuple[str, str]:
+def _call_gemini(
+    settings: Settings, system_prompt: str, turns: list[tuple[str, str]]
+) -> tuple[str, str]:
     model = "gemini-2.5-flash"
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         f"?key={settings.gemini_api_key}"
     )
+    # Gemini uses "model" where OpenAI-style APIs use "assistant".
+    contents = [
+        {"role": "user" if role == "user" else "model", "parts": [{"text": content}]}
+        for role, content in turns
+    ]
     body = {
         "systemInstruction": {"parts": [{"text": system_prompt}]},
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "contents": contents,
     }
     resp = httpx.post(url, json=body, timeout=30.0)
     _raise_for_provider("gemini", resp)
@@ -106,18 +113,19 @@ def _call_gemini(settings: Settings, system_prompt: str, prompt: str) -> tuple[s
 
 @_retry_transient
 def _call_openai_compatible(
-    provider: str, base_url: str, api_key: str, model: str, system_prompt: str, prompt: str
+    provider: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    system_prompt: str,
+    turns: list[tuple[str, str]],
 ) -> tuple[str, str]:
+    messages = [{"role": "system", "content": system_prompt}]
+    messages += [{"role": role, "content": content} for role, content in turns]
     resp = httpx.post(
         f"{base_url}/chat/completions",
         headers={"Authorization": f"Bearer {api_key}"},
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ],
-        },
+        json={"model": model, "messages": messages},
         timeout=30.0,
     )
     _raise_for_provider(provider, resp)
@@ -137,31 +145,31 @@ def _raise_for_provider(provider: str, resp: httpx.Response) -> None:
 
 
 def _providers(settings: Settings):
-    """Ordered failover chain. Each entry is (name, callable(prompt) -> (text, model))."""
+    """Ordered failover chain. Each entry is (name, callable(system_prompt, turns) -> (text, model))."""
     return [
         (
             "gemini",
-            lambda sp, p: _call_gemini(settings, sp, p),
+            lambda sp, turns: _call_gemini(settings, sp, turns),
         ),
         (
             "groq",
-            lambda sp, p: _call_openai_compatible(
+            lambda sp, turns: _call_openai_compatible(
                 "groq", "https://api.groq.com/openai/v1", settings.groq_api_key,
-                "llama-3.3-70b-versatile", sp, p,
+                "llama-3.3-70b-versatile", sp, turns,
             ),
         ),
         (
             "sambanova",
-            lambda sp, p: _call_openai_compatible(
+            lambda sp, turns: _call_openai_compatible(
                 "sambanova", "https://api.sambanova.ai/v1", settings.sambanova_api_key,
-                "Meta-Llama-3.3-70B-Instruct", sp, p,
+                "Meta-Llama-3.3-70B-Instruct", sp, turns,
             ),
         ),
         (
             "cerebras",
-            lambda sp, p: _call_openai_compatible(
+            lambda sp, turns: _call_openai_compatible(
                 "cerebras", "https://api.cerebras.ai/v1", settings.cerebras_api_key,
-                "llama-3.3-70b", sp, p,
+                "llama-3.3-70b", sp, turns,
             ),
         ),
     ]
@@ -174,6 +182,7 @@ def generate(
     mask_map: MaskMap | None = None,
     entities: list[tuple[str, str]] | None = None,
     settings: Settings | None = None,
+    history: list[dict] | None = None,
 ) -> GenerationResult:
     """Mask -> call providers in failover order -> unmask.
 
@@ -181,17 +190,27 @@ def generate(
     prompts that are already known to contain no client data, e.g. the
     IK spike script). Production callers must always pass a matter's
     MaskMap.
+
+    `history` is prior conversation turns, each `{"role": "user"|
+    "assistant", "content": str}` — the caller is responsible for making
+    sure `content` is already masked (see app/routers/matters.py's
+    _build_history) before it ever reaches this function. generate()
+    itself only masks the *current* `prompt`; it has no way to verify a
+    caller-supplied history entry is safe.
     """
     settings = settings or get_settings()
     system_prompt = SYSTEM_PROMPTS.get(task_type, SYSTEM_PROMPTS["chat"])
 
     masked_prompt = mask_text(prompt, mask_map, entities) if mask_map else prompt
+    turns: list[tuple[str, str]] = [
+        (h["role"], h["content"]) for h in (history or [])
+    ] + [("user", masked_prompt)]
 
     last_error: Exception | None = None
     for provider_name, call in _providers(settings):
         start = time.monotonic()
         try:
-            text, model = call(system_prompt, masked_prompt)
+            text, model = call(system_prompt, turns)
             latency_ms = int((time.monotonic() - start) * 1000)
             logger.info(
                 "llm_gateway.generate provider=%s model=%s task_type=%s "

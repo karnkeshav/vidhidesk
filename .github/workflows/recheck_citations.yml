@@ -1,0 +1,23 @@
+name: Nightly citation dead-link recheck
+
+on:
+  schedule:
+    # 21:00 UTC = 02:30 IST — off working hours per TRD §5 availability note.
+    - cron: "0 21 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  recheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r api/requirements.txt
+      - run: python scripts/recheck_citations.py
+        working-directory: api
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
