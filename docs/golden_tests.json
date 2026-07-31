@@ -29,7 +29,7 @@
   },
   {
     "id": "GT-05",
-    "facts": "Common carrier refused to accept a consignment of goods for transport without giving any reason. Consignor wants to know if the carrier had a legal duty to accept.",
+    "facts": "Common carrier accepted a consignment of goods but did not issue a goods receipt to the consignor at the time of acceptance. Consignor wants to know what the law requires of the carrier at this stage.",
     "expected_acts": ["Carriage by Road Act, 2007"],
     "expected_sections": {"Carriage by Road Act, 2007": ["9"]},
     "domain": "carriage"
