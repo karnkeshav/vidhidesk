@@ -6,6 +6,7 @@ import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { listMatters, Matter } from "@/lib/api";
 import {
   ShieldCheck,
   Globe,
@@ -13,8 +14,9 @@ import {
   LayoutDashboard,
   FolderKanban,
   FileText,
-  BookOpen,
+  Calendar,
   Plus,
+  Gavel,
 } from "lucide-react";
 
 export function AuthedShell({
@@ -28,6 +30,7 @@ export function AuthedShell({
   const router = useRouter();
   const [session, setSession] = useState<Session | null | "loading">("loading");
   const [jurisdiction, setJurisdiction] = useState<string>("Delhi");
+  const [recentMatters, setRecentMatters] = useState<Matter[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -35,6 +38,9 @@ export function AuthedShell({
         router.push("/login");
       } else {
         setSession(data.session);
+        listMatters()
+          .then((data) => setRecentMatters(data.slice(0, 4)))
+          .catch(() => {});
       }
     });
 
@@ -133,45 +139,76 @@ export function AuthedShell({
       </div>
 
       <div className="flex">
-        {/* Left Sidebar Navigation (Stitch Approved Design) */}
-        <aside className="sticky top-16 hidden h-[calc(100vh-64px)] w-64 shrink-0 flex-col gap-4 border-r border-[#E4E2DD] bg-[#F0EEE9] p-4 md:flex">
-          <a href="/contracts">
-            <Button className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#081534] py-2.5 font-sans text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-[#1E2A4A]">
-              <Plus className="h-4 w-4" strokeWidth={1.5} />
-              New Contract
-            </Button>
-          </a>
+        {/* Left Sidebar Navigation (Exact Stitch Approved Design) */}
+        <aside className="sticky top-16 hidden h-[calc(100vh-64px)] w-64 shrink-0 flex-col justify-between gap-4 border-r border-[#E4E2DD] bg-[#F0EEE9] p-4 md:flex">
+          <div className="space-y-4">
+            <a href="/contracts">
+              <Button className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#081534] py-2.5 font-sans text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-[#1E2A4A]">
+                <Plus className="h-4 w-4" strokeWidth={1.5} />
+                New Matter
+              </Button>
+            </a>
 
-          <nav className="flex flex-col gap-1">
-            <a
-              href="/dashboard"
-              className="flex items-center gap-3 rounded-sm bg-[#1E2A4A] p-2.5 font-sans text-xs font-semibold text-white"
-            >
-              <LayoutDashboard className="h-4 w-4" strokeWidth={1.5} />
-              <span>Dashboard</span>
-            </a>
-            <a
-              href="/contracts"
-              className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
-            >
-              <FolderKanban className="h-4 w-4" strokeWidth={1.5} />
-              <span>Contracts</span>
-            </a>
-            <a
-              href="/admin/templates"
-              className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
-            >
-              <FileText className="h-4 w-4" strokeWidth={1.5} />
-              <span>Templates</span>
-            </a>
-            <a
-              href="/security"
-              className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
-            >
-              <BookOpen className="h-4 w-4" strokeWidth={1.5} />
-              <span>Security</span>
-            </a>
-          </nav>
+            <nav className="flex flex-col gap-1">
+              <a
+                href="/dashboard"
+                className="flex items-center gap-3 rounded-sm bg-[#1E2A4A] p-2.5 font-sans text-xs font-semibold text-white"
+              >
+                <LayoutDashboard className="h-4 w-4" strokeWidth={1.5} />
+                <span>Dashboard</span>
+              </a>
+              <a
+                href="/contracts"
+                className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+              >
+                <Gavel className="h-4 w-4" strokeWidth={1.5} />
+                <span>Matter List</span>
+              </a>
+              <a
+                href="/contracts"
+                className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+              >
+                <FolderKanban className="h-4 w-4" strokeWidth={1.5} />
+                <span>Documents</span>
+              </a>
+              <a
+                href="/admin/templates"
+                className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+              >
+                <FileText className="h-4 w-4" strokeWidth={1.5} />
+                <span>Research</span>
+              </a>
+              <a
+                href="/dashboard"
+                className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+              >
+                <Calendar className="h-4 w-4" strokeWidth={1.5} />
+                <span>Calendar</span>
+              </a>
+            </nav>
+          </div>
+
+          {/* Bottom Left Navigation: Recent Matters Section */}
+          <div className="border-t border-[#E4E2DD] pt-3">
+            <p className="mb-2 px-2 font-sans text-[10px] font-bold uppercase tracking-widest text-[#45464E]">
+              Recent Matters
+            </p>
+            <div className="space-y-1">
+              {recentMatters.length === 0 ? (
+                <p className="px-2 font-serif text-xs text-[#76777F]">No recent matters</p>
+              ) : (
+                recentMatters.map((m) => (
+                  <a
+                    key={m.id}
+                    href={m.module === "contracts" ? `/contracts/${m.id}` : `/matters/${m.id}`}
+                    className="block truncate rounded-sm px-2 py-1.5 font-serif text-xs font-medium text-[#081534] transition-colors hover:bg-[#E4E2DD]"
+                  >
+                    {m.title}
+                  </a>
+                ))
+              )}
+            </div>
+          </div>
         </aside>
 
         {/* Main Workspace Canvas */}
