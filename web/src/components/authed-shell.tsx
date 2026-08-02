@@ -34,6 +34,17 @@ export function AuthedShell({
   const [session, setSession] = useState<Session | null | "loading">("loading");
   const [jurisdiction, setJurisdiction] = useState<string>("Delhi");
   const [recentMatters, setRecentMatters] = useState<Matter[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+
+  const loadAdvocateProfile = () => {
+    const saved = localStorage.getItem("vidhidesk_advocate_profile");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
+      } catch {}
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -47,6 +58,17 @@ export function AuthedShell({
       }
     });
 
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.user_metadata?.avatar_url) {
+        setAvatarUrl(data.user.user_metadata.avatar_url);
+      }
+    });
+
+    loadAdvocateProfile();
+
+    const handleProfileUpdate = () => loadAdvocateProfile();
+    window.addEventListener("advocate_profile_updated", handleProfileUpdate);
+
     const savedJurisdiction = localStorage.getItem("vidhidesk_jurisdiction");
     if (savedJurisdiction) {
       setJurisdiction(savedJurisdiction);
@@ -55,7 +77,10 @@ export function AuthedShell({
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       if (!s) router.push("/login");
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      sub.subscription.unsubscribe();
+      window.removeEventListener("advocate_profile_updated", handleProfileUpdate);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -107,35 +132,28 @@ export function AuthedShell({
             </select>
           </div>
 
-          <a
-            href="/admin/templates"
-            className="font-sans text-xs font-medium uppercase tracking-wider text-[#45464E] transition-colors hover:text-[#081534] hover:underline"
-          >
-            Templates
-          </a>
-
-          <a
-            href="/security"
-            className="font-sans text-xs font-medium uppercase tracking-wider text-[#45464E] transition-colors hover:text-[#081534] hover:underline"
-          >
-            Security
-          </a>
-
           {/* Notifications Icon with Badge (Stitch Approved Design) */}
           <div className="relative cursor-pointer text-[#45464E] transition-colors hover:text-[#081534]" title="Notifications">
             <Bell className="h-4 w-4" strokeWidth={1.5} />
             <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#7A2A2A]"></span>
           </div>
 
-          {/* Settings Icon */}
-          <a href="/security" className="text-[#45464E] transition-colors hover:text-[#081534]" title="Settings">
+          {/* Settings Icon — Opens Profile & Credentials Page */}
+          <a href="/profile" className="text-[#45464E] transition-colors hover:text-[#081534]" title="Advocate Settings & Credentials">
             <Settings className="h-4 w-4" strokeWidth={1.5} />
           </a>
 
-          {/* User Profile Avatar Frame */}
-          <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#E4E2DD] bg-[#F0EEE9] text-[#081534]" title="Advocate Profile">
-            <User className="h-4 w-4" strokeWidth={1.5} />
-          </div>
+          {/* User Profile Avatar Frame — Opens Profile & Photo Upload */}
+          <a href="/profile" title="Edit Advocate Profile & Photo">
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-sm border border-[#E4E2DD] bg-[#F0EEE9] text-[#081534] transition-all hover:border-[#081534]">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="Advocate Profile" className="h-full w-full object-cover" />
+              ) : (
+                <User className="h-4 w-4" strokeWidth={1.5} />
+              )}
+            </div>
+          </a>
 
           <Button
             variant="outline"
@@ -158,7 +176,7 @@ export function AuthedShell({
       </div>
 
       <div className="flex">
-        {/* Left Sidebar Navigation (Desktop Viewports) */}
+        {/* Left Sidebar Navigation (Exact Stitch Approved Design) */}
         <aside className="sticky top-16 hidden h-[calc(100vh-64px)] w-64 shrink-0 flex-col justify-between gap-4 border-r border-[#E4E2DD] bg-[#F0EEE9] p-4 md:flex">
           <div className="space-y-4">
             <a href="/contracts">
@@ -184,7 +202,7 @@ export function AuthedShell({
                 <span>Matter List</span>
               </a>
               <a
-                href="/contracts"
+                href="/documents"
                 className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
               >
                 <FolderKanban className="h-4 w-4" strokeWidth={1.5} />
@@ -195,10 +213,10 @@ export function AuthedShell({
                 className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
               >
                 <FileText className="h-4 w-4" strokeWidth={1.5} />
-                <span>Research</span>
+                <span>Research / Drafts</span>
               </a>
               <a
-                href="/dashboard"
+                href="/calendar"
                 className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
               >
                 <Calendar className="h-4 w-4" strokeWidth={1.5} />
@@ -242,17 +260,17 @@ export function AuthedShell({
           <LayoutDashboard className="h-4 w-4" strokeWidth={1.5} />
           <span className="font-sans text-[10px] font-semibold">Home</span>
         </a>
-        <a href="/contracts" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
+        <a href="/documents" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
           <FolderKanban className="h-4 w-4" strokeWidth={1.5} />
-          <span className="font-sans text-[10px] font-medium">Matters</span>
+          <span className="font-sans text-[10px] font-medium">Documents</span>
         </a>
         <a href="/admin/templates" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
           <FileText className="h-4 w-4" strokeWidth={1.5} />
           <span className="font-sans text-[10px] font-medium">Research</span>
         </a>
-        <a href="/security" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
-          <ShieldCheck className="h-4 w-4" strokeWidth={1.5} />
-          <span className="font-sans text-[10px] font-medium">Security</span>
+        <a href="/calendar" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
+          <Calendar className="h-4 w-4" strokeWidth={1.5} />
+          <span className="font-sans text-[10px] font-medium">Calendar</span>
         </a>
       </div>
     </div>
