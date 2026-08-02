@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ibm-sans",
 });
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+
+const ibmPlexSerif = IBM_Plex_Serif({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-ibm-serif",
 });
 
 export const metadata: Metadata = {
-  title: "VidhiDesk",
+  title: "VidhiDesk — AI Legal Assistant",
   description: "AI legal assistant — advocate-reviewed drafting and research.",
 };
 
@@ -25,8 +26,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geistSans.variable, geistMono.variable)}>
-      <body className="antialiased">{children}</body>
+    <html
+      lang="en"
+      className={cn("font-sans", ibmPlexSans.variable, ibmPlexSerif.variable)}
+    >
+      <body className="antialiased bg-background text-foreground">{children}</body>
     </html>
   );
 }
+
