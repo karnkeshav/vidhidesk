@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
-import { User, Upload, CheckCircle2, ShieldCheck, Camera, Save } from "lucide-react";
+import { User, Upload, CheckCircle2, ShieldCheck, Camera, Save, KeyRound, Mail } from "lucide-react";
 
 export type AdvocateProfile = {
   full_name: string;
@@ -28,9 +28,19 @@ export default function ProfilePage() {
     office_address: "Chamber No. 412, Lawyers Chambers Block, High Court of Delhi, New Delhi",
     avatar_url: "",
   });
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
+
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [emailResetSuccess, setEmailResetSuccess] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -114,6 +124,58 @@ export default function ProfilePage() {
     }
   };
 
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(false);
+
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const { error: err } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (err) throw err;
+
+      setPasswordSuccess(true);
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!profile.email) return;
+    setSendingResetEmail(true);
+    setPasswordError(null);
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(profile.email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      if (err) throw err;
+
+      setEmailResetSuccess(true);
+      setTimeout(() => setEmailResetSuccess(false), 5000);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSendingResetEmail(false);
+    }
+  };
+
   return (
     <AuthedShell>
       <div className="mx-auto max-w-4xl space-y-6">
@@ -122,7 +184,7 @@ export default function ProfilePage() {
             Advocate Profile & Settings
           </h1>
           <p className="font-serif text-sm text-[#45464E]">
-            Manage your professional credentials, chamber details, and profile photo.
+            Manage your professional credentials, chamber details, profile photo, and password security.
           </p>
         </div>
 
@@ -311,6 +373,97 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </form>
+
+        {/* Security & Password Reset Section */}
+        <Card className="rounded-sm border border-[#E4E2DD] bg-white p-6 shadow-none">
+          <CardHeader className="p-0 pb-4">
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-[#081534]" strokeWidth={1.5} />
+              <CardTitle className="font-sans text-base font-semibold text-[#081534]">
+                Password Reset & Security
+              </CardTitle>
+            </div>
+            <CardDescription className="font-serif text-xs text-[#45464E]">
+              Update your advocate password or send a password reset link to your registered email.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4 p-0 pt-4">
+            {passwordSuccess && (
+              <div className="flex items-center gap-2 rounded-sm border border-[#C3E6CB] bg-[#D4EDDA] p-3 font-sans text-xs font-semibold text-[#155724]">
+                <CheckCircle2 className="h-4 w-4" />
+                Password updated successfully in Supabase!
+              </div>
+            )}
+
+            {emailResetSuccess && (
+              <div className="flex items-center gap-2 rounded-sm border border-[#C3E6CB] bg-[#D4EDDA] p-3 font-sans text-xs font-semibold text-[#155724]">
+                <CheckCircle2 className="h-4 w-4" />
+                Password reset email sent to {profile.email}! Check your inbox.
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="rounded-sm border border-[#F8D7DA] bg-[#FFF5F5] p-3 font-sans text-xs text-[#7A2A2A]">
+                {passwordError}
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordUpdate} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="font-sans text-xs font-semibold text-[#081534]">
+                    New Password
+                  </label>
+                  <Input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="h-9 rounded-sm border-[#E4E2DD] font-sans text-xs text-[#1A1A1A]"
+                    placeholder="Enter new password (min 6 chars)"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-sans text-xs font-semibold text-[#081534]">
+                    Confirm New Password
+                  </label>
+                  <Input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="h-9 rounded-sm border-[#E4E2DD] font-sans text-xs text-[#1A1A1A]"
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="h-9 gap-2 rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white transition-colors hover:bg-[#1E2A4A]"
+                >
+                  <KeyRound className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  {savingPassword ? "Updating Password..." : "Update Password"}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSendResetEmail}
+                  disabled={sendingResetEmail || !profile.email}
+                  className="h-9 gap-2 rounded-sm border-[#E4E2DD] font-sans text-xs font-semibold text-[#081534] hover:bg-[#FBF9F4]"
+                >
+                  <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  {sendingResetEmail ? "Sending Reset Email..." : "Send Reset Link to Email"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </AuthedShell>
   );
