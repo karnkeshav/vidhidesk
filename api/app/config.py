@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_key: str = ""
 
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:3000,
+    "https://vidhidesk.vercel.app"]
 
 
 @lru_cache
