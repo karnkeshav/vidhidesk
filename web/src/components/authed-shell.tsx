@@ -158,7 +158,7 @@ export function AuthedShell({
       </div>
 
       <div className="flex">
-        {/* Left Sidebar Navigation (Exact Stitch Approved Design) */}
+        {/* Left Sidebar Navigation (Desktop Viewports) */}
         <aside className="sticky top-16 hidden h-[calc(100vh-64px)] w-64 shrink-0 flex-col justify-between gap-4 border-r border-[#E4E2DD] bg-[#F0EEE9] p-4 md:flex">
           <div className="space-y-4">
             <a href="/contracts">
@@ -231,9 +231,29 @@ export function AuthedShell({
         </aside>
 
         {/* Main Workspace Canvas */}
-        <main className={cn("w-full min-w-0 p-4 md:p-6", wide ? "max-w-7xl" : "max-w-6xl")}>
+        <main className={cn("w-full min-w-0 p-4 pb-20 md:p-6 md:pb-6", wide ? "max-w-7xl" : "max-w-6xl")}>
           {children}
         </main>
+      </div>
+
+      {/* Bottom Mobile Navigation Bar (Mobile Viewports Only - Stitch Approved Layout) */}
+      <div className="fixed bottom-0 left-0 z-40 flex w-full items-center justify-around border-t border-[#E4E2DD] bg-white py-2 shadow-lg md:hidden">
+        <a href="/dashboard" className="flex flex-col items-center gap-0.5 text-[#081534]">
+          <LayoutDashboard className="h-4 w-4" strokeWidth={1.5} />
+          <span className="font-sans text-[10px] font-semibold">Home</span>
+        </a>
+        <a href="/contracts" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
+          <FolderKanban className="h-4 w-4" strokeWidth={1.5} />
+          <span className="font-sans text-[10px] font-medium">Matters</span>
+        </a>
+        <a href="/admin/templates" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
+          <FileText className="h-4 w-4" strokeWidth={1.5} />
+          <span className="font-sans text-[10px] font-medium">Research</span>
+        </a>
+        <a href="/security" className="flex flex-col items-center gap-0.5 text-[#45464E] transition-colors hover:text-[#081534]">
+          <ShieldCheck className="h-4 w-4" strokeWidth={1.5} />
+          <span className="font-sans text-[10px] font-medium">Security</span>
+        </a>
       </div>
     </div>
   );
