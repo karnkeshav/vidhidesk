@@ -1,119 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { AuthedShell } from "@/components/authed-shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { createMatter, listMatters, Matter } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { listMatters, Matter } from "@/lib/api";
 
-const MODULES: Matter["module"][] = ["litigation", "contracts", "rera", "consulting"];
-
+// The Contracts module (via /contracts) is the only module with a real
+// per-matter workflow (template selection -> intake form -> draft ->
+// clause review) as of Sprint 2. litigation/rera/consulting have no
+// module-specific UI yet, so this page is deliberately a read-only
+// overview, not a matter-creation form — an earlier generic "New
+// matter" form here let a matter be created without a template
+// attached, landing on a bare, unfinished chat page regardless of which
+// module was picked. Removed 2026-08-02 ahead of Nitesh's first login,
+// rather than leaving a control that only works for one of its four
+// listed options.
 export default function DashboardPage() {
-  const router = useRouter();
   const [matters, setMatters] = useState<Matter[]>([]);
-  const [title, setTitle] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [module, setModule] = useState<Matter["module"]>("litigation");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function refresh() {
-    try {
-      setMatters(await listMatters());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }
 
   useEffect(() => {
-    void refresh();
+    listMatters()
+      .then(setMatters)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const matter = await createMatter({
-        title,
-        client_name: clientName || undefined,
-        module,
-      });
-      setTitle("");
-      setClientName("");
-      router.push(`/matters/${matter.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <AuthedShell>
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>New matter</CardTitle>
-            <CardDescription>
-              Sprint 0 scope: create a matter and send a chat message. Module
-              workspaces come later.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" required value={title} onChange={(e) => setTitle(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="client">Client name (optional)</Label>
-                <Input
-                  id="client"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Used to auto-mask PII before any LLM call"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="module">Module</Label>
-                <select
-                  id="module"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={module}
-                  onChange={(e) => setModule(e.target.value as Matter["module"])}
-                >
-                  {MODULES.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={busy}>
-                Create matter
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold">Your matters</h1>
+          <a href="/contracts">
+            <Button>Start a new contract</Button>
+          </a>
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="space-y-2">
-          <h2 className="text-sm font-medium text-muted-foreground">Your matters</h2>
-          {matters.length === 0 && (
-            <p className="text-sm text-muted-foreground">No matters yet.</p>
+          {matters.length === 0 && !error && (
+            <p className="text-sm text-muted-foreground">
+              No matters yet — start one from Contracts above.
+            </p>
           )}
           {matters.map((m) => (
-            <a key={m.id} href={`/matters/${m.id}`} className="block">
+            <a
+              key={m.id}
+              href={m.module === "contracts" ? `/contracts/${m.id}` : `/matters/${m.id}`}
+              className="block"
+            >
               <Card className="transition hover:bg-accent">
                 <CardContent className="flex items-center justify-between py-4">
                   <div>

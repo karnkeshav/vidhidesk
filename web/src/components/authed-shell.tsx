@@ -44,6 +44,9 @@ export function AuthedShell({
           VidhiDesk
         </a>
         <div className="flex items-center gap-4">
+          <a href="/admin/templates" className="text-sm text-muted-foreground underline">
+            Template Review
+          </a>
           <a href="/security" className="text-sm text-muted-foreground underline">
             Security
           </a>
