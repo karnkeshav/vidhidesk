@@ -17,6 +17,9 @@ import {
   Calendar,
   Plus,
   Gavel,
+  Bell,
+  Settings,
+  User,
 } from "lucide-react";
 
 export function AuthedShell({
@@ -88,7 +91,7 @@ export function AuthedShell({
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 md:gap-4">
+        <div className="flex flex-wrap items-center gap-3 md:gap-5">
           <div className="flex items-center gap-1.5 rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] px-2.5 py-1">
             <Globe className="h-3.5 w-3.5 text-[#45464E]" strokeWidth={1.5} />
             <span className="font-sans text-xs font-medium text-[#45464E]">State:</span>
@@ -117,6 +120,22 @@ export function AuthedShell({
           >
             Security
           </a>
+
+          {/* Notifications Icon with Badge (Stitch Approved Design) */}
+          <div className="relative cursor-pointer text-[#45464E] transition-colors hover:text-[#081534]" title="Notifications">
+            <Bell className="h-4 w-4" strokeWidth={1.5} />
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#7A2A2A]"></span>
+          </div>
+
+          {/* Settings Icon */}
+          <a href="/security" className="text-[#45464E] transition-colors hover:text-[#081534]" title="Settings">
+            <Settings className="h-4 w-4" strokeWidth={1.5} />
+          </a>
+
+          {/* User Profile Avatar Frame */}
+          <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#E4E2DD] bg-[#F0EEE9] text-[#081534]" title="Advocate Profile">
+            <User className="h-4 w-4" strokeWidth={1.5} />
+          </div>
 
           <Button
             variant="outline"
