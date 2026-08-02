@@ -6,7 +6,16 @@ import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ShieldCheck, Globe, LogOut } from "lucide-react";
+import {
+  ShieldCheck,
+  Globe,
+  LogOut,
+  LayoutDashboard,
+  FolderKanban,
+  FileText,
+  BookOpen,
+  Plus,
+} from "lucide-react";
 
 export function AuthedShell({
   children,
@@ -57,7 +66,8 @@ export function AuthedShell({
 
   return (
     <div className="min-h-screen bg-[#FBF9F4] font-sans text-[#1A1A1A]">
-      <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-4 border-b border-[#E4E2DD] bg-white px-4 py-3 md:px-8">
+      {/* Top Header Navigation Bar */}
+      <header className="sticky top-0 z-30 flex h-16 flex-wrap items-center justify-between gap-4 border-b border-[#E4E2DD] bg-white px-4 md:px-8">
         <div className="flex items-center gap-3">
           <a href="/dashboard" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-[#081534] text-white">
@@ -117,13 +127,58 @@ export function AuthedShell({
         </div>
       </header>
 
+      {/* Advocate Review Banner */}
       <div className="border-b border-[#E4E2DD] bg-[#FFFBEB] px-4 py-2 text-center text-xs font-sans font-medium text-[#92400E]">
         AI-generated draft for advocate review. Not legal advice.
       </div>
 
-      <main className={cn("mx-auto p-4 md:p-8", wide ? "max-w-7xl" : "max-w-6xl")}>
-        {children}
-      </main>
+      <div className="flex">
+        {/* Left Sidebar Navigation (Stitch Approved Design) */}
+        <aside className="sticky top-16 hidden h-[calc(100vh-64px)] w-64 shrink-0 flex-col gap-4 border-r border-[#E4E2DD] bg-[#F0EEE9] p-4 md:flex">
+          <a href="/contracts">
+            <Button className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#081534] py-2.5 font-sans text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-[#1E2A4A]">
+              <Plus className="h-4 w-4" strokeWidth={1.5} />
+              New Contract
+            </Button>
+          </a>
+
+          <nav className="flex flex-col gap-1">
+            <a
+              href="/dashboard"
+              className="flex items-center gap-3 rounded-sm bg-[#1E2A4A] p-2.5 font-sans text-xs font-semibold text-white"
+            >
+              <LayoutDashboard className="h-4 w-4" strokeWidth={1.5} />
+              <span>Dashboard</span>
+            </a>
+            <a
+              href="/contracts"
+              className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+            >
+              <FolderKanban className="h-4 w-4" strokeWidth={1.5} />
+              <span>Contracts</span>
+            </a>
+            <a
+              href="/admin/templates"
+              className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+            >
+              <FileText className="h-4 w-4" strokeWidth={1.5} />
+              <span>Templates</span>
+            </a>
+            <a
+              href="/security"
+              className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+            >
+              <BookOpen className="h-4 w-4" strokeWidth={1.5} />
+              <span>Security</span>
+            </a>
+          </nav>
+        </aside>
+
+        {/* Main Workspace Canvas */}
+        <main className={cn("w-full min-w-0 p-4 md:p-6", wide ? "max-w-7xl" : "max-w-6xl")}>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
