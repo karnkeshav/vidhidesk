@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import citations, health, matters, retrieval
+from app.routers import citations, contracts, health, matters, retrieval
 
 app = FastAPI(title="VidhiDesk API", version="0.1.0")
 
@@ -19,3 +19,4 @@ app.include_router(health.router)
 app.include_router(matters.router)
 app.include_router(citations.router)
 app.include_router(retrieval.router)
+app.include_router(contracts.router)

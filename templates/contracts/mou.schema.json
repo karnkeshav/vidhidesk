@@ -1,0 +1,55 @@
+{
+  "template_key": "mou",
+  "title": "Memorandum of Understanding",
+  "fields": [
+    {"key": "party_a_name", "label": "Party A — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_a_entity_type", "label": "Party A — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_a_address", "label": "Party A — Registered / Residential Address", "type": "textarea", "required": true},
+    {"key": "party_b_name", "label": "Party B — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_b_entity_type", "label": "Party B — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_b_address", "label": "Party B — Registered / Residential Address", "type": "textarea", "required": true},
+    {
+      "key": "purpose", "label": "Purpose / Background of the Understanding", "type": "textarea", "required": true,
+      "help": "Free text — describe the intended collaboration or objective. The recitals are drafted from this."
+    },
+    {
+      "key": "confidentiality_direction", "label": "Confidentiality", "type": "select", "required": true,
+      "options": [
+        {"value": "mutual", "label": "Mutual (both parties may disclose)"},
+        {"value": "one_way_from_a", "label": "One-way (Party A discloses to Party B)"},
+        {"value": "one_way_from_b", "label": "One-way (Party B discloses to Party A)"}
+      ],
+      "help": "MoUs are commonly mutual — both parties often share sensitive information while exploring the collaboration. Pick the direction that actually applies to this matter."
+    },
+    {
+      "key": "confidentiality_survival_period", "label": "Confidentiality — Survival Period After Termination", "type": "text",
+      "required": true, "help": "e.g. '3 years' or '5 years'"
+    },
+    {
+      "key": "term_duration", "label": "Term / Duration", "type": "text", "required": true,
+      "help": "e.g. '6 months from the Effective Date, or until superseded by a definitive agreement between the Parties, whichever is earlier'"
+    },
+    {
+      "key": "termination_notice_period", "label": "Termination — Notice Period", "type": "text",
+      "required": true, "help": "e.g. '15 days'"
+    },
+    {
+      "key": "state", "label": "Governing State", "type": "select", "required": true,
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"]
+    },
+    {"key": "arbitration", "label": "Include Arbitration Clause?", "type": "boolean", "default": false},
+    {
+      "key": "arbitration_seat", "label": "Arbitration Seat (city)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "arbitration", "equals": true}
+    },
+    {"key": "effective_date", "label": "Effective Date", "type": "date", "required": true}
+  ]
+}

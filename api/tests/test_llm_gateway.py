@@ -59,6 +59,35 @@ def test_fails_over_gemini_to_groq_on_rate_limit(settings):
 
 
 @respx.mock
+def test_success_log_line_reports_final_provider_and_failed_providers(settings, caplog):
+    """Observability gap found live (2026-08-01): a warning line per
+    failed attempt already existed, but nothing on the eventual success
+    line said which providers had already failed for *that* request —
+    with multiple concurrent generate() calls (one per llm_fillable
+    clause in a single Contracts draft), failures and successes
+    interleave in the log and can't be correlated. failed_providers on
+    the success line closes that."""
+    respx.post(url__startswith="https://generativelanguage.googleapis.com").mock(
+        return_value=httpx.Response(429, json={"error": "rate limited"})
+    )
+    respx.post("https://api.groq.com/openai/v1/chat/completions").mock(
+        return_value=httpx.Response(500, text="server error")
+    )
+    respx.post("https://api.sambanova.ai/v1/chat/completions").mock(
+        return_value=_openai_ok("SambaNova says hi")
+    )
+
+    with caplog.at_level("INFO", logger="vidhidesk.llm_gateway"):
+        result = generate("hello", settings=settings)
+
+    assert result.provider == "sambanova"
+    success_lines = [r.message for r in caplog.records if "status=ok" in r.message]
+    assert len(success_lines) == 1
+    assert "provider=sambanova" in success_lines[0]
+    assert "failed_providers=['gemini', 'groq']" in success_lines[0]
+
+
+@respx.mock
 def test_fails_over_through_full_chain_to_cerebras(settings):
     respx.post(url__startswith="https://generativelanguage.googleapis.com").mock(
         return_value=httpx.Response(500, text="server error")

@@ -1,0 +1,114 @@
+{
+  "template_key": "consultancy",
+  "title": "Consultancy Agreement",
+  "fields": [
+    {"key": "party_a_name", "label": "Consultant — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_a_entity_type", "label": "Consultant — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_a_address", "label": "Consultant — Registered / Residential Address", "type": "textarea", "required": true},
+    {"key": "party_b_name", "label": "Client — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_b_entity_type", "label": "Client — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_b_address", "label": "Client — Registered / Residential Address", "type": "textarea", "required": true},
+    {
+      "key": "purpose", "label": "Purpose / Business Context", "type": "textarea", "required": true,
+      "help": "Free text — describe the engagement. The recitals and Scope of Consulting Services are drafted from this."
+    },
+    {
+      "key": "scope_notes", "label": "Additional Scope Detail (optional)", "type": "textarea",
+      "required": false, "default": "",
+      "help": "Extra detail for the Scope of Consulting Services clause beyond Purpose — e.g. specific areas of advice, cadence of engagement."
+    },
+    {
+      "key": "deliverables", "label": "Deliverables (optional)", "type": "list", "required": false,
+      "item_singular_label": "Deliverable", "min_items": 0, "max_items": null,
+      "help": "Leave empty for an advisory/retainer engagement with no itemized deliverables — the Scope of Consulting Services clause will describe the engagement narratively instead.",
+      "item_schema": [
+        {"key": "description", "label": "Description", "type": "textarea", "required": true},
+        {"key": "due_date", "label": "Due Date", "type": "date", "required": false, "default": ""}
+      ]
+    },
+    {
+      "key": "fee_structure", "label": "Fee Structure", "type": "select", "required": true,
+      "options": ["Fixed Fee", "Hourly Rate", "Milestone-Based", "Retainer"]
+    },
+    {
+      "key": "fee_amount", "label": "Fee Amount", "type": "text", "required": false, "default": "",
+      "condition": {"field": "fee_structure", "not_equals": "Retainer"},
+      "help": "Enter the fee amount as it should read in the clause, e.g. '₹1,50,000' or '₹5,000 per hour' — this is substituted verbatim, not LLM-smoothed, so format it exactly as it should appear in the document."
+    },
+    {
+      "key": "payment_frequency", "label": "Payment Frequency", "type": "select", "required": false,
+      "options": ["Monthly", "Upon Milestone Completion", "Upfront", "Net 30 from Invoice"],
+      "condition": {"field": "fee_structure", "not_equals": "Retainer"}
+    },
+    {
+      "key": "retainer_fee_amount", "label": "Retainer Fee Amount", "type": "text", "required": false, "default": "",
+      "condition": {"field": "fee_structure", "equals": "Retainer"},
+      "help": "e.g. '₹50,000 per month' — substituted verbatim."
+    },
+    {
+      "key": "retainer_frequency", "label": "Retainer Billing Frequency", "type": "select", "required": false,
+      "options": ["Monthly", "Quarterly"],
+      "condition": {"field": "fee_structure", "equals": "Retainer"}
+    },
+    {
+      "key": "retainer_scope_hours", "label": "Retainer Hours Cap (optional)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "fee_structure", "equals": "Retainer"},
+      "help": "e.g. 'up to 20 hours per month' — leave blank if the retainer is uncapped."
+    },
+    {
+      "key": "late_payment_interest_rate", "label": "Late Payment Interest Rate", "type": "text", "required": true,
+      "help": "e.g. '18% per annum' or '1.5% per month, compounding monthly'"
+    },
+    {
+      "key": "ip_ownership_model", "label": "IP Ownership Model", "type": "select", "required": true,
+      "options": [
+        "Full Assignment to Client",
+        "License Grant to Client (Consultant Retains Ownership)",
+        "Custom / Negotiated"
+      ]
+    },
+    {
+      "key": "ip_carveout_notes", "label": "Pre-existing IP / Carve-outs (optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {
+      "key": "confidentiality_direction", "label": "Confidentiality", "type": "select", "required": true,
+      "options": [
+        {"value": "mutual", "label": "Mutual (both parties may disclose)"},
+        {"value": "one_way_from_client", "label": "One-way (Client discloses to Consultant)"},
+        {"value": "one_way_from_consultant", "label": "One-way (Consultant discloses to Client)"}
+      ],
+      "help": "Consulting engagements are commonly mutual — the Consultant often shares its own methodology/frameworks while the Client shares business information. Pick the direction that actually applies to this matter."
+    },
+    {
+      "key": "confidentiality_survival_period", "label": "Confidentiality — Survival Period After Termination", "type": "text",
+      "required": true, "help": "e.g. '3 years' or '5 years'"
+    },
+    {
+      "key": "term_duration", "label": "Term / Duration", "type": "text", "required": true,
+      "help": "e.g. '12 months from the Effective Date', or 'until either Party terminates on notice' for an open-ended retainer"
+    },
+    {
+      "key": "termination_notice_period", "label": "Termination for Convenience — Notice Period", "type": "text",
+      "required": true, "help": "e.g. '30 days'"
+    },
+    {
+      "key": "state", "label": "Governing State", "type": "select", "required": true,
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"]
+    },
+    {"key": "arbitration", "label": "Include Arbitration Clause?", "type": "boolean", "default": false},
+    {
+      "key": "arbitration_seat", "label": "Arbitration Seat (city)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "arbitration", "equals": true}
+    },
+    {"key": "effective_date", "label": "Effective Date", "type": "date", "required": true}
+  ]
+}

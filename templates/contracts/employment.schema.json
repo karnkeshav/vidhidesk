@@ -1,0 +1,66 @@
+{
+  "template_key": "employment",
+  "title": "Employment Agreement",
+  "fields": [
+    {"key": "party_a_name", "label": "Employer — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_a_entity_type", "label": "Employer — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_a_address", "label": "Employer — Registered / Principal Address", "type": "textarea", "required": true},
+    {"key": "party_b_name", "label": "Employee — Full Legal Name", "type": "text", "required": true},
+    {"key": "party_b_address", "label": "Employee — Residential Address", "type": "textarea", "required": true},
+    {"key": "designation", "label": "Designation", "type": "text", "required": true, "help": "e.g. 'Senior Software Engineer'"},
+    {"key": "department", "label": "Department", "type": "text", "required": true, "help": "e.g. 'Engineering'"},
+    {
+      "key": "reporting_to", "label": "Reporting To (optional)", "type": "text",
+      "required": false, "default": "", "help": "e.g. 'the Engineering Manager'"
+    },
+    {
+      "key": "duties_description", "label": "Duties and Responsibilities", "type": "textarea", "required": true,
+      "help": "Free text — describe the employee's key duties and responsibilities. The Duties clause is drafted from this."
+    },
+    {
+      "key": "employment_type", "label": "Employment Type", "type": "select", "required": true,
+      "options": ["Full-Time", "Part-Time", "Fixed-Term"]
+    },
+    {
+      "key": "fixed_term_end_date", "label": "Fixed-Term End Date", "type": "date",
+      "required": false, "default": "", "condition": {"field": "employment_type", "equals": "Fixed-Term"}
+    },
+    {"key": "has_probation", "label": "Include a Probation Period?", "type": "boolean", "default": false},
+    {
+      "key": "probation_period", "label": "Probation Period", "type": "text",
+      "required": false, "default": "", "condition": {"field": "has_probation", "equals": true},
+      "help": "e.g. '3 months' or '6 months'"
+    },
+    {
+      "key": "annual_ctc", "label": "Annual CTC", "type": "text", "required": true,
+      "help": "Enter the amount as it should read in the clause, e.g. '₹12,00,000 per annum' — substituted verbatim, not LLM-smoothed."
+    },
+    {
+      "key": "other_benefits", "label": "Other Benefits (optional)", "type": "textarea",
+      "required": false, "default": "", "help": "e.g. 'health insurance, meal vouchers, annual bonus eligibility'"
+    },
+    {
+      "key": "state", "label": "Governing State", "type": "select", "required": true,
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"]
+    },
+    {
+      "key": "termination_notice_period", "label": "Termination — Notice Period (post-probation)", "type": "text",
+      "required": true, "help": "e.g. '30 days' or '1 month'"
+    },
+    {
+      "key": "non_compete_notes", "label": "Restrictive Covenant Notes (optional)", "type": "textarea",
+      "required": false, "default": "",
+      "help": "Any specific non-solicitation or confidentiality-adjacent restriction to consider — post-termination non-competes are largely unenforceable in India (Section 27, Indian Contract Act, 1872) and will be flagged accordingly."
+    },
+    {"key": "arbitration", "label": "Include Arbitration Clause?", "type": "boolean", "default": false},
+    {
+      "key": "arbitration_seat", "label": "Arbitration Seat (city)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "arbitration", "equals": true}
+    },
+    {"key": "effective_date", "label": "Effective Date / Date of Joining", "type": "date", "required": true}
+  ]
+}

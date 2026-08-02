@@ -376,6 +376,8 @@ def mask_text(
     text: str,
     mask_map: MaskMap,
     entities: list[tuple[str, str]] | None = None,
+    *,
+    auto_detect_names: bool = True,
 ) -> str:
     """Replace known and auto-detected PII with placeholders.
 
@@ -386,12 +388,32 @@ def mask_text(
 
     Everything else runs automatically on every call, no caller input
     required:
+      - PAN, Aadhaar, email, phone numbers (regex) — always on, regardless
+        of `auto_detect_names`. These are precise structural patterns
+        (digit/letter shape), not prose heuristics, so they carry no
+        meaningful false-positive risk against ordinary English text.
       - person names (Title-Case run detection, spaCy-filtered — see
-        _detect_person_names)
-      - company names carrying an Indian corporate suffix
-        (Pvt Ltd / Private Limited / LLP / Ltd / Limited)
-      - postal addresses (house/plot number + a recognised address keyword)
-      - PAN, Aadhaar, email, phone numbers (regex)
+        _detect_person_names), company names carrying an Indian corporate
+        suffix, and postal addresses — gated behind `auto_detect_names`
+        (see below).
+
+    `auto_detect_names` (TICKET-1, Sprint 2 postmortem): the Title-Case-run
+    heuristic that makes person-name detection work on contextless Indian
+    names ("Ramesh Kumar" with no surrounding cues) is, by the same
+    permissive design, prone to false-positiving on ordinary two-word
+    capitalized legal phrases — "NOW THEREFORE", "Governing Law" — when
+    they're not really "text a client typed" but boilerplate a caller
+    wrote itself (e.g. a Contracts clause-fill prompt's own instructions).
+    Masking a caller's own template scaffolding isn't just noise: it
+    corrupts the literal instruction sent to the LLM ("Draft the PARTY_D
+    and Dispute Resolution clause..."). Callers whose `text` is a mix of
+    their own static prompt wording and already-sanitized user data
+    (values that went through a *separate* mask_text() call before being
+    interpolated in) should pass `auto_detect_names=False` — real PII was
+    already caught at the point it was genuinely user-supplied; this flag
+    only stops re-scanning prose the caller itself authored. Callers whose
+    `text` is entirely user-authored (e.g. a raw chat message) should
+    leave this at the default True, unchanged from prior behaviour.
 
     All detection runs against the original `text` so entity boundaries
     aren't thrown off by earlier substitutions; substitution itself is
@@ -413,14 +435,15 @@ def mask_text(
 
         masked = pattern.sub(_replace, masked)
 
-    for company in _detect_companies(text):
-        masked = _mask_value(masked, mask_map, "PARTY", company)
+    if auto_detect_names:
+        for company in _detect_companies(text):
+            masked = _mask_value(masked, mask_map, "PARTY", company)
 
-    for person in _detect_person_names(text):
-        masked = _mask_value(masked, mask_map, "PARTY", person)
+        for person in _detect_person_names(text):
+            masked = _mask_value(masked, mask_map, "PARTY", person)
 
-    for address in _detect_addresses(text):
-        masked = _mask_value(masked, mask_map, "ADDR", address)
+        for address in _detect_addresses(text):
+            masked = _mask_value(masked, mask_map, "ADDR", address)
 
     return masked
 

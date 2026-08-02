@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-export function AuthedShell({ children }: { children: ReactNode }) {
+export function AuthedShell({
+  children,
+  wide = false,
+}: {
+  children: ReactNode;
+  /** Wider content column for two-panel layouts (e.g. clause review). */
+  wide?: boolean;
+}) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null | "loading">("loading");
 
@@ -54,7 +62,7 @@ export function AuthedShell({ children }: { children: ReactNode }) {
       <div className="border-b bg-amber-50 px-6 py-2 text-center text-xs text-amber-900">
         AI-generated draft for advocate review. Not legal advice.
       </div>
-      <main className="mx-auto max-w-3xl p-6">{children}</main>
+      <main className={cn("mx-auto p-6", wide ? "max-w-6xl" : "max-w-3xl")}>{children}</main>
     </div>
   );
 }

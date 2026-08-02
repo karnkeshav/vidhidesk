@@ -1,0 +1,109 @@
+{
+  "template_key": "service_agreement",
+  "title": "Service Agreement",
+  "fields": [
+    {"key": "party_a_name", "label": "Service Provider — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_a_entity_type", "label": "Service Provider — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_a_address", "label": "Service Provider — Registered / Residential Address", "type": "textarea", "required": true},
+    {"key": "party_b_name", "label": "Client — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_b_entity_type", "label": "Client — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_b_address", "label": "Client — Registered / Residential Address", "type": "textarea", "required": true},
+    {
+      "key": "purpose", "label": "Purpose / Business Context", "type": "textarea", "required": true,
+      "help": "Free text — describe the engagement. The recitals are drafted from this."
+    },
+    {
+      "key": "deliverables", "label": "Deliverables", "type": "list", "required": true,
+      "item_singular_label": "Deliverable", "min_items": 1, "max_items": null,
+      "item_schema": [
+        {"key": "description", "label": "Description", "type": "textarea", "required": true},
+        {"key": "due_date", "label": "Due Date", "type": "date", "required": false, "default": ""}
+      ]
+    },
+    {
+      "key": "fee_structure", "label": "Fee Structure", "type": "select", "required": true,
+      "options": ["Fixed Fee", "Hourly Rate", "Milestone-Based"]
+    },
+    {
+      "key": "fee_amount", "label": "Fee Amount", "type": "text", "required": true,
+      "help": "Enter the fee amount as it should read in the clause, e.g. '₹1,50,000' or '₹5,000 per hour' — this is substituted verbatim, not LLM-smoothed, so format it exactly as it should appear in the document."
+    },
+    {
+      "key": "payment_frequency", "label": "Payment Frequency", "type": "select", "required": true,
+      "options": ["Monthly", "Upon Milestone Completion", "Upfront", "Net 30 from Invoice"]
+    },
+    {
+      "key": "late_payment_interest_rate", "label": "Late Payment Interest Rate", "type": "text", "required": true,
+      "help": "e.g. '18% per annum' or '1.5% per month, compounding monthly'"
+    },
+    {"key": "include_sla", "label": "Include Service Level Terms?", "type": "boolean", "default": false},
+    {
+      "key": "sla_response_time_hours", "label": "SLA — Response Time (hours)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "include_sla", "equals": true}
+    },
+    {
+      "key": "sla_resolution_time_hours", "label": "SLA — Resolution Time (hours)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "include_sla", "equals": true}
+    },
+    {
+      "key": "sla_uptime_percentage", "label": "SLA — Uptime Commitment (%)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "include_sla", "equals": true}
+    },
+    {
+      "key": "sla_credit_terms", "label": "Service Credit / Penalty Terms", "type": "textarea",
+      "required": false, "default": "", "condition": {"field": "include_sla", "equals": true},
+      "help": "What happens if the SLA is missed — e.g. a fee credit percentage"
+    },
+    {
+      "key": "ip_ownership_model", "label": "IP Ownership Model", "type": "select", "required": true,
+      "options": [
+        "Full Assignment to Client",
+        "License Grant to Client (Provider Retains Ownership)",
+        "Custom / Negotiated"
+      ]
+    },
+    {
+      "key": "ip_carveout_notes", "label": "Pre-existing IP / Carve-outs (optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {
+      "key": "confidentiality_direction", "label": "Confidentiality", "type": "select", "required": true,
+      "options": [
+        {"value": "mutual", "label": "Mutual (both parties may disclose)"},
+        {"value": "one_way_from_client", "label": "One-way (Client discloses to Service Provider)"},
+        {"value": "one_way_from_provider", "label": "One-way (Service Provider discloses to Client)"}
+      ],
+      "help": "Service Agreements are commonly mutual — the Provider often shares its own methodology/tools while the Client shares business information. Pick the direction that actually applies to this matter."
+    },
+    {
+      "key": "confidentiality_survival_period", "label": "Confidentiality — Survival Period After Termination", "type": "text",
+      "required": true, "help": "e.g. '3 years' or '5 years'"
+    },
+    {
+      "key": "term_duration", "label": "Term / Duration", "type": "text", "required": true,
+      "help": "e.g. '12 months from the Effective Date'"
+    },
+    {
+      "key": "termination_notice_period", "label": "Termination for Convenience — Notice Period", "type": "text",
+      "required": true, "help": "e.g. '30 days'"
+    },
+    {
+      "key": "state", "label": "Governing State", "type": "select", "required": true,
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"]
+    },
+    {"key": "arbitration", "label": "Include Arbitration Clause?", "type": "boolean", "default": false},
+    {
+      "key": "arbitration_seat", "label": "Arbitration Seat (city)", "type": "text",
+      "required": false, "default": "", "condition": {"field": "arbitration", "equals": true}
+    },
+    {"key": "effective_date", "label": "Effective Date", "type": "date", "required": true}
+  ]
+}

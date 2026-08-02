@@ -1,0 +1,60 @@
+{
+  "template_key": "nda",
+  "title": "Non-Disclosure Agreement",
+  "variant_field": "nda_variant",
+  "fields": [
+    {
+      "key": "nda_variant",
+      "label": "NDA Type",
+      "type": "select",
+      "options": [
+        {"value": "mutual", "label": "Mutual (both parties disclose)"},
+        {"value": "one_way", "label": "One-way (one party discloses)"}
+      ],
+      "required": true
+    },
+    {"key": "party_a_name", "label": "Party A — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_a_entity_type", "label": "Party A — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_a_address", "label": "Party A — Registered / Residential Address", "type": "textarea", "required": true},
+    {
+      "key": "party_a_role", "label": "Party A — Role", "type": "select",
+      "options": [{"value": "disclosing", "label": "Disclosing Party"}, {"value": "receiving", "label": "Receiving Party"}],
+      "required": true,
+      "condition": {"field": "nda_variant", "equals": "one_way"}
+    },
+    {"key": "party_b_name", "label": "Party B — Full Legal Name", "type": "text", "required": true},
+    {
+      "key": "party_b_entity_type", "label": "Party B — Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "LLP", "Partnership Firm", "Proprietorship", "Other"],
+      "required": true
+    },
+    {"key": "party_b_address", "label": "Party B — Registered / Residential Address", "type": "textarea", "required": true},
+    {
+      "key": "purpose", "label": "Purpose of Disclosure / Business Context", "type": "textarea", "required": true,
+      "help": "Free text — describe why confidential information is being shared. The recitals are drafted from this."
+    },
+    {
+      "key": "confidential_items", "label": "Categories of Confidential Information (optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {
+      "key": "tenure", "label": "Term / Duration", "type": "text", "required": true,
+      "help": "e.g. '3 years from the Effective Date', or 'during the subsistence of the underlying agreement'"
+    },
+    {
+      "key": "state", "label": "Governing State", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"],
+      "required": true
+    },
+    {"key": "arbitration", "label": "Include Arbitration Clause?", "type": "boolean", "default": false},
+    {
+      "key": "arbitration_seat", "label": "Arbitration Seat (city)", "type": "text", "required": false,
+      "default": "", "condition": {"field": "arbitration", "equals": true}
+    },
+    {"key": "effective_date", "label": "Effective Date", "type": "date", "required": true}
+  ]
+}

@@ -183,6 +183,7 @@ def generate(
     entities: list[tuple[str, str]] | None = None,
     settings: Settings | None = None,
     history: list[dict] | None = None,
+    auto_detect_names: bool = True,
 ) -> GenerationResult:
     """Mask -> call providers in failover order -> unmask.
 
@@ -197,25 +198,43 @@ def generate(
     _build_history) before it ever reaches this function. generate()
     itself only masks the *current* `prompt`; it has no way to verify a
     caller-supplied history entry is safe.
+
+    `auto_detect_names` is passed straight through to mask_text() — see
+    its docstring (TICKET-1). Pass False when `prompt` mixes the caller's
+    own static wording with data that was already individually masked
+    before being interpolated in (e.g. Contracts clause-fill prompts);
+    leave it True (default) when `prompt` is entirely user-authored.
     """
     settings = settings or get_settings()
     system_prompt = SYSTEM_PROMPTS.get(task_type, SYSTEM_PROMPTS["chat"])
 
-    masked_prompt = mask_text(prompt, mask_map, entities) if mask_map else prompt
+    masked_prompt = (
+        mask_text(prompt, mask_map, entities, auto_detect_names=auto_detect_names)
+        if mask_map
+        else prompt
+    )
     turns: list[tuple[str, str]] = [
         (h["role"], h["content"]) for h in (history or [])
     ] + [("user", masked_prompt)]
 
     last_error: Exception | None = None
+    failed_providers: list[str] = []
+    # Cumulative wall-clock from the first attempt, not just the winning
+    # provider's own call — a request that failed over Gemini -> Groq ->
+    # Cerebras took the sum of all three, and that's the number that
+    # matters for capacity planning / user-perceived latency, not just
+    # whichever provider happened to finally answer.
+    sequence_start = time.monotonic()
     for provider_name, call in _providers(settings):
         start = time.monotonic()
         try:
             text, model = call(system_prompt, turns)
             latency_ms = int((time.monotonic() - start) * 1000)
+            total_latency_ms = int((time.monotonic() - sequence_start) * 1000)
             logger.info(
                 "llm_gateway.generate provider=%s model=%s task_type=%s "
-                "latency_ms=%d status=success",
-                provider_name, model, task_type, latency_ms,
+                "latency_ms=%d status=ok failed_providers=%s",
+                provider_name, model, task_type, total_latency_ms, failed_providers,
             )
             unmasked_text = unmask_text(text, mask_map) if mask_map else text
             return GenerationResult(
@@ -233,6 +252,7 @@ def generate(
                 "status=error reason=%s",
                 provider_name, task_type, latency_ms, reason,
             )
+            failed_providers.append(provider_name)
             last_error = exc
             continue
 

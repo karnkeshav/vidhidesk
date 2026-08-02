@@ -44,6 +44,22 @@ ACT_CONFIG: dict[str, dict] = {
         "act": "Carriage by Road Act, 2007",
         "year": 2007,
     },
+    "indian_contract_act_1872.pdf": {
+        "act": "Indian Contract Act, 1872",
+        "year": 1872,
+    },
+    "indian_stamp_act_1899.pdf": {
+        "act": "Indian Stamp Act, 1899",
+        "year": 1899,
+    },
+    "registration_act_1908.pdf": {
+        "act": "Registration Act, 1908",
+        "year": 1908,
+    },
+    "transfer_of_property_act_1882.pdf": {
+        "act": "Transfer of Property Act, 1882",
+        "year": 1882,
+    },
 }
 
 

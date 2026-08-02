@@ -1,0 +1,1975 @@
+"""Tests for the Contracts template engine (Sprint 2, Deliverable 1).
+
+Core guarantees under test:
+  - only clause_type='llm_fillable' rows ever reach the LLM gateway;
+    fixed_boilerplate text is copied through untouched (CLAUDE.md Hard
+    Rule 2 — no hallucinated structure)
+  - every LLM call for a clause fill carries the real party names/
+    addresses as `entities`, so the existing PII masker actually masks
+    them (CLAUDE.md Decision 4) — this test does not re-verify masking
+    correctness itself (test_pii_mask.py owns that), only that contracts.py
+    upholds its side of the contract
+  - the mutual/one-way variant selects the right confidentiality clause
+    and excludes the other
+  - amendment = calling generate_draft again never overwrites a prior
+    draft_versions row, and version_no increments (AC-2.3)
+  - clause review (keep/redraft/delete) updates the audit trail and the
+    denormalized status, and flips the template beta -> reviewed only
+    once every clause has cleared review (Project_Plan §6.4)
+  - the real nda.docx skeleton actually renders with docxtpl end to end
+"""
+
+from __future__ import annotations
+
+import itertools
+import json
+import re
+from pathlib import Path
+
+import pytest
+
+from app.services import contracts
+from app.services.llm_gateway import GenerationResult
+from app.services.pii_mask import MaskMap
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+# --- Fake Supabase client (select/insert/update/upsert, multi-table) -------
+
+
+class FakeResponse:
+    def __init__(self, data):
+        self.data = data
+
+
+_id_counter = itertools.count(1)
+
+
+class FakeQuery:
+    def __init__(self, table: "FakeTable", op: str, payload=None):
+        self._table = table
+        self._op = op
+        self._payload = payload
+        self._filters: dict[str, object] = {}
+        self._order_col = None
+        self._order_desc = False
+        self._limit = None
+
+    def eq(self, col, val):
+        self._filters[col] = val
+        return self
+
+    def order(self, col, desc=False):
+        self._order_col = col
+        self._order_desc = desc
+        return self
+
+    def limit(self, n):
+        self._limit = n
+        return self
+
+    def execute(self):
+        if self._op == "select":
+            matches = [
+                r for r in self._table.rows
+                if all(r.get(c) == v for c, v in self._filters.items())
+            ]
+            if self._order_col:
+                matches = sorted(
+                    matches, key=lambda r: r.get(self._order_col), reverse=self._order_desc
+                )
+            if self._limit is not None:
+                matches = matches[: self._limit]
+            return FakeResponse(matches)
+
+        if self._op == "insert":
+            records = self._payload if isinstance(self._payload, list) else [self._payload]
+            inserted = []
+            for rec in records:
+                row = dict(rec)
+                row.setdefault("id", f"{self._table.name}-{next(_id_counter)}")
+                self._table.rows.append(row)
+                inserted.append(row)
+            return FakeResponse(inserted)
+
+        if self._op == "update":
+            matches = [
+                r for r in self._table.rows
+                if all(r.get(c) == v for c, v in self._filters.items())
+            ]
+            for r in matches:
+                r.update(self._payload)
+            return FakeResponse(matches)
+
+        if self._op == "upsert":
+            records = self._payload if isinstance(self._payload, list) else [self._payload]
+            key_cols = (self._table.upsert_key or "id").split(",")
+            result = []
+            for rec in records:
+                match = next(
+                    (r for r in self._table.rows if all(r.get(k) == rec.get(k) for k in key_cols)),
+                    None,
+                )
+                if match:
+                    match.update(rec)
+                    result.append(match)
+                else:
+                    row = dict(rec)
+                    row.setdefault("id", f"{self._table.name}-{next(_id_counter)}")
+                    self._table.rows.append(row)
+                    result.append(row)
+            return FakeResponse(result)
+
+        raise AssertionError(f"unsupported op {self._op}")
+
+
+class FakeTable:
+    def __init__(self, name: str):
+        self.name = name
+        self.rows: list[dict] = []
+        self.upsert_key: str | None = None
+
+    def select(self, *_a, **_k):
+        return FakeQuery(self, "select")
+
+    def insert(self, payload):
+        return FakeQuery(self, "insert", payload)
+
+    def update(self, payload):
+        return FakeQuery(self, "update", payload)
+
+    def upsert(self, payload, on_conflict=None):
+        self.upsert_key = on_conflict
+        return FakeQuery(self, "upsert", payload)
+
+
+class FakeDB:
+    def __init__(self):
+        self._tables: dict[str, FakeTable] = {}
+
+    def table(self, name):
+        return self._tables.setdefault(name, FakeTable(name))
+
+
+# --- Fixtures ----------------------------------------------------------------
+
+NDA_CLAUSES = [
+    {"clause_key": "recitals", "display_order": 1, "clause_type": "llm_fillable",
+     "applicable_condition": None, "heading": None, "source_text": "Draft recitals for: {{ purpose }}",
+     "current_text": "Draft recitals for: {{ purpose }}"},
+    {"clause_key": "definitions", "display_order": 2, "clause_type": "fixed_boilerplate",
+     "applicable_condition": None, "heading": "Definitions", "source_text": "Fixed boilerplate text.",
+     "current_text": "Fixed boilerplate text."},
+    {"clause_key": "confidentiality_obligations_mutual", "display_order": 3,
+     "clause_type": "fixed_boilerplate", "applicable_condition": {"field": "nda_variant", "equals": "mutual"},
+     "heading": "Confidentiality Obligations",
+     "source_text": "Confidentiality (mutual variant).",
+     "current_text": "Confidentiality (mutual variant)."},
+    {"clause_key": "confidentiality_obligations_one_way", "display_order": 3,
+     "clause_type": "fixed_boilerplate", "applicable_condition": {"field": "nda_variant", "equals": "one_way"},
+     "heading": "Confidentiality Obligations",
+     "source_text": "Confidentiality (one-way variant).",
+     "current_text": "Confidentiality (one-way variant)."},
+    {"clause_key": "term_and_survival", "display_order": 4, "clause_type": "llm_fillable",
+     "applicable_condition": None, "heading": "Term and Survival",
+     "source_text": "Draft term clause for: {{ tenure }}",
+     "current_text": "Draft term clause for: {{ tenure }}"},
+]
+
+
+DEFAULT_TEST_SCHEMA = {
+    "template_key": "nda",
+    "variant_field": "nda_variant",
+    "fields": [
+        # "type" is required on every field for real schemas — masking is
+        # schema-type-aware (only text/textarea gets masked; see
+        # contracts._mask_form_data) — a field missing "type" here would
+        # silently never get masked, same bug class as the missing-default
+        # StrictUndefined crash this fixture was already built to avoid.
+        {"key": "nda_variant", "type": "select", "required": True},
+        {"key": "party_a_name", "type": "text", "required": True},
+        {"key": "party_a_address", "type": "textarea", "required": True},
+        {"key": "party_b_name", "type": "text", "required": True},
+        {"key": "party_b_address", "type": "textarea", "required": True},
+        {"key": "purpose", "type": "textarea", "required": True},
+        {"key": "confidential_items", "type": "textarea", "required": False, "default": ""},
+        {"key": "tenure", "type": "text", "required": True},
+        {"key": "state", "type": "select", "required": True},
+        {"key": "arbitration", "type": "boolean", "default": False},
+        {"key": "arbitration_seat", "type": "text", "required": False, "default": ""},
+        {"key": "effective_date", "type": "date", "required": True},
+    ],
+}
+
+
+def _seed_template(db: FakeDB, clauses=None, schema_json=None) -> str:
+    template_id = "template-nda"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Non-Disclosure Agreement",
+            "category": "contracts",
+            "docx_path": "templates/contracts/nda.docx",
+            "review_status": "beta",
+            "schema_json": schema_json if schema_json is not None else DEFAULT_TEST_SCHEMA,
+        }
+    )
+    for clause in clauses if clauses is not None else NDA_CLAUSES:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+def _seed_matter(db: FakeDB, matter_id="matter-1") -> str:
+    db.table("matters").rows.append({"id": matter_id, "client_name": "Acme Pvt Ltd"})
+    return matter_id
+
+
+BASE_FORM = {
+    "nda_variant": "mutual",
+    "party_a_name": "Ramesh Kumar",
+    "party_a_entity_type": "Individual",
+    "party_a_address": "123 MG Road, Delhi",
+    "party_b_name": "Acme Pvt Ltd",
+    "party_b_entity_type": "Private Limited Company",
+    "party_b_address": "456 Business Park, Mumbai",
+    "purpose": "evaluating a potential software licensing deal",
+    "tenure": "3 years from the Effective Date",
+    "state": "Delhi",
+    "arbitration": False,
+    "arbitration_seat": "",
+    "effective_date": "2026-08-01",
+}
+
+
+def _fake_generate(monkeypatch, canned_text="LLM-GENERATED TEXT"):
+    calls = []
+
+    def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+        calls.append(
+            {
+                "prompt": prompt, "task_type": task_type, "mask_map": mask_map,
+                "entities": entities, "auto_detect_names": auto_detect_names,
+            }
+        )
+        return GenerationResult(
+            text=canned_text, provider="gemini", model="gemini-2.5-flash",
+            latency_ms=10, masked_prompt=prompt,
+        )
+
+    monkeypatch.setattr(contracts, "generate", fake)
+    return calls
+
+
+# --- generate_draft: LLM only touches llm_fillable clauses ------------------
+
+
+def test_generate_draft_handles_conditionally_hidden_optional_fields(monkeypatch):
+    """Regression test for a real Sprint 2 E2E bug: the real frontend never
+    submits a value for a field that's conditionally hidden (e.g.
+    arbitration_seat when arbitration=False) or an optional field the user
+    just never touched (confidential_items) — form_data simply won't have
+    the key, unlike every other test in this file which hand-constructs a
+    fully-populated dict. Loads the REAL nda.schema.json (not the
+    hand-rolled DEFAULT_TEST_SCHEMA) so this stays honest to what the
+    actual frontend does. Must not raise jinja2.UndefinedError."""
+    import json
+
+    real_schema = json.loads((REPO_ROOT / "templates" / "contracts" / "nda.schema.json").read_text())
+    db = FakeDB()
+    template_id = _seed_template(db, schema_json=real_schema)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch)
+
+    incomplete_form = dict(BASE_FORM)
+    incomplete_form.pop("arbitration_seat", None)
+    incomplete_form.pop("confidential_items", None)
+
+    result = contracts.generate_draft(matter_id, template_id, incomplete_form, db=db)
+    assert result.version_no == 1
+
+
+def test_generate_draft_calls_llm_only_for_llm_fillable_clauses(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    result = contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+
+    filled_keys = {f.clause_key for f in result.clause_fills}
+    assert filled_keys == {"recitals", "term_and_survival"}
+    assert len(calls) == 2
+    # Fixed boilerplate text must never be sent to the LLM.
+    for call in calls:
+        assert "Fixed boilerplate text" not in call["prompt"]
+
+
+def test_generate_draft_passes_real_pii_as_entities_for_masking(monkeypatch):
+    """contracts.py's obligation under CLAUDE.md Decision 4: every gateway
+    call must carry mask_map + the real party names/addresses as entities,
+    so the gateway's own masker (already tested in test_pii_mask.py) has
+    something to mask. This does not re-verify masking correctness."""
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+
+    assert calls, "expected at least one LLM call"
+    for call in calls:
+        assert isinstance(call["mask_map"], MaskMap)
+        assert ("PARTY", "Ramesh Kumar") in call["entities"]
+        assert ("PARTY", "Acme Pvt Ltd") in call["entities"]
+        assert ("ADDR", "123 MG Road, Delhi") in call["entities"]
+        assert ("ADDR", "456 Business Park, Mumbai") in call["entities"]
+
+
+def test_generate_draft_disables_fuzzy_auto_detect_on_the_gateway_call(monkeypatch):
+    """TICKET-1: contracts.py's half of the fix — form_data values are
+    already individually masked (full detection) before being interpolated
+    into a clause prompt, so the outer gateway call must pass
+    auto_detect_names=False (see test_pii_mask.py for what that flag
+    actually does to the assembled prompt's static wording)."""
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+
+    assert calls, "expected at least one LLM call"
+    for call in calls:
+        assert call["auto_detect_names"] is False
+
+
+def test_generate_draft_masks_incidental_pii_in_free_text_fields_before_render(monkeypatch):
+    """The field-level pre-masking pass (not just the entities list) must
+    catch PII embedded in free text, e.g. a PAN mentioned inside the
+    purpose field — and it must do so BEFORE the clause template is
+    rendered, so the prompt the LLM sees never contains the raw value."""
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    form = dict(BASE_FORM)
+    form["purpose"] = "Context involves PAN ABCDE1234F and mobile 9876543210."
+
+    contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    recitals_call = next(c for c in calls if "recitals" in c["prompt"].lower() or "Draft recitals" in c["prompt"])
+    assert "ABCDE1234F" not in recitals_call["prompt"]
+    assert "9876543210" not in recitals_call["prompt"]
+    assert "PAN_1" in recitals_call["prompt"]
+    assert "PHONE_1" in recitals_call["prompt"]
+
+
+def test_select_field_values_are_never_masked(monkeypatch):
+    """Regression test for a real Service Agreement bug: masking every
+    string form value indiscriminately (the original TICKET-1 fix, before
+    it was made schema-aware) also masked `select` field values —
+    "Fixed Fee" false-positived through the same Title-Case-run heuristic
+    as "Governing Law", silently breaking a fixed_boilerplate clause's own
+    `{% if fee_structure == 'Fixed Fee' %}` comparison (masked value could
+    never equal the literal string, so no branch matched — no error, just
+    a blank clause). `select`/`boolean`/`date` fields must render through
+    with their exact schema-declared value, never a PARTY_x placeholder."""
+    schema = {
+        "fields": [
+            {"key": "fee_structure", "type": "select"},
+        ]
+    }
+    clauses = [
+        {"clause_key": "payment", "display_order": 1, "clause_type": "fixed_boilerplate",
+         "applicable_condition": None, "heading": "Payment",
+         "source_text": "{% if fee_structure == 'Fixed Fee' %}Fixed fee applies.{% endif %}",
+         "current_text": "{% if fee_structure == 'Fixed Fee' %}Fixed fee applies.{% endif %}"},
+    ]
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=clauses, schema_json=schema)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch)
+
+    result = contracts.generate_draft(matter_id, template_id, {"fee_structure": "Fixed Fee"}, db=db)
+
+    assert "Fixed fee applies." in result.full_text
+
+
+def test_generate_draft_selects_variant_specific_confidentiality_clause(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch)
+
+    mutual_form = dict(BASE_FORM, nda_variant="mutual")
+    contracts.generate_draft(matter_id, template_id, mutual_form, db=db)
+
+    one_way_form = dict(BASE_FORM, nda_variant="one_way", party_a_role="disclosing")
+    contracts.generate_draft(matter_id, template_id, one_way_form, db=db)
+
+    # Both drafts render fine (docx assertions are covered separately below);
+    # here we only assert the clause-selection logic itself via the
+    # applicable-clauses helper, which is what actually branches on variant.
+    all_clauses = db.table("template_clauses").rows
+    mutual_selected = contracts._applicable_clauses(all_clauses, {"nda_variant": "mutual"})
+    one_way_selected = contracts._applicable_clauses(all_clauses, {"nda_variant": "one_way"})
+    assert "confidentiality_obligations_mutual" in {c["clause_key"] for c in mutual_selected}
+    assert "confidentiality_obligations_one_way" not in {c["clause_key"] for c in mutual_selected}
+    assert "confidentiality_obligations_one_way" in {c["clause_key"] for c in one_way_selected}
+    assert "confidentiality_obligations_mutual" not in {c["clause_key"] for c in one_way_selected}
+
+
+# --- amendment loop: new version, prior versions untouched ------------------
+
+
+def test_generate_draft_increments_version_without_losing_prior_versions(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch)
+
+    first = contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+    amended_form = dict(BASE_FORM, tenure="5 years from the Effective Date")
+    second = contracts.generate_draft(matter_id, template_id, amended_form, db=db)
+
+    assert first.version_no == 1
+    assert second.version_no == 2
+    all_versions = db.table("draft_versions").rows
+    assert len(all_versions) == 2
+    assert {v["id"] for v in all_versions} == {first.draft_version_id, second.draft_version_id}
+
+
+# --- clause review -----------------------------------------------------------
+
+
+def test_review_clause_redraft_updates_current_text_and_logs_audit_row():
+    db = FakeDB()
+    template_id = _seed_template(db)
+    clause_id = "clause-definitions"
+
+    updated = contracts.review_clause(
+        clause_id, "redraft", redraft_text="Revised definitions text.", db=db
+    )
+
+    assert updated["review_status"] == "redrafted"
+    assert updated["current_text"] == "Revised definitions text."
+    audit_rows = db.table("clause_reviews").rows
+    assert len(audit_rows) == 1
+    assert audit_rows[0]["decision"] == "redraft"
+    assert audit_rows[0]["redraft_text"] == "Revised definitions text."
+
+
+def test_review_clause_redraft_requires_text():
+    db = FakeDB()
+    _seed_template(db)
+    with pytest.raises(ValueError):
+        contracts.review_clause("clause-definitions", "redraft", db=db)
+
+
+def test_review_clause_rejects_invalid_decision():
+    db = FakeDB()
+    _seed_template(db)
+    with pytest.raises(ValueError):
+        contracts.review_clause("clause-definitions", "approve", db=db)
+
+
+def test_review_clause_delete_requires_reviewer_notes():
+    db = FakeDB()
+    _seed_template(db)
+    with pytest.raises(ValueError):
+        contracts.review_clause("clause-definitions", "delete", db=db)
+
+
+def test_template_flips_beta_to_reviewed_only_once_every_clause_cleared():
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=[NDA_CLAUSES[0], NDA_CLAUSES[1]])
+    clause_ids = [f"clause-{c['clause_key']}" for c in [NDA_CLAUSES[0], NDA_CLAUSES[1]]]
+
+    contracts.review_clause(clause_ids[0], "keep", db=db)
+    template_row = db.table("templates").rows[0]
+    assert template_row["review_status"] == "beta"  # one clause still unreviewed
+
+    contracts.review_clause(clause_ids[1], "keep", db=db)
+    assert template_row["review_status"] == "reviewed"
+
+
+# --- bulk-keep boilerplate (review-velocity Lever 1, 2026-08-02) -----------
+#
+# NDA_CLAUSES fixture shape: recitals (llm_fillable), definitions
+# (fixed_boilerplate), confidentiality_obligations_mutual/one_way (both
+# fixed_boilerplate, applicable_condition-gated), term_and_survival
+# (llm_fillable) — 2 llm_fillable, 3 fixed_boilerplate.
+
+
+def test_bulk_keep_boilerplate_keeps_only_unreviewed_fixed_boilerplate():
+    db = FakeDB()
+    _seed_template(db)
+
+    updated = contracts.bulk_keep_boilerplate_clauses("template-nda", db=db)
+
+    assert len(updated) == 3, "only the 3 fixed_boilerplate clauses should be kept"
+    assert all(c["review_status"] == "kept" for c in updated)
+    assert all(c["clause_type"] == "fixed_boilerplate" for c in updated)
+
+    all_clauses = {c["id"]: c for c in db.table("template_clauses").rows}
+    llm_fillable_ids = ["clause-recitals", "clause-term_and_survival"]
+    for cid in llm_fillable_ids:
+        assert all_clauses[cid]["review_status"] == "unreviewed", (
+            "llm_fillable clauses must never be touched by bulk-keep"
+        )
+
+    audit_rows = db.table("clause_reviews").rows
+    assert len(audit_rows) == 3
+    assert all(r["decision"] == "keep" for r in audit_rows)
+    assert all(r["reviewer_notes"] == contracts.BULK_KEEP_REVIEWER_NOTES for r in audit_rows)
+
+
+def test_bulk_keep_boilerplate_never_overwrites_an_already_reviewed_clause():
+    db = FakeDB()
+    _seed_template(db)
+
+    # Nitesh redrafts one fixed_boilerplate clause by hand before the
+    # bulk action runs.
+    contracts.review_clause(
+        "clause-definitions", "redraft", redraft_text="Nitesh's custom definitions text.", db=db
+    )
+
+    updated = contracts.bulk_keep_boilerplate_clauses("template-nda", db=db)
+
+    # Only the two remaining unreviewed fixed_boilerplate clauses (the
+    # two confidentiality variants) get bulk-kept — definitions is
+    # excluded because it's no longer 'unreviewed'.
+    assert len(updated) == 2
+    assert {c["clause_key"] for c in updated} == {
+        "confidentiality_obligations_mutual", "confidentiality_obligations_one_way",
+    }
+
+    definitions = next(c for c in db.table("template_clauses").rows if c["id"] == "clause-definitions")
+    assert definitions["review_status"] == "redrafted"
+    assert definitions["current_text"] == "Nitesh's custom definitions text.", (
+        "bulk-keep must never touch a clause that already has a human review decision"
+    )
+    # Still exactly one clause_reviews row for definitions (the redraft) —
+    # bulk-keep didn't add a second row for it.
+    definitions_reviews = [r for r in db.table("clause_reviews").rows if r["clause_id"] == "clause-definitions"]
+    assert len(definitions_reviews) == 1
+    assert definitions_reviews[0]["decision"] == "redraft"
+
+
+def test_bulk_keep_boilerplate_can_flip_template_to_reviewed():
+    db = FakeDB()
+    _seed_template(db)
+    contracts.review_clause("clause-recitals", "keep", db=db)
+    contracts.review_clause("clause-term_and_survival", "keep", db=db)
+
+    template_row = db.table("templates").rows[0]
+    assert template_row["review_status"] == "beta", "3 fixed_boilerplate clauses still unreviewed"
+
+    contracts.bulk_keep_boilerplate_clauses("template-nda", db=db)
+
+    assert template_row["review_status"] == "reviewed", (
+        "bulk-keep clearing the last unreviewed clauses must flip beta -> reviewed, same as review_clause does"
+    )
+
+
+def test_bulk_keep_boilerplate_returns_empty_list_when_nothing_qualifies():
+    db = FakeDB()
+    _seed_template(db)
+
+    contracts.bulk_keep_boilerplate_clauses("template-nda", db=db)
+    second_call = contracts.bulk_keep_boilerplate_clauses("template-nda", db=db)
+
+    assert second_call == []
+
+
+# --- re-seed must never silently overwrite a reviewed clause ---------------
+#
+# Found live 2026-08-02, more urgent than a Sprint 3 ticket: every seed
+# script's upsert previously wrote current_text = source_text
+# unconditionally, every re-seed, for every clause — including ones
+# already reviewed. This would (a) wipe out a redraft even on a
+# no-op re-run (current_text always reset regardless of whether
+# source_text changed), and (b) silently swap a 'kept' clause's
+# rendered text out from under an approval the moment its source_text
+# was edited. Fix, deliberately STRICT: a re-seed HALTS (raises
+# ReviewedClauseConflict) if an already-reviewed clause's incoming
+# source_text differs from what's stored — no auto-decision. When
+# nothing has changed for reviewed clauses, they're excluded from the
+# upsert batch entirely (current_text/review_status never touched,
+# only structural fields refreshed).
+#
+# Uses the real seed_nda_template.py module directly (not just its
+# CLAUSES list) to exercise _write_clauses_preserving_review and
+# ReviewedClauseConflict as actually shipped.
+
+
+def _load_nda_seed_module():
+    spec = _importlib_util.spec_from_file_location(
+        "seed_nda_template_module_test",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_nda_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_reseed_halts_when_a_kept_clauses_source_text_changed():
+    module = _load_nda_seed_module()
+    db = FakeDB()
+
+    # Initial seed, then Nitesh keeps "definitions" as-is.
+    module._write_clauses_preserving_review(db, "template-nda", module.CLAUSES)
+    definitions_id = next(
+        r["id"] for r in db.table("template_clauses").rows if r["clause_key"] == "definitions"
+    )
+    contracts.review_clause(definitions_id, "keep", db=db)
+
+    # An author now edits definitions' source_text (e.g. fixing wording)
+    # without knowing it's already been reviewed.
+    edited_clauses = [
+        dict(c, source_text=c["source_text"] + " EDITED.") if c["clause_key"] == "definitions" else c
+        for c in module.CLAUSES
+    ]
+
+    with pytest.raises(module.ReviewedClauseConflict) as exc_info:
+        module._write_clauses_preserving_review(db, "template-nda", edited_clauses)
+
+    assert "definitions" in str(exc_info.value)
+    assert "kept" in str(exc_info.value)
+
+    # Nothing was written — not even the unaffected clauses — matching
+    # "HALTS... no auto-decisions."
+    definitions_row = next(r for r in db.table("template_clauses").rows if r["clause_key"] == "definitions")
+    assert not definitions_row["current_text"].endswith("EDITED.")
+    assert definitions_row["source_text"] == module.CLAUSES[1]["source_text"]
+
+
+def test_reseed_preserves_a_redrafted_clause_when_source_text_unchanged():
+    module = _load_nda_seed_module()
+    db = FakeDB()
+
+    module._write_clauses_preserving_review(db, "template-nda", module.CLAUSES)
+    definitions_id = next(
+        r["id"] for r in db.table("template_clauses").rows if r["clause_key"] == "definitions"
+    )
+    contracts.review_clause(
+        definitions_id, "redraft", redraft_text="Nitesh's fully custom definitions text.", db=db
+    )
+
+    # Re-seed with the EXACT same CLAUSES content — a plain re-run, no
+    # edits anywhere. Before the fix, this alone (no content change at
+    # all) would still have wiped the redraft, since current_text was
+    # always reset unconditionally.
+    module._write_clauses_preserving_review(db, "template-nda", module.CLAUSES)
+
+    definitions_row = next(r for r in db.table("template_clauses").rows if r["clause_key"] == "definitions")
+    assert definitions_row["current_text"] == "Nitesh's fully custom definitions text."
+    assert definitions_row["review_status"] == "redrafted"
+
+
+def test_reseed_still_updates_unreviewed_clauses_normally():
+    module = _load_nda_seed_module()
+    db = FakeDB()
+
+    module._write_clauses_preserving_review(db, "template-nda", module.CLAUSES)
+    # definitions stays unreviewed; recitals gets kept.
+    recitals_id = next(r["id"] for r in db.table("template_clauses").rows if r["clause_key"] == "recitals")
+    contracts.review_clause(recitals_id, "keep", db=db)
+
+    edited_clauses = [
+        dict(c, source_text=c["source_text"] + " Updated wording.") if c["clause_key"] == "definitions" else c
+        for c in module.CLAUSES
+    ]
+    # No conflict — only an unreviewed clause changed.
+    module._write_clauses_preserving_review(db, "template-nda", edited_clauses)
+
+    definitions_row = next(r for r in db.table("template_clauses").rows if r["clause_key"] == "definitions")
+    assert definitions_row["current_text"].endswith("Updated wording.")
+    assert definitions_row["review_status"] == "unreviewed"
+
+
+# --- docx rendering (real skeleton file, mocked LLM only) -------------------
+
+
+def test_generate_draft_renders_real_docx_skeleton(monkeypatch):
+    """Exercises the actual templates/contracts/nda.docx file end to end —
+    the one piece nothing above touches. LLM calls are still mocked (no
+    network in unit tests); docxtpl rendering is real. Writes to the real
+    (gitignored) generated_drafts/ dir, cleaned up at the end of the test."""
+    from docx import Document
+
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db, matter_id="matter-docx-smoke-test")
+    _fake_generate(monkeypatch, canned_text="WHEREAS the parties wish to collaborate.")
+
+    result = contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+    output_path = REPO_ROOT / result.docx_path
+    try:
+        assert output_path.exists()
+        doc = Document(str(output_path))
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Ramesh Kumar" in full_text
+        assert "Acme Pvt Ltd" in full_text
+        assert "BETA — PENDING CLAUSE REVIEW" in full_text
+        assert "WHEREAS the parties wish to collaborate." in full_text
+        assert "Fixed boilerplate text." in full_text
+        # TICKET-3: an_or_a filter — "an Individual" (vowel), "a Private
+        # Limited Company" (consonant), never the ungrammatical "a Individual".
+        assert "an Individual having its registered" in full_text
+        assert "a Private Limited Company having its registered" in full_text
+        assert "a Individual" not in full_text
+        # Migration 0008: numbers are auto-assigned at assembly time from
+        # each clause's `heading`, not hardcoded in clause body text —
+        # recitals (no heading) stays unnumbered, Definitions is clause 1.
+        assert "1. Definitions" in full_text
+        assert "0. Recitals" not in full_text and "1. Recitals" not in full_text
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+def test_an_or_a_filter():
+    from app.services.contracts import _an_or_a
+
+    assert _an_or_a("Individual") == "an"
+    assert _an_or_a("Private Limited Company") == "a"
+    assert _an_or_a("LLP") == "an"  # acronym read as "el-el-pee" — vowel sound despite consonant spelling
+    assert _an_or_a("Partnership Firm") == "a"
+    assert _an_or_a("") == "a"
+
+
+# --- Generic list/repeater field type (Sprint 2 Deliverable 2 prep) --------
+# Proves the mechanism generically, ahead of Service Agreement — a
+# fixed_boilerplate clause looping over a "list" schema field with {% for %},
+# rendering each item verbatim (no LLM call, no paraphrasing risk on the
+# kind of enumerable content — deliverables, benefits, fixtures — every
+# template from here on needs).
+
+
+def test_with_schema_defaults_normalizes_list_field_items():
+    schema = {
+        "fields": [
+            {"key": "deliverables", "type": "list", "item_schema": [
+                {"key": "description", "type": "text", "required": True},
+                {"key": "notes", "type": "text", "required": False, "default": ""},
+            ]},
+        ]
+    }
+    form_data = {"deliverables": [{"description": "Build the API"}, {"description": "Write docs", "notes": "PDF format"}]}
+
+    result = contracts._with_schema_defaults(form_data, schema)
+
+    assert result["deliverables"] == [
+        {"description": "Build the API", "notes": ""},
+        {"description": "Write docs", "notes": "PDF format"},
+    ]
+
+
+def test_with_schema_defaults_missing_list_field_defaults_to_empty_list():
+    schema = {"fields": [{"key": "deliverables", "type": "list", "item_schema": []}]}
+    result = contracts._with_schema_defaults({}, schema)
+    assert result["deliverables"] == []
+
+
+def test_generate_draft_renders_list_field_verbatim_no_llm(monkeypatch):
+    """The core Service Agreement mechanism: a fixed_boilerplate clause with
+    a {% for %} loop over a list field renders every item's exact text —
+    no LLM call, so no paraphrasing risk on enumerable content."""
+    schema = {
+        "fields": [
+            {"key": "party_a_name", "type": "text"},
+            {"key": "deliverables", "type": "list", "item_schema": [
+                {"key": "description", "type": "text"},
+                {"key": "due_date", "type": "text"},
+            ]},
+        ]
+    }
+    clauses = [
+        {"clause_key": "scope", "display_order": 1, "clause_type": "fixed_boilerplate",
+         "applicable_condition": None,
+         "source_text": "Scope of Services:\n{% for item in deliverables %}- {{ item.description }} (due {{ item.due_date }})\n{% endfor %}",
+         "current_text": "Scope of Services:\n{% for item in deliverables %}- {{ item.description }} (due {{ item.due_date }})\n{% endfor %}"},
+    ]
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=clauses, schema_json=schema)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    form = {
+        "party_a_name": "Ramesh Kumar",
+        "deliverables": [
+            {"description": "Build the payment API", "due_date": "2026-09-01"},
+            {"description": "Deliver integration tests", "due_date": "2026-09-15"},
+        ],
+    }
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert not calls, "a fixed_boilerplate clause must never call the LLM"
+    docx_path = REPO_ROOT / result.docx_path
+    try:
+        from docx import Document
+
+        doc = Document(str(docx_path))
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Build the payment API (due 2026-09-01)" in full_text
+        assert "Deliver integration tests (due 2026-09-15)" in full_text
+    finally:
+        docx_path.unlink(missing_ok=True)
+
+
+# --- version history + amendment_note ---------------------------------------
+
+
+def test_list_drafts_returns_newest_first(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch)
+
+    first = contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+    second = contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+
+    versions = contracts.list_drafts(matter_id, db=db)
+    assert [v["id"] for v in versions] == [second.draft_version_id, first.draft_version_id]
+
+
+def test_amendment_note_is_appended_to_llm_fillable_prompts_only(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_template(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    contracts.generate_draft(
+        matter_id, template_id, BASE_FORM, amendment_note="reduce lock-in to 12 months", db=db
+    )
+
+    assert calls, "expected at least one LLM call"
+    for call in calls:
+        assert "reduce lock-in to 12 months" in call["prompt"]
+
+
+# --- PDF export: environment without LibreOffice --------------------------
+
+
+def test_convert_docx_to_pdf_raises_clear_error_without_soffice(monkeypatch, tmp_path):
+    monkeypatch.setattr(contracts.shutil, "which", lambda _name: None)
+    fake_docx = tmp_path / "draft.docx"
+    fake_docx.write_bytes(b"not a real docx, never read")
+
+    with pytest.raises(contracts.PdfConversionUnavailable):
+        contracts.convert_docx_to_pdf(fake_docx)
+
+
+# --- Service Agreement (Sprint 2 Deliverable 2, Batch 1) --------------------
+# Pre-live-DB verification of the real schema + clause content: the SLA
+# conditional-exclusion + auto-numbering interaction, the Jinja branching
+# on fee_structure, the deliverables list loop, and an_or_a on a second
+# template. Ahead of the live E2E, which needs migration 0008 applied.
+
+import importlib.util as _importlib_util  # noqa: E402
+
+
+def _load_service_agreement_fixtures():
+    schema = json.loads((REPO_ROOT / "templates" / "contracts" / "service-agreement.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_service_agreement_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_service_agreement_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _load_nda_fixtures():
+    """Real nda.schema.json + the real seed_nda_template.py CLAUSES list —
+    same rationale as _load_service_agreement_fixtures above: the
+    hand-rolled NDA_CLAUSES fixture near the top of this file uses a
+    placeholder recitals prompt ("Draft recitals for: {{ purpose }}")
+    that would never have caught the missing-party-names bug found live
+    2026-08-01, because it never had party names in it to begin with."""
+    schema = json.loads((REPO_ROOT / "templates" / "contracts" / "nda.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_nda_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_nda_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _seed_nda_real(db):
+    schema, clauses = _load_nda_fixtures()
+    template_id = "template-nda-real"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Non-Disclosure Agreement",
+            "category": "contracts",
+            "docx_path": "templates/contracts/nda.docx",
+            "review_status": "beta",
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+def _load_consultancy_fixtures():
+    """Real consultancy.schema.json + the real seed_consultancy_template.py
+    CLAUSES list — same rationale as the NDA/Service Agreement loaders
+    above, applied from the start for this template rather than added
+    after a bug is found live."""
+    schema = json.loads((REPO_ROOT / "templates" / "contracts" / "consultancy.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_consultancy_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_consultancy_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _seed_consultancy(db):
+    schema, clauses = _load_consultancy_fixtures()
+    template_id = "template-consultancy"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Consultancy Agreement",
+            "category": "contracts",
+            "docx_path": "templates/contracts/consultancy.docx",
+            "review_status": "beta",
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+def _load_mou_fixtures():
+    """Real mou.schema.json + the real seed_mou_template.py CLAUSES list —
+    same rationale as the NDA/Service Agreement/Consultancy loaders
+    above, applied from the start for this template too."""
+    schema = json.loads((REPO_ROOT / "templates" / "contracts" / "mou.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_mou_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_mou_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _seed_mou(db):
+    schema, clauses = _load_mou_fixtures()
+    template_id = "template-mou"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Memorandum of Understanding",
+            "category": "contracts",
+            "docx_path": "templates/contracts/mou.docx",
+            "review_status": "beta",
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+MOU_FORM = {
+    "party_a_name": "Karan Malhotra",
+    "party_a_entity_type": "Individual",
+    "party_a_address": "7 Lodi Road, New Delhi",
+    "party_b_name": "Greenfield Renewables Pvt Ltd",
+    "party_b_entity_type": "Private Limited Company",
+    "party_b_address": "Sector 21, Noida",
+    "purpose": "exploring a joint venture for a solar energy project",
+    "confidentiality_direction": "mutual",
+    "confidentiality_survival_period": "3 years",
+    "term_duration": "6 months from the Effective Date, or until superseded by a definitive agreement, whichever is earlier",
+    "termination_notice_period": "15 days",
+    "state": "Delhi",
+    "arbitration": False,
+    "arbitration_seat": "",
+    "effective_date": "2026-08-02",
+}
+
+
+def _load_employment_fixtures():
+    """Real employment.schema.json + the real seed_employment_template.py
+    CLAUSES list — same rationale as the NDA/Service Agreement/
+    Consultancy/MoU loaders above, applied from the start."""
+    schema = json.loads((REPO_ROOT / "templates" / "contracts" / "employment.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_employment_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_employment_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _seed_employment(db):
+    schema, clauses = _load_employment_fixtures()
+    template_id = "template-employment"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Employment Agreement",
+            "category": "contracts",
+            "docx_path": "templates/contracts/employment.docx",
+            "review_status": "beta",
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+EMPLOYMENT_FORM = {
+    "party_a_name": "Bright Horizons Tech Pvt Ltd",
+    "party_a_entity_type": "Private Limited Company",
+    "party_a_address": "Tower B, Cyber Hub, Gurugram",
+    "party_b_name": "Sneha Reddy",
+    "party_b_address": "45 Jubilee Hills, Hyderabad",
+    "designation": "Senior Software Engineer",
+    "department": "Engineering",
+    "reporting_to": "the Engineering Manager",
+    "duties_description": "design, develop, and maintain backend services; participate in code reviews and on-call rotations",
+    "employment_type": "Full-Time",
+    "fixed_term_end_date": "",
+    "has_probation": True,
+    "probation_period": "6 months",
+    "annual_ctc": "₹18,00,000 per annum",
+    "other_benefits": "health insurance for self and dependents, annual performance bonus eligibility",
+    "state": "Delhi",
+    "termination_notice_period": "30 days",
+    "non_compete_notes": "",
+    "arbitration": False,
+    "arbitration_seat": "",
+    "effective_date": "2026-08-02",
+}
+
+
+CONSULTANCY_FORM = {
+    "party_a_name": "Anjali Mehta",
+    "party_a_entity_type": "Individual",
+    "party_a_address": "18 Green Park, New Delhi",
+    "party_b_name": "Bluewave Logistics Pvt Ltd",
+    "party_b_entity_type": "Private Limited Company",
+    "party_b_address": "Sector 44, Gurugram",
+    "purpose": "advising on supply chain restructuring",
+    "scope_notes": "",
+    "deliverables": [],
+    "fee_structure": "Retainer",
+    "fee_amount": "",
+    "payment_frequency": "",
+    "retainer_fee_amount": "₹1,00,000 per month",
+    "retainer_frequency": "Monthly",
+    "retainer_scope_hours": "up to 20 hours per month",
+    "late_payment_interest_rate": "18% per annum",
+    "ip_ownership_model": "Full Assignment to Client",
+    "ip_carveout_notes": "",
+    "confidentiality_direction": "mutual",
+    "confidentiality_survival_period": "3 years",
+    "term_duration": "12 months from the Effective Date",
+    "termination_notice_period": "30 days",
+    "state": "Delhi",
+    "arbitration": False,
+    "arbitration_seat": "",
+    "effective_date": "2026-08-02",
+}
+
+
+SERVICE_AGREEMENT_FORM = {
+    "party_a_name": "Ramesh Kumar",
+    "party_a_entity_type": "Individual",
+    "party_a_address": "42 MG Road, Bengaluru",
+    "party_b_name": "Acme Technologies Pvt Ltd",
+    "party_b_entity_type": "Private Limited Company",
+    "party_b_address": "Business Park, Mumbai",
+    "purpose": "Ongoing software consulting services",
+    "deliverables": [
+        {"description": "Design and build the payment API", "due_date": "2026-09-01"},
+        {"description": "Deliver integration test suite", "due_date": "2026-09-15"},
+    ],
+    "fee_structure": "Fixed Fee",
+    "fee_amount": "₹1,50,000",
+    "payment_frequency": "Monthly",
+    "late_payment_interest_rate": "18% per annum",
+    "ip_ownership_model": "Full Assignment to Client",
+    "ip_carveout_notes": "",
+    "confidentiality_direction": "one_way_from_client",
+    "confidentiality_survival_period": "3 years",
+    "term_duration": "12 months from the Effective Date",
+    "termination_notice_period": "30 days",
+    "state": "Delhi",
+    "arbitration": False,
+    "arbitration_seat": "",
+    "effective_date": "2026-08-01",
+}
+
+
+def _seed_service_agreement(db):
+    schema, clauses = _load_service_agreement_fixtures()
+    template_id = "template-service-agreement"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Service Agreement",
+            "category": "contracts",
+            "docx_path": "templates/contracts/service-agreement.docx",
+            "review_status": "beta",
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+def test_service_agreement_sla_excluded_four_fills_and_numbering_shifts(monkeypatch):
+    from docx import Document
+
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="WHEREAS the parties wish to engage.")
+
+    form = dict(SERVICE_AGREEMENT_FORM, include_sla=False)
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert len(result.clause_fills) == 4, "SLA is fixed_boilerplate — must never produce a fill row"
+    assert "Service Levels" not in result.full_text
+
+    output_path = REPO_ROOT / result.docx_path
+    try:
+        doc = Document(str(output_path))
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        # 9 numbered clauses with SLA excluded (recitals is unnumbered, so
+        # 10 total clauses - recitals - SLA = 9) — Miscellaneous (last)
+        # must read "9.", not the SLA-included template's "10.".
+        assert "9. Miscellaneous" in full_text
+        assert "10. Miscellaneous" not in full_text
+        # Deliverables render verbatim, no LLM paraphrase.
+        assert "Design and build the payment API (due 2026-09-01)" in full_text
+        assert "Deliver integration test suite (due 2026-09-15)" in full_text
+        # Fixed Fee branch of the payment clause, not Hourly/Milestone.
+        assert "a fixed fee of ₹1,50,000" in full_text
+        assert "18% per annum" in full_text
+        # an_or_a on a second template: "an Individual", "a Private Limited Company".
+        assert "an Individual having its" in full_text
+        assert "a Private Limited Company having its" in full_text
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+def test_service_agreement_sla_included_five_clauses_numbering_intact(monkeypatch):
+    from docx import Document
+
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="WHEREAS the parties wish to engage.")
+
+    form = dict(
+        SERVICE_AGREEMENT_FORM,
+        include_sla=True,
+        sla_response_time_hours="4",
+        sla_resolution_time_hours="24",
+        sla_uptime_percentage="99.9",
+        sla_credit_terms="A 2% fee credit applies per hour of SLA breach, capped at 10% of monthly Fees.",
+    )
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert len(result.clause_fills) == 4, "SLA inclusion must not change the llm_fillable count"
+    assert "Service Levels" in result.full_text
+
+    output_path = REPO_ROOT / result.docx_path
+    try:
+        doc = Document(str(output_path))
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        # 10 numbered clauses with SLA included (11 total - unnumbered recitals).
+        assert "10. Miscellaneous" in full_text
+        assert "4. Service Levels" in full_text
+        assert "respond to a Client-reported issue within 4 hours" in full_text
+        assert "maintain 99.9% uptime" in full_text
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+# --- Regression: recitals prompt must actually carry the party names ------
+#
+# Found live, 2026-08-01 (Sprint 2, user click-through on NDA v1): the
+# recitals came out with generic labels ("Party A", "the Disclosing
+# Party") instead of real party names — screenshot-confirmed, defeating
+# the point of the intake form. Root cause, confirmed by direct code
+# read: the recitals source_text in both seed_nda_template.py and
+# seed_service_agreement_template.py never referenced
+# {{ party_a_name }}/{{ party_b_name }} at all, so the model had nothing
+# to draw a real name from. These tests load the REAL seed script CLAUSES
+# (not the hand-rolled NDA_CLAUSES fixture, whose recitals stub —
+# "Draft recitals for: {{ purpose }}" — never had party names either and
+# so could never have caught this). They assert on the rendered PROMPT
+# text captured by _fake_generate, after PII masking — CLAUDE.md Decision
+# 4 masks party names before any LLM call, so proving the fix means
+# proving two distinct PARTY_n placeholders reach the prompt (i.e. two
+# Jinja substitutions actually happened), not that the raw names do.
+
+
+def _party_placeholders(prompt: str) -> set[str]:
+    # "Named party" kinds get letter suffixes (PARTY_A, PARTY_B, ...), not
+    # numeric ones — see pii_mask.py's _LETTER_KINDS.
+    return set(re.findall(r"PARTY_[A-Z]+", prompt))
+
+
+def test_nda_recitals_prompt_carries_both_party_names_mutual(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_nda_real(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    form = dict(BASE_FORM, nda_variant="mutual")
+    contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    recitals_prompt = calls[0]["prompt"]
+    placeholders = _party_placeholders(recitals_prompt)
+    assert len(placeholders) == 2, (
+        f"expected both party names substituted into the recitals prompt as two "
+        f"distinct masked placeholders, got {placeholders} in: {recitals_prompt!r}"
+    )
+    assert "Ramesh Kumar" not in recitals_prompt and "Acme Pvt Ltd" not in recitals_prompt, (
+        "party names must reach the prompt only via their masked placeholders (CLAUDE.md Decision 4)"
+    )
+    assert "MUTUAL NDA" in recitals_prompt
+    # the old hardcoded phrasing that was legally incoherent for a mutual
+    # NDA (both parties get the identical role label from
+    # _variant_role_labels) must not appear unconditionally.
+    assert "is the Disclosing Party and" not in recitals_prompt
+
+
+def test_nda_recitals_prompt_one_way_party_a_disclosing(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_nda_real(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    form = dict(BASE_FORM, nda_variant="one_way", party_a_role="disclosing")
+    contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    recitals_prompt = calls[0]["prompt"]
+    assert len(_party_placeholders(recitals_prompt)) == 2
+    assert "ONE-WAY NDA" in recitals_prompt
+    placeholder_a = re.search(r"(PARTY_[A-Z]+) is the Disclosing Party and (PARTY_[A-Z]+) is the Receiving Party", recitals_prompt)
+    assert placeholder_a, f"expected 'X is the Disclosing Party and Y is the Receiving Party' in: {recitals_prompt!r}"
+    assert placeholder_a.group(1) != placeholder_a.group(2)
+
+
+def test_nda_recitals_prompt_one_way_party_a_receiving(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_nda_real(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    form = dict(BASE_FORM, nda_variant="one_way", party_a_role="receiving")
+    contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    recitals_prompt = calls[0]["prompt"]
+    assert len(_party_placeholders(recitals_prompt)) == 2
+    assert "ONE-WAY NDA" in recitals_prompt
+    # party_a_role=receiving -> the branch names party_b_name as Disclosing first.
+    match = re.search(r"(PARTY_[A-Z]+) is the Disclosing Party and (PARTY_[A-Z]+) is the Receiving Party", recitals_prompt)
+    assert match, f"expected 'X is the Disclosing Party and Y is the Receiving Party' in: {recitals_prompt!r}"
+    assert match.group(1) != match.group(2)
+
+
+def test_service_agreement_recitals_prompt_carries_both_party_names(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    contracts.generate_draft(matter_id, template_id, SERVICE_AGREEMENT_FORM, db=db)
+
+    recitals_prompt = calls[0]["prompt"]
+    placeholders = _party_placeholders(recitals_prompt)
+    assert len(placeholders) == 2, (
+        f"expected both party names substituted into the recitals prompt as two "
+        f"distinct masked placeholders, got {placeholders} in: {recitals_prompt!r}"
+    )
+    assert "Ramesh Kumar" not in recitals_prompt and "Acme Technologies Pvt Ltd" not in recitals_prompt
+    assert "Service Provider" in recitals_prompt and "Client" in recitals_prompt
+
+
+# --- Regression: embedded newlines in free text must not fragment a docx --
+# paragraph mid-sentence -----------------------------------------------------
+#
+# Found live, 2026-08-01 (Sprint 2, user reviewed the Service Agreement
+# docx): a deliverable description came out truncated mid-word in Scope
+# of Services. Root cause: `deliverables[].description` is a `textarea`
+# field (a real multi-row control — see intake-form.tsx's rows={3}), so
+# a literal "\n" can end up inside a single field's value (Enter while
+# typing, or pasting hyphenated text from a justified PDF/Word
+# paragraph). generate_draft's docx-assembly step splits each rendered
+# clause's text on "\n" to create separate paragraphs — meant for a
+# template author's own intentional paragraph breaks (e.g. NDA's
+# Definitions "1.1 ... \n1.2 ..."), but blind to the difference between
+# that and a newline that happened to be inside a client's answer, so it
+# silently fragments the value across two docx paragraphs.
+
+
+def test_generate_draft_normalizes_embedded_newlines_in_deliverable_description(monkeypatch):
+    from docx import Document
+
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="WHEREAS the parties wish to engage.")
+
+    form = dict(
+        SERVICE_AGREEMENT_FORM,
+        deliverables=[
+            {"description": "Integrate third-\nparty payment gateways", "due_date": "2026-09-01"},
+        ],
+    )
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    output_path = REPO_ROOT / result.docx_path
+    try:
+        doc = Document(str(output_path))
+        paragraphs = [p.text for p in doc.paragraphs]
+        # The embedded newline collapses to a literal space (not a seamless
+        # hyphen-join — that would need fragile PDF-dehyphenation
+        # heuristics this fix deliberately doesn't attempt); what matters
+        # is the value survives as ONE docx paragraph, not two.
+        assert any("Integrate third- party payment gateways" in p for p in paragraphs), (
+            f"embedded newline should collapse to a space within a single "
+            f"paragraph, not fragment the value across paragraphs; got: {paragraphs!r}"
+        )
+        assert not any(p.strip() == "party payment gateways" for p in paragraphs), (
+            "deliverable description was split into two docx paragraphs at the embedded newline"
+        )
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+def test_normalize_free_text_collapses_newlines_recursively_in_lists():
+    real_schema = json.loads((REPO_ROOT / "templates" / "contracts" / "service-agreement.schema.json").read_text())
+    form = dict(
+        SERVICE_AGREEMENT_FORM,
+        purpose="Ongoing software\nconsulting services",
+        deliverables=[{"description": "Build the\napi", "due_date": ""}],
+    )
+    normalized = contracts._normalize_free_text(form, real_schema)
+    assert normalized["purpose"] == "Ongoing software consulting services"
+    assert normalized["deliverables"][0]["description"] == "Build the api"
+
+
+# --- Regression: recitals must not invent a fee structure it was never ----
+# told about --------------------------------------------------------------
+
+
+def test_service_agreement_recitals_prompt_excludes_fee_structure(monkeypatch):
+    """Found live 2026-08-01: recitals asserted 'a fixed fee model' for a
+    matter configured as Milestone-Based. fee_structure/fee_amount were
+    never even in this prompt's context — pure invention, because unlike
+    the (working) deliverables guard, there was no equivalent 'don't
+    describe fee/payment terms here' instruction. This asserts the guard
+    is present in the real seed script content, not just that the two
+    variables are absent (which was already true before the fix, and
+    didn't stop the model inventing language anyway)."""
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    contracts.generate_draft(matter_id, template_id, SERVICE_AGREEMENT_FORM, db=db)
+
+    recitals_prompt = calls[0]["prompt"]
+    assert "fee_structure" not in recitals_prompt and "fee_amount" not in recitals_prompt
+    lowered = recitals_prompt.lower()
+    assert "do not state or characterise the fee amount" in lowered or "payment terms clause covers that separately" in lowered
+
+
+# --- Regression: llm_fillable clauses must not drift to generic party ----
+# labels mid-generation -----------------------------------------------------
+
+
+def test_service_agreement_ip_assignment_prompt_forbids_generic_party_labels(monkeypatch):
+    """Found live 2026-08-01: a generated IP clause used 'Client' in one
+    sub-clause and 'Party B' in another. The recitals prompt already had
+    an explicit guard against generic labels; this prompt didn't."""
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    contracts.generate_draft(matter_id, template_id, SERVICE_AGREEMENT_FORM, db=db)
+
+    ip_prompt = next(c["prompt"] for c in calls if "IP ownership model" in c["prompt"])
+    lowered = ip_prompt.lower()
+    assert "never 'party a', 'party b'" in lowered or ("never" in lowered and "party a" in lowered and "party b" in lowered)
+
+
+# --- Regression: arbitration clause flags per-matter specifics for --------
+# Nitesh's clause review, both templates -------------------------------------
+
+
+def test_service_agreement_governing_law_prompt_flags_arbitration_specifics(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    form = dict(SERVICE_AGREEMENT_FORM, arbitration=True, arbitration_seat="Mumbai")
+    contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    gov_prompt = next(c["prompt"] for c in calls if "Governing Law and Dispute Resolution" in c["prompt"])
+    assert "ADVOCATE REVIEW" in gov_prompt
+    assert "number of arbitrators" in gov_prompt
+
+
+def test_nda_governing_law_prompt_flags_arbitration_specifics(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_nda_real(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    form = dict(BASE_FORM, arbitration=True, arbitration_seat="Delhi")
+    contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    gov_prompt = next(c["prompt"] for c in calls if "Governing Law and Dispute Resolution" in c["prompt"])
+    assert "ADVOCATE REVIEW" in gov_prompt
+    assert "number of arbitrators" in gov_prompt
+
+
+# --- Regression: confidentiality direction/survival is matter-specific ----
+# now, not hardcoded ----------------------------------------------------------
+#
+# Design gap fixed 2026-08-02: confidentiality was previously hardcoded
+# one-way (Client discloses to Service Provider only) with a fixed
+# 3-year survival, regardless of the matter. User's call: add real
+# intake fields rather than defer entirely to clause review, since this
+# clause is central to the deal. These tests confirm the right one of
+# the three confidentiality_* clause rows is selected by
+# confidentiality_direction and that confidentiality_survival_period is
+# substituted in — mirroring the same applicable_condition mechanism
+# NDA's confidentiality_obligations_mutual/one_way already used.
+
+
+@pytest.mark.parametrize(
+    "direction,expected_clause_key,excluded_clause_keys",
+    [
+        (
+            "mutual",
+            "confidentiality_mutual",
+            {"confidentiality_one_way_from_client", "confidentiality_one_way_from_provider"},
+        ),
+        (
+            "one_way_from_client",
+            "confidentiality_one_way_from_client",
+            {"confidentiality_mutual", "confidentiality_one_way_from_provider"},
+        ),
+        (
+            "one_way_from_provider",
+            "confidentiality_one_way_from_provider",
+            {"confidentiality_mutual", "confidentiality_one_way_from_client"},
+        ),
+    ],
+)
+def test_service_agreement_confidentiality_direction_selects_right_clause(
+    monkeypatch, direction, expected_clause_key, excluded_clause_keys
+):
+    db = FakeDB()
+    template_id = _seed_service_agreement(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="WHEREAS the parties wish to engage.")
+
+    form = dict(
+        SERVICE_AGREEMENT_FORM,
+        confidentiality_direction=direction,
+        confidentiality_survival_period="5 years",
+    )
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert "Confidentiality" in result.full_text
+    assert "for a period of 5 years" in result.full_text
+    _, clauses = _load_service_agreement_fixtures()
+    all_confidentiality_keys = {
+        "confidentiality_mutual", "confidentiality_one_way_from_client", "confidentiality_one_way_from_provider"
+    }
+    assert all_confidentiality_keys <= {c["clause_key"] for c in clauses}, (
+        "all three variants must exist in the real seed script"
+    )
+    for excluded_key in excluded_clause_keys:
+        excluded_text = next(c["source_text"] for c in clauses if c["clause_key"] == excluded_key)
+        # A crude but effective signal that the excluded variant's wording
+        # did not leak into this draft: its opening subject differs by
+        # clause, so check its first ~40 chars are absent.
+        assert excluded_text[:40] not in result.full_text
+
+
+# =============================================================================
+# Consultancy Agreement (Sprint 2 Deliverable 2, Batch 2)
+#
+# Built with all four of Batch 1's live-discovered lessons already baked
+# in (see docs/lessons_learned.md's new process rule and design pattern
+# notes) rather than rediscovered here: real party names + no-generic-
+# label guards on every llm_fillable clause from day one, fee/payment
+# terms explicitly excluded from recitals, confidentiality as a real
+# three-way intake choice via applicable_condition-per-variant, and the
+# arbitration [ADVOCATE REVIEW: ...] flag. These tests exercise what's
+# actually new here: the Deliverables/Scope split and the Retainer fee
+# branch — the confidentiality-direction and arbitration-flag mechanics
+# are already covered generically by the NDA/Service Agreement tests
+# above, reusing the identical pattern.
+# =============================================================================
+
+
+def test_consultancy_deliverables_clause_excluded_when_list_empty(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative scope text.")
+
+    result = contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    assert "9. Miscellaneous" in result.full_text, (
+        "with no deliverables, Deliverables clause should be excluded and "
+        "Miscellaneous should shift down to clause 9"
+    )
+    assert "10. Miscellaneous" not in result.full_text
+
+
+def test_consultancy_deliverables_clause_included_when_list_non_empty(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative scope text.")
+
+    form = dict(
+        CONSULTANCY_FORM,
+        deliverables=[
+            {"description": "Deliver a supply chain audit report", "due_date": "2026-09-01"},
+        ],
+    )
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert "Deliver a supply chain audit report (due 2026-09-01)" in result.full_text
+    assert "10. Miscellaneous" in result.full_text, (
+        "with a deliverable present, Deliverables clause should be "
+        "included and Miscellaneous should be clause 10"
+    )
+    assert "9. Miscellaneous" not in result.full_text
+
+
+def test_consultancy_recitals_prompt_excludes_scope_and_fee_details(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch, canned_text="Narrative scope text.")
+
+    contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    recitals_prompt = calls[0]["prompt"]
+    placeholders = _party_placeholders(recitals_prompt)
+    assert len(placeholders) == 2, (
+        f"expected both party names substituted as two distinct masked "
+        f"placeholders, got {placeholders} in: {recitals_prompt!r}"
+    )
+    assert "fee_structure" not in recitals_prompt and "fee_amount" not in recitals_prompt
+    assert "Consultant" in recitals_prompt and "Client" in recitals_prompt
+
+
+def test_consultancy_payment_terms_retainer_branch_with_scope_hours(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative scope text.")
+
+    result = contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    assert "a retainer fee of ₹1,00,000 per month" in result.full_text
+    assert "billed Monthly" in result.full_text
+    assert "covers up to 20 hours per month of the Consultant's time" in result.full_text, (
+        "the field's own value ('up to 20 hours per month') should read "
+        "naturally after 'covers', not be double-prefixed by the clause's own 'up to'"
+    )
+    assert "up to up to" not in result.full_text
+
+
+def test_consultancy_payment_terms_retainer_branch_uncapped(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative scope text.")
+
+    form = dict(CONSULTANCY_FORM, retainer_scope_hours="")
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert "a retainer fee of ₹1,00,000 per month" in result.full_text
+    assert "of the Consultant's time" not in result.full_text, (
+        "an uncapped retainer should not mention an hours cap at all"
+    )
+
+
+def test_consultancy_payment_terms_fixed_fee_branch(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative scope text.")
+
+    form = dict(
+        CONSULTANCY_FORM,
+        fee_structure="Fixed Fee",
+        fee_amount="₹2,00,000",
+        payment_frequency="Upfront",
+        retainer_fee_amount="",
+        retainer_frequency="",
+        retainer_scope_hours="",
+    )
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert "a fixed fee of ₹2,00,000, payable Upfront" in result.full_text
+    assert "retainer" not in result.full_text.lower()
+
+
+def test_consultancy_docx_renders_end_to_end(monkeypatch):
+    from docx import Document
+
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db, matter_id="matter-consultancy-docx")
+    _fake_generate(monkeypatch, canned_text="Narrative scope text drafted by the model.")
+
+    form = dict(
+        CONSULTANCY_FORM,
+        deliverables=[{"description": "Deliver a supply chain audit report", "due_date": "2026-09-01"}],
+    )
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    output_path = REPO_ROOT / result.docx_path
+    try:
+        doc = Document(str(output_path))
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        assert "CONSULTANCY AGREEMENT" in full_text
+        assert "Anjali Mehta" in full_text
+        assert "Bluewave Logistics Pvt Ltd" in full_text
+        assert "Consultant" in full_text and "Client" in full_text
+        assert "Deliver a supply chain audit report (due 2026-09-01)" in full_text
+        assert "10. Miscellaneous" in full_text
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+# =============================================================================
+# Memorandum of Understanding (Sprint 2 Deliverable 2, Batch 3)
+#
+# Deliberately the simplest template so far — a validation that Sprint
+# 2's abstractions (applicable_condition-per-variant, an_or_a, schema-
+# type-aware masking, _normalize_free_text) hold on a minimal template
+# without introducing any new mechanism. Only 2 of 7 logical clauses are
+# llm_fillable (Recitals, Governing Law and Jurisdiction); the rest is
+# fixed boilerplate, including Term and Termination (llm_fillable in
+# Consultancy/Service Agreement, fixed_boilerplate here — MoU term logic
+# needs no narrative judgment).
+# =============================================================================
+
+
+def test_mou_recitals_prompt_carries_both_party_names_and_excludes_binding_status(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_mou(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch, canned_text="Recitals narrative text.")
+
+    contracts.generate_draft(matter_id, template_id, MOU_FORM, db=db)
+
+    recitals_prompt = calls[0]["prompt"]
+    placeholders = _party_placeholders(recitals_prompt)
+    assert len(placeholders) == 2, (
+        f"expected both party names substituted as two distinct masked "
+        f"placeholders, got {placeholders} in: {recitals_prompt!r}"
+    )
+    assert "Karan Malhotra" not in recitals_prompt and "Greenfield Renewables Pvt Ltd" not in recitals_prompt
+    assert "do not state whether this memorandum is binding or non-binding" in recitals_prompt.lower()
+
+
+def test_mou_nature_clause_enumerates_binding_exceptions(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_mou(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Recitals narrative text.")
+
+    result = contracts.generate_draft(matter_id, template_id, MOU_FORM, db=db)
+
+    assert "does not constitute a legally binding" in result.full_text
+    assert "Confidentiality, Costs and Expenses, and Governing Law and Jurisdiction" in result.full_text
+    assert "shall be binding on the Parties with immediate effect" in result.full_text
+
+
+@pytest.mark.parametrize(
+    "direction,expected_clause_key,excluded_clause_keys",
+    [
+        (
+            "mutual",
+            "confidentiality_mutual",
+            {"confidentiality_one_way_from_a", "confidentiality_one_way_from_b"},
+        ),
+        (
+            "one_way_from_a",
+            "confidentiality_one_way_from_a",
+            {"confidentiality_mutual", "confidentiality_one_way_from_b"},
+        ),
+        (
+            "one_way_from_b",
+            "confidentiality_one_way_from_b",
+            {"confidentiality_mutual", "confidentiality_one_way_from_a"},
+        ),
+    ],
+)
+def test_mou_confidentiality_direction_selects_right_clause(
+    monkeypatch, direction, expected_clause_key, excluded_clause_keys
+):
+    db = FakeDB()
+    template_id = _seed_mou(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Recitals narrative text.")
+
+    form = dict(MOU_FORM, confidentiality_direction=direction, confidentiality_survival_period="4 years")
+    result = contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    assert "Confidentiality" in result.full_text
+    assert "for a period of 4 years" in result.full_text
+    _, clauses = _load_mou_fixtures()
+    all_confidentiality_keys = {
+        "confidentiality_mutual", "confidentiality_one_way_from_a", "confidentiality_one_way_from_b"
+    }
+    assert all_confidentiality_keys <= {c["clause_key"] for c in clauses}
+    for excluded_key in excluded_clause_keys:
+        excluded_text = next(c["source_text"] for c in clauses if c["clause_key"] == excluded_key)
+        assert excluded_text[:40] not in result.full_text
+
+
+def test_mou_governing_law_prompt_flags_arbitration_specifics(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_mou(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch, canned_text="Recitals narrative text.")
+
+    form = dict(MOU_FORM, arbitration=True, arbitration_seat="Delhi")
+    contracts.generate_draft(matter_id, template_id, form, db=db)
+
+    gov_prompt = next(c["prompt"] for c in calls if "Governing Law and Dispute Resolution" in c["prompt"])
+    assert "ADVOCATE REVIEW" in gov_prompt
+    assert "number of arbitrators" in gov_prompt
+
+
+def test_mou_docx_renders_end_to_end_with_correct_numbering(monkeypatch):
+    from docx import Document
+
+    db = FakeDB()
+    template_id = _seed_mou(db)
+    matter_id = _seed_matter(db, matter_id="matter-mou-docx")
+    _fake_generate(monkeypatch, canned_text="Recitals narrative text drafted by the model.")
+
+    result = contracts.generate_draft(matter_id, template_id, MOU_FORM, db=db)
+
+    output_path = REPO_ROOT / result.docx_path
+    try:
+        doc = Document(str(output_path))
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        assert "MEMORANDUM OF UNDERSTANDING" in full_text
+        assert "Karan Malhotra" in full_text
+        assert "Greenfield Renewables Pvt Ltd" in full_text
+        assert "1. Nature of this Memorandum" in full_text
+        assert "2. Confidentiality" in full_text
+        assert "3. Term and Termination" in full_text
+        assert "4. Costs and Expenses" in full_text
+        assert "5. Governing Law and Jurisdiction" in full_text
+        assert "6. Miscellaneous" in full_text
+        # Costs and Expenses is pure fixed boilerplate — no fields at all.
+        assert "Each Party shall bear its own costs" in full_text
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+# =============================================================================
+# Employment Agreement (Sprint 2 Deliverable 2, Batch 4)
+#
+# Introduces this rollout's first statutory-compliance content (PF/ESI/
+# Gratuity) and non-compete doctrine (Section 27, Indian Contract Act,
+# 1872) but no new mechanism. Governing Law is fixed_boilerplate from
+# day one here (unlike NDA/Service Agreement/Consultancy/MoU, which all
+# shipped it as llm_fillable before the MoU-established classification
+# bar) — third clean application of that bar, alongside Intellectual
+# Property (also fixed_boilerplate here, second application).
+# =============================================================================
+
+
+def test_employment_probation_clause_selected_by_has_probation(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_employment(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative text drafted by the model.")
+
+    with_probation = contracts.generate_draft(matter_id, template_id, EMPLOYMENT_FORM, db=db)
+    assert "shall serve a probationary period of 6 months" in with_probation.full_text
+    assert "without any probationary period" not in with_probation.full_text
+
+    form_no_probation = dict(EMPLOYMENT_FORM, has_probation=False, probation_period="")
+    without_probation = contracts.generate_draft(matter_id, template_id, form_no_probation, db=db)
+    assert "without any probationary period" in without_probation.full_text
+    assert "shall serve a probationary period" not in without_probation.full_text
+
+
+def test_employment_statutory_compliance_clause_cites_correct_acts_no_computed_figures(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_employment(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative text drafted by the model.")
+
+    result = contracts.generate_draft(matter_id, template_id, EMPLOYMENT_FORM, db=db)
+
+    assert "Employees' Provident Funds and Miscellaneous Provisions Act, 1952" in result.full_text
+    assert "Employees' State Insurance Act, 1948" in result.full_text
+    assert "Payment of Gratuity Act, 1972" in result.full_text
+    assert "are not asserted as fact in this Agreement" in result.full_text
+    # No specific rate/threshold/ceiling figure should ever appear — the
+    # clause is deliberately non-computed (approved design decision).
+    assert "₹" not in result.full_text.split("Statutory Compliance")[-1].split("Confidentiality")[0], (
+        "Statutory Compliance clause must not assert a specific rupee figure"
+    )
+
+
+def test_employment_restrictive_covenants_prompt_has_section_27_caveat(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_employment(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch, canned_text="Narrative text drafted by the model.")
+
+    contracts.generate_draft(matter_id, template_id, EMPLOYMENT_FORM, db=db)
+
+    rc_prompt = next(c["prompt"] for c in calls if "Restrictive Covenants" in c["prompt"])
+    assert "Section 27" in rc_prompt and "Indian Contract Act, 1872" in rc_prompt
+    assert "void" in rc_prompt.lower()
+    assert "ADVOCATE REVIEW" in rc_prompt
+
+
+def test_employment_governing_law_is_fixed_boilerplate_not_llm_fillable():
+    _, clauses = _load_employment_fixtures()
+    gov = next(c for c in clauses if c["clause_key"] == "governing_law_jurisdiction")
+    assert gov["clause_type"] == "fixed_boilerplate", (
+        "Governing Law must ship as fixed_boilerplate from day one on this template — "
+        "see the MoU-established llm_fillable classification bar"
+    )
+
+
+def test_employment_intellectual_property_is_fixed_boilerplate_not_llm_fillable():
+    _, clauses = _load_employment_fixtures()
+    ip = next(c for c in clauses if c["clause_key"] == "intellectual_property")
+    assert ip["clause_type"] == "fixed_boilerplate"
+
+
+def test_employment_only_three_llm_fillable_clauses():
+    _, clauses = _load_employment_fixtures()
+    llm_fillable_keys = {c["clause_key"] for c in clauses if c["clause_type"] == "llm_fillable"}
+    assert llm_fillable_keys == {"recitals", "position_duties_reporting", "restrictive_covenants"}
+
+
+def test_employment_confidentiality_is_single_clause_no_variant(monkeypatch):
+    """Employment confidentiality only has one sensible configuration
+    (Employee owes Employer) — unlike Consultancy/Service Agreement/MoU,
+    it should NOT use the applicable_condition-per-variant pattern."""
+    _, clauses = _load_employment_fixtures()
+    confidentiality_clauses = [c for c in clauses if c["clause_key"].startswith("confidentiality")]
+    assert len(confidentiality_clauses) == 1
+    assert confidentiality_clauses[0]["applicable_condition"] is None
+
+
+def test_employment_fixed_term_end_date_appears_only_for_fixed_term(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_employment(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative text drafted by the model.")
+
+    full_time = contracts.generate_draft(matter_id, template_id, EMPLOYMENT_FORM, db=db)
+    assert "shall automatically terminate on" not in full_time.full_text
+
+    form = dict(EMPLOYMENT_FORM, employment_type="Fixed-Term", fixed_term_end_date="2027-08-02")
+    fixed_term = contracts.generate_draft(matter_id, template_id, form, db=db)
+    assert "shall automatically terminate on 2027-08-02" in fixed_term.full_text
+
+
+def test_employment_governing_law_arbitration_branch(monkeypatch):
+    db = FakeDB()
+    template_id = _seed_employment(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="Narrative text drafted by the model.")
+
+    no_arb = contracts.generate_draft(matter_id, template_id, EMPLOYMENT_FORM, db=db)
+    assert "governed by the laws of India" in no_arb.full_text
+    assert "ADVOCATE REVIEW" not in no_arb.full_text
+
+    form = dict(EMPLOYMENT_FORM, arbitration=True, arbitration_seat="Gurugram")
+    with_arb = contracts.generate_draft(matter_id, template_id, form, db=db)
+    assert "referred to arbitration" in with_arb.full_text
+    assert "seated at Gurugram" in with_arb.full_text
+    assert "ADVOCATE REVIEW" in with_arb.full_text
+
+
+def test_employment_docx_renders_end_to_end_with_correct_numbering(monkeypatch):
+    from docx import Document
+
+    db = FakeDB()
+    template_id = _seed_employment(db)
+    matter_id = _seed_matter(db, matter_id="matter-employment-docx")
+    _fake_generate(monkeypatch, canned_text="Narrative text drafted by the model.")
+
+    result = contracts.generate_draft(matter_id, template_id, EMPLOYMENT_FORM, db=db)
+
+    output_path = REPO_ROOT / result.docx_path
+    try:
+        doc = Document(str(output_path))
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        assert "EMPLOYMENT AGREEMENT" in full_text
+        assert "Bright Horizons Tech Pvt Ltd" in full_text
+        assert "Sneha Reddy" in full_text
+        assert "an Individual residing at" in full_text, "Employee block must hardcode 'an Individual', no entity_type field"
+        assert "1. Definitions" in full_text
+        assert "2. Position, Duties and Reporting" in full_text
+        assert "3. Probation" in full_text
+        assert "4. Compensation and Benefits" in full_text
+        assert "5. Statutory Compliance" in full_text
+        assert "6. Confidentiality" in full_text
+        assert "7. Intellectual Property" in full_text
+        assert "8. Restrictive Covenants" in full_text
+        assert "9. Termination" in full_text
+        assert "10. Governing Law and Jurisdiction" in full_text
+        assert "11. Miscellaneous" in full_text
+    finally:
+        output_path.unlink(missing_ok=True)

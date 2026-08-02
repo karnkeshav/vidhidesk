@@ -313,6 +313,71 @@ def test_indian_legal_abbreviations_are_never_masked():
     assert mm.reverse == {}
 
 
+# --- TICKET-1 (Sprint 2 postmortem, 2026-08-01): auto_detect_names=False ---
+# Found live in the NDA E2E run: a Contracts clause-fill prompt is a mix of
+# this codebase's own static instruction wording and user-supplied data.
+# Scanning the whole assembled string with the Title-Case-run heuristic
+# false-positived on ordinary two-word capitalized legal drafting phrases
+# ("NOW THEREFORE", "Governing Law") that are the caller's own boilerplate,
+# not client data — and it wasn't just noise: the corrupted placeholder
+# ended up inside the literal instruction sent to the LLM ("Draft the
+# PARTY_D and Dispute Resolution clause..."). auto_detect_names=False lets
+# a caller that has ALREADY masked its user-supplied values individually
+# (see app/services/contracts.py::generate_draft) skip re-scanning its own
+# prose, without losing PAN/phone/Aadhaar/email detection (still regex,
+# still precise, still always on) or explicit entity masking.
+
+
+def test_template_boilerplate_passes_through_unchanged_with_auto_detect_off():
+    mm = MaskMap(matter_id="m1")
+    text = (
+        "Draft the recitals for this Non-Disclosure Agreement, ending with "
+        "'NOW THEREFORE, in consideration of the mutual covenants contained "
+        "herein, the Parties agree as follows:'. Draft the Governing Law and "
+        "Dispute Resolution clause, numbered '9. Governing Law and "
+        "Jurisdiction'."
+    )
+
+    masked = mask_text(text, mm, auto_detect_names=False)
+
+    assert masked == text
+    assert mm.reverse == {}
+
+
+def test_auto_detect_off_still_masks_explicit_entities_and_regex_pii():
+    """The flag only gates the fuzzy Title-Case-run/company/address
+    heuristics — explicit entities and structural regex (PAN/phone/
+    Aadhaar/email) must still fire, since those are exactly what a caller
+    relies on when it passes auto_detect_names=False for its own text."""
+    mm = MaskMap(matter_id="m1")
+    entities = [("PARTY", "Ramesh Kumar")]
+    text = (
+        "Client contact: Ramesh Kumar (PAN ABCDE1234F, mobile 9876543210). "
+        "Draft the Governing Law clause for this Agreement."
+    )
+
+    masked = mask_text(text, mm, entities, auto_detect_names=False)
+
+    assert "Ramesh Kumar" not in masked
+    assert "ABCDE1234F" not in masked
+    assert "9876543210" not in masked
+    assert "Governing Law" in masked  # not caught by fuzzy detection — correct, it's boilerplate
+
+
+def test_auto_detect_true_still_default_and_unchanged_for_existing_callers():
+    """Backward-compatibility guard: omitting auto_detect_names must behave
+    exactly as before this ticket — Litigation's chat messages and every
+    other existing caller are entirely user-authored text and must keep
+    full fuzzy detection."""
+    mm = MaskMap(matter_id="m1")
+    text = "Ramesh Kumar signed the notice."
+
+    masked = mask_text(text, mm)
+
+    assert "Ramesh Kumar" not in masked
+    assert "PARTY_A" in masked
+
+
 # --- Permanent regressions for the 2026-07-24 Q1 hand-traces ---------------
 
 

@@ -34,3 +34,6 @@ yarn-debug.log*
 
 # Local corpus (large PDFs shouldn't be committed)
 /corpus/*.pdf
+
+# Generated contract drafts (runtime output, not source)
+/api/generated_drafts/
