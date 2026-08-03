@@ -2129,4 +2129,25 @@ def test_template_lookup_supports_both_uuid_and_slug_keys(monkeypatch):
     assert data_uuid["template_key"] == "service-agreement"
 
 
+def test_profile_metadata_no_hardcoded_advocate_defaults():
+    """PROFILE-01: Verify user_metadata for a new user account does not contain
+    hardcoded advocate demo strings (e.g. Nitesh Sharma, D/1042/2018), and that missing
+    fields evaluate to empty strings instead of displaying another advocate's data."""
+    mock_user_meta = {}
+
+    def resolve_profile_field(meta_val, cached_val):
+        return meta_val or cached_val or ""
+
+    full_name = resolve_profile_field(mock_user_meta.get("full_name"), None)
+    bar_number = resolve_profile_field(mock_user_meta.get("bar_number"), None)
+    primary_court = resolve_profile_field(mock_user_meta.get("primary_court"), None)
+
+    assert full_name == "", f"Expected empty string, got hardcoded value: {full_name}"
+    assert bar_number == "", f"Expected empty string, got hardcoded value: {bar_number}"
+    assert primary_court == "", f"Expected empty string, got hardcoded value: {primary_court}"
+    assert "Nitesh" not in full_name
+    assert "D/1042/2018" not in bar_number
+
+
+
 

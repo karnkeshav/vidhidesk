@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
-import { User, Upload, CheckCircle2, ShieldCheck, Camera, Save, KeyRound, Mail } from "lucide-react";
+import { User, Upload, CheckCircle2, ShieldCheck, Camera, Save, KeyRound, Mail, AlertCircle } from "lucide-react";
 
 export type AdvocateProfile = {
   full_name: string;
@@ -20,12 +20,12 @@ export type AdvocateProfile = {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<AdvocateProfile>({
-    full_name: "Adv. Nitesh Sharma",
-    bar_number: "D/1042/2018",
-    primary_court: "Delhi High Court & Supreme Court of India",
-    phone: "+91 98765 43210",
+    full_name: "",
+    bar_number: "",
+    primary_court: "",
+    phone: "",
     email: "",
-    office_address: "Chamber No. 412, Lawyers Chambers Block, High Court of Delhi, New Delhi",
+    office_address: "",
     avatar_url: "",
   });
   const [newPassword, setNewPassword] = useState("");
@@ -42,31 +42,32 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        const meta = data.user.user_metadata || {};
-        const savedProfile = localStorage.getItem("vidhidesk_advocate_profile");
-        let initialProfile: AdvocateProfile = {
-          full_name: meta.full_name || "Adv. Nitesh Sharma",
-          bar_number: meta.bar_number || "D/1042/2018",
-          primary_court: meta.primary_court || "Delhi High Court & Supreme Court of India",
-          phone: meta.phone || "+91 98765 43210",
-          email: data.user.email || "",
-          office_address:
-            meta.office_address ||
-            "Chamber No. 412, Lawyers Chambers Block, High Court of Delhi, New Delhi",
-          avatar_url: meta.avatar_url || "",
-        };
-
-        if (savedProfile) {
-          try {
-            initialProfile = { ...initialProfile, ...JSON.parse(savedProfile) };
-          } catch {}
-        }
-        setProfile(initialProfile);
+  const loadProfileFromSupabase = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      const meta = data.user.user_metadata || {};
+      let cached: Partial<AdvocateProfile> = {};
+      const savedCache = localStorage.getItem("vidhidesk_advocate_profile");
+      if (savedCache) {
+        try {
+          cached = JSON.parse(savedCache);
+        } catch {}
       }
-    });
+
+      setProfile({
+        full_name: meta.full_name ?? cached.full_name ?? "",
+        bar_number: meta.bar_number ?? cached.bar_number ?? "",
+        primary_court: meta.primary_court ?? cached.primary_court ?? "",
+        phone: meta.phone ?? cached.phone ?? "",
+        email: data.user.email || "",
+        office_address: meta.office_address ?? cached.office_address ?? "",
+        avatar_url: meta.avatar_url ?? cached.avatar_url ?? "",
+      });
+    }
+  };
+
+  useEffect(() => {
+    void loadProfileFromSupabase();
   }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +115,9 @@ export default function ProfilePage() {
       localStorage.setItem("vidhidesk_advocate_profile", JSON.stringify(profile));
       // Dispatch custom event to update AuthedShell header immediately
       window.dispatchEvent(new Event("advocate_profile_updated"));
+
+      // Reload fresh server metadata from Supabase
+      await loadProfileFromSupabase();
 
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
@@ -187,6 +191,20 @@ export default function ProfilePage() {
             Manage your professional credentials, chamber details, profile photo, and password security.
           </p>
         </div>
+
+        {(!profile.full_name.trim() || !profile.bar_number.trim()) && (
+          <div role="status" className="flex items-start gap-3 rounded-sm border border-[#FFEBAA] bg-[#FFFBEB] p-4 text-xs font-sans text-[#92400E]">
+            <AlertCircle className="h-5 w-5 shrink-0 text-[#B45309]" />
+            <div>
+              <h4 className="font-semibold uppercase tracking-wider text-[#B45309]">
+                Welcome to Advocate Workspace — Complete Your Professional Profile
+              </h4>
+              <p className="mt-1 font-serif text-[#78350F]">
+                Please fill in your Advocate Full Name and Bar Council Registration Number below. These details will be automatically used to personalize your legal document sheets, verified contract drafts, and court dockets.
+              </p>
+            </div>
+          </div>
+        )}
 
         {savedSuccess && (
           <div className="flex items-center gap-2 rounded-sm border border-[#C3E6CB] bg-[#D4EDDA] p-3 font-sans text-xs font-semibold text-[#155724]">
@@ -287,7 +305,7 @@ export default function ProfilePage() {
                     value={profile.full_name}
                     onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
                     className="h-9 rounded-sm border-[#E4E2DD] font-sans text-xs text-[#1A1A1A]"
-                    placeholder="e.g. Adv. Nitesh Sharma"
+                    placeholder="Enter your full name and title"
                   />
                 </div>
 
@@ -301,7 +319,7 @@ export default function ProfilePage() {
                     value={profile.bar_number}
                     onChange={(e) => setProfile({ ...profile, bar_number: e.target.value })}
                     className="h-9 rounded-sm border-[#E4E2DD] font-sans text-xs text-[#1A1A1A]"
-                    placeholder="e.g. D/1042/2018"
+                    placeholder="Enter Bar Council Registration No."
                   />
                 </div>
               </div>
@@ -316,7 +334,7 @@ export default function ProfilePage() {
                   value={profile.primary_court}
                   onChange={(e) => setProfile({ ...profile, primary_court: e.target.value })}
                   className="h-9 rounded-sm border-[#E4E2DD] font-sans text-xs text-[#1A1A1A]"
-                  placeholder="e.g. Delhi High Court & Supreme Court of India"
+                  placeholder="Enter primary court jurisdiction"
                 />
               </div>
 
@@ -330,7 +348,7 @@ export default function ProfilePage() {
                     value={profile.phone}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                     className="h-9 rounded-sm border-[#E4E2DD] font-sans text-xs text-[#1A1A1A]"
-                    placeholder="+91 98765 43210"
+                    placeholder="Enter contact phone number"
                   />
                 </div>
 
@@ -356,7 +374,7 @@ export default function ProfilePage() {
                   value={profile.office_address}
                   onChange={(e) => setProfile({ ...profile, office_address: e.target.value })}
                   className="w-full rounded-sm border border-[#E4E2DD] p-2.5 font-sans text-xs text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#081534]"
-                  placeholder="Chamber address..."
+                  placeholder="Enter chamber or office address..."
                 />
               </div>
 

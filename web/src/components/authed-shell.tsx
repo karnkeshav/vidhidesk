@@ -37,13 +37,19 @@ export function AuthedShell({
   const [avatarUrl, setAvatarUrl] = useState<string>("");
 
   const loadAdvocateProfile = () => {
-    const saved = localStorage.getItem("vidhidesk_advocate_profile");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
-      } catch {}
-    }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.user_metadata?.avatar_url) {
+        setAvatarUrl(data.user.user_metadata.avatar_url);
+      } else {
+        const saved = localStorage.getItem("vidhidesk_advocate_profile");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
+          } catch {}
+        }
+      }
+    });
   };
 
   useEffect(() => {

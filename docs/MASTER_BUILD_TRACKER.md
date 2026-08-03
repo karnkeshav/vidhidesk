@@ -1,6 +1,6 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v10 — 3 August 2026 (updated after Matter-Centric Loading Model release)
+Document version: v11 — 3 August 2026 (updated after PROFILE-01 Advocate Profile Data Isolation Release)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
@@ -41,7 +41,7 @@ Doc	Date	Role	Status
 Single dashboard, four module tiles:
 Module	Core function	Primary risk	Build status
 Litigation	Query → validate → provisions → draft pleading, with verified case citations	Citation hallucination	📐 Designed in full [E23] — cause list & calendar live [E19], Sprint 3.5 workspace architecture documented in `LITIGATION_ARCHITECTURE.md`
-Contracts	Pick 1 of 25–30 templates → intake → generate → amend by chat command	Legal correctness without gold-standard drafts	✅ Confirmed live — 10 of 10 Phase 1 templates live [E2][E8][E16][E20], 3-panel workspace live [E17], P0 Stabilization complete [E21][E22], canonical template_key normalization live [E25], Matter-Centric Loading Model live [E26]
+Contracts	Pick 1 of 25–30 templates → intake → generate → amend by chat command	Legal correctness without gold-standard drafts	✅ Confirmed live — 10 of 10 Phase 1 templates live [E2][E8][E16][E20], 3-panel workspace live [E17], P0 Stabilization complete [E21][E22], canonical template_key normalization live [E25], Matter-Centric Loading Model live [E26], PROFILE-01 advocate profile isolation live [E27]
 RERA / Real Estate	Property deeds (Transfer of Property Act family) + RERA complaint drafting + state filing walkthroughs	State-by-state rule drift	📐 Designed only — tile live on dashboard
 Consulting & Litigation Support	Facts in → applicable law, forum, remedy, limitation; strategy briefs for matters argued by other counsel	~80% reuse of Litigation engine	📐 Designed only — tile live on dashboard
 Non-negotiable across all four (📐 Designed, TRD §3.3): every case citation is either verified against the Indian Kanoon API and hyperlinked, or rendered as `⚠ UNVERIFIED`. Enforced in the renderer (no `ik_id` in DB → no hyperlink can render), not just in the prompt. Confirmed implemented in engine [E1]; active rendering on live citation-bearing screens will accompany Litigation/Consulting workspace launches.
@@ -68,7 +68,7 @@ Copy tone: Formal, restrained. "Draft" not "Create." "Matter" not "Case." Indian
 4. Phase (Project Plan) → Sprint (Stitch/Nav Spec) Mapping
 Project Plan Phase	Weeks	Stitch/Nav Sprint equivalent	Status
 Phase 0 — Scope freeze + template sourcing	3 wks	Sprint 1 (pre-tracker)	✅ Confirmed done [E1: commits `219a9aa`, `28e6e85`]
-Phase 1 — Contracts MVP	8–10 wks	Sprint 2 + Sprint 3	✅ Confirmed COMPLETE [E2][E3][E8][E16][E17][E20][E21][E22][E24][E25][E26] — 10 of 10 Phase 1 templates live, workspace 100% complete, all P0 backend & frontend stabilization complete, template key normalization complete [E25], Matter-centric loading model complete [E26]
+Phase 1 — Contracts MVP	8–10 wks	Sprint 2 + Sprint 3	✅ Confirmed COMPLETE [E2][E3][E8][E16][E17][E20][E21][E22][E24][E25][E26][E27] — 10 of 10 Phase 1 templates live, workspace 100% complete, all P0 backend & frontend stabilization complete, template key normalization complete [E25], Matter-centric loading model complete [E26], PROFILE-01 complete [E27]
 Phase 2 — Litigation + citation engine	6–8 wks	Sprint 3.5 (Litigation Pleading & Case Law Workbench)	📐 Architecture designed [E23] (`docs/LITIGATION_ARCHITECTURE.md`), pending user implementation signoff
 Phase 3 — RERA + Consulting	6 wks	Sprint 4 (Consulting) + Sprint 5 (RERA)	📐 Designed only — tiles live on dashboard
 Phase 4 — Productisation (post-launch)	ongoing	Sprint 6 (Hardening) + beyond	📐 Designed only, no build evidence
@@ -81,12 +81,12 @@ Login	`/login`	✅ Confirmed [E1: Sprint 0 commit `28e6e85`, Lex Scripta V2 desi
 Dashboard	`/dashboard`	✅ Confirmed [E3: commit `6c6bdc6`, Stitch V2 4-card module layout `d928c15`]
 Contracts Template Picker (initial)	`/contracts`	✅ Confirmed live [E2: `web/src/app/contracts/page.tsx`, Stitch V2 layout `5fdf32f`]
 ---
-Sprint 2 — Contracts Module Completion — ✅ Confirmed 100% built for UI & all 10 Phase 1 templates [E16][E17][E20][E21][E22][E24][E25][E26]
+Sprint 2 — Contracts Module Completion — ✅ Confirmed 100% built for UI & all 10 Phase 1 templates [E16][E17][E20][E21][E22][E24][E25][E26][E27]
 Session (as planned)	Focus	Route(s)	API Endpoints	DB Tables	Status
 1	Intake Form	`/contracts` & `/contracts/[matterId]`	`POST /api/matters` · `PATCH /api/matters/[id]` · `GET /api/state-rules`	`matters`, `templates`, `state_rules`, `draft_versions`	✅ Confirmed built [E2: `intake-form.tsx`; E8: E2E walkthrough; E17: Stitch V2 intake integration; E26: Matter-centric loading model]. Collapsible groups & live party title auto-generation active across all 10 templates.
 2	Draft View	`/contracts/[matterId]`	`GET /api/drafts/[id]/download`, `.pdf` · `POST /api/matters/[id]/drafts`	`draft_versions`, `matters`, `draft_clause_fills`	✅ Confirmed built [E17: `LegalDocumentSheet` serif canvas, `ContractAiAssistant` right sidebar copilot, sticky formatting toolbar, status footer bar; E21: HTTP 504 timeout protection; E22: mobile AI slide-over sheet].
 3	Clause Review Admin	`/admin/templates/[key]`	`POST /api/contracts/templates/{id}/clauses/{cid}/review` · `.../bulk-keep-boilerplate`	`templates`, `template_clauses` ✅, `clause_reviews` ✅	✅ Confirmed built and exercised [E5: migration 0007; E11: review-state sweep; E20: 10 templates supported]. Admin template index ([`/admin/templates`](file:///home/keysh/vidhidesk/web/src/app/admin/templates/page.tsx)) live.
-4	Header Shell & Controls	Applies globally	Supabase Auth metadata	`auth.users`	✅ Confirmed built [E17][E18]: Header notifications icon, settings gear, advocate avatar frame, and Advocate Profile page ([`/profile`](file:///home/keysh/vidhidesk/web/src/app/profile/page.tsx)) with photo upload and password reset options.
+4	Header Shell & Controls	Applies globally	Supabase Auth metadata	`auth.users`	✅ Confirmed built [E17][E18][E27]: Header notifications icon, settings gear, advocate avatar frame, and Advocate Profile page ([`/profile`](file:///home/keysh/vidhidesk/web/src/app/profile/page.tsx)) with photo upload, Supabase user_metadata server-first loading [E27], onboarding profile alert banner, and password reset options.
 5	Mobile Responsive Pass	`/contracts`, `/dashboard`, `/profile`	`GET /api/templates`	`templates`, `matters`	✅ Confirmed built [E17][E18][E22]: Mobile bottom nav bar (`Home`, `Documents`, `Research / Drafts`, `Calendar`), left drawer navigation, responsive document sheet layout, and mobile floating AI assistant trigger button & slide-over sheet.
 Templates actually shipped (✅ Confirmed [E2][E9][E16][E20][E25], 10 of 10 Phase 1 templates live in production):
 1. NDA — 12 clauses (`nda`)
@@ -99,12 +99,12 @@ Templates actually shipped (✅ Confirmed [E2][E9][E16][E20][E25], 10 of 10 Phas
 8. Agreement to Sell — 8 clauses (`agreement-to-sell`) [E20]
 9. Joint Venture Agreement — 8 clauses (`joint-venture`) [E20]
 10. Software Development & Maintenance Agreement — 9 clauses (`software-dev`) [E20]
-Sprint 2 exit gate (✅ Confirmed met for all 10 templates [E17][E20][E21][E22][E24][E25][E26]): all 10 templates generate complete drafts from intake; state selection provides stamp-duty notes; amendment commands version without loss; drafts export .docx and .pdf with 15s timeout protection; all 10 templates render cleanly on Contracts Workspace grid and open directly via Matter-centric URLs (`/contracts/{matterId}`).
+Sprint 2 exit gate (✅ Confirmed met for all 10 templates [E17][E20][E21][E22][E24][E25][E26][E27]): all 10 templates generate complete drafts from intake; state selection provides stamp-duty notes; amendment commands version without loss; drafts export .docx and .pdf with 15s timeout protection; all 10 templates render cleanly on Contracts Workspace grid; profile page isolates advocate data per user without hardcoded defaults [E27].
 ---
 Sprint 3 — Refinements, Navigation & Admin Improvements
 Session	Focus	Route(s)	Status
 S3.1	Admin templates index (all-templates review status)	`/admin/templates`	✅ Confirmed built [E3: commit `6c6bdc6` — `web/src/app/admin/templates/page.tsx` created].
-S3.2	Advocate Profile & Settings Page	`/profile`	✅ Confirmed built [E18: commit `c1c118d`, `6eec6a3` — photo upload, Supabase metadata sync, password update & email reset].
+S3.2	Advocate Profile & Settings Page	`/profile`	✅ Confirmed built [E18: commit `c1c118d`, `6eec6a3`; E27: PROFILE-01 removed demo strings, server-first user_metadata persistence, onboarding banner].
 S3.3	Cause List Calendar Page	`/calendar`	✅ Confirmed built [E19: commit `c1c118d` — litigation hearing dockets schedule].
 S3.4	Advocate Document Vault	`/documents`	✅ Confirmed built [E19: commit `c1c118d` — versioned `.docx` draft file store].
 S3.5	Template Expansion Helper Refactoring	`api/scripts/template_seed_utils.py`	✅ Confirmed built [E20: centralized `seed_template_pipeline` to eliminate seed script code duplication].
@@ -114,8 +114,9 @@ S3.8	Sprint 3.5 Litigation Architecture Design	`docs/LITIGATION_ARCHITECTURE.md`
 S3.9	LLM Gateway Intra-Provider Model Pool Failover	`api/app/services/llm_gateway.py`	✅ Confirmed built [E24: intra-provider model pools with pinned versions; Gemini 4 models, Groq 5 models, SambaNova 1 model, Cerebras 3 models; per-model transient retry + position logging].
 S3.10	Canonical Template Key Normalization	`service-agreement`	✅ Confirmed built [E25: standardized all 10 templates to kebab-case across DB, seed scripts, schemas, frontend filter, migration 0009, and regression tests].
 S3.11	Matter-Centric Loading Model Release	`/contracts/{matterId}`	✅ Confirmed built [E26: added template_id column to matters table (migration 0009/0010), updated MatterCreate/Out schemas, standardized get_template for UUID & slug lookup, clean matter-centric routing without requiring ?template=].
-S3.12	Cross-template shared-clause detection banner	`/admin/templates/[key]` (enhancement)	📐 Requested in Batch 4.5 message [E13], not confirmed built
-S3.13	Content-hash mismatch warning (clause changed since review)	`/admin/templates/[key]` (enhancement)	⚠ Gap remains — not built as far as evidence shows
+S3.12	PROFILE-01 Advocate Profile Isolation Release	`/profile`	✅ Confirmed built [E27: removed hardcoded advocate demo values, server-first user_metadata loading, onboarding alert banner for incomplete profiles, regression tests].
+S3.13	Cross-template shared-clause detection banner	`/admin/templates/[key]` (enhancement)	📐 Requested in Batch 4.5 message [E13], not confirmed built
+S3.14	Content-hash mismatch warning (clause changed since review)	`/admin/templates/[key]` (enhancement)	⚠ Gap remains — not built as far as evidence shows
 ---
 Sprint 4 — Consulting & Litigation Support Module
 Session	Focus	Route(s)	Status
@@ -143,6 +144,7 @@ Formatted Legal Document Canvas	✅ Confirmed built [E17: `web/src/components/le
 Persistent AI Legal Copilot Sidebar	✅ Confirmed built [E17: `web/src/components/contract-ai-assistant.tsx` (Risk analysis, suggestions, citations); E22: mobile slide-over sheet]
 Template Category Checkbox Filter & Search	✅ Confirmed built [E22: `web/src/app/contracts/page.tsx`; E25: normalized key matching rendering 10/10 templates]
 Matter-Centric Loading Model & Clean Routing	✅ Confirmed built [E26: stored template_id on matters table, clean `/contracts/{matterId}` URLs, robust UUID/slug lookup]
+Advocate Profile Data Isolation (PROFILE-01)	✅ Confirmed built [E27: server-first user_metadata loading, onboarding alert banner, removed hardcoded advocate demo values]
 ---
 7. Current Status Snapshot
 7.1 Confirmed build log (✅ — chronological, per pasted evidence)
@@ -159,6 +161,7 @@ Sprint 3.5 Litigation Architecture Design [E23]: Delivered `docs/LITIGATION_ARCH
 LLM Gateway Intra-Provider Model Pool Failover [E24]: Refactored `api/app/services/llm_gateway.py` to try an ordered pool of pinned models within each provider tier before escalating to the next provider. Configured 4 Gemini models, 5 Groq models, 1 SambaNova model, and 3 Cerebras models. All 169 backend pytest tests passed cleanly.
 Canonical Template Key Normalization [E25]: Standardized all template keys to kebab-case (`service-agreement`). Created migration `0009_normalize_template_keys.sql`, updated Supabase database, seed script, JSON schema, and frontend category filter logic (`web/src/app/contracts/page.tsx`). Added 2 backend regression tests. All 10/10 templates render cleanly on Contracts Workspace grid.
 Matter-Centric Loading Model Release [E26]: Implemented permanent template association on matters table (`0010_add_template_id_to_matters.sql`), clean `/contracts/{matterId}` URLs, standardized `get_template()` for UUID & slug lookup, and updated all frontend navigation links. Added regression tests. 173/173 backend pytest tests and 13/13 frontend static pages passed.
+PROFILE-01 Advocate Profile Isolation Release [E27]: Removed all hardcoded advocate demo values (`Adv. Nitesh Sharma`, `D/1042/2018`, etc.), implemented server-first loading from Supabase Auth `user_metadata`, added a friendly onboarding alert banner for incomplete profiles, and updated `AuthedShell` header avatar synchronization. Added regression tests. 174/174 backend pytest tests and 13/13 frontend static pages passed.
 Deployment [E15]: backend live on Render (`vidhidesk.onrender.com`), frontend live on Vercel; confirmed working end-to-end.
 7.2 Not started / no evidence
 Litigation pleading generator workspace implementation (architecture designed [E23]), RERA filing wizard, Consulting advisory brief generator.
@@ -172,8 +175,8 @@ Defined and built via migration 0007 [E5] — `template_clauses`, `clause_review
 Cross-template shared-clause detection requested in Batch 4.5 message [E13] but no build confirmation exists. Content-hash mismatch warning has no build evidence.
 8.4 Template Inventory Completed — ✅ 10 of 10 Phase 1 templates live in production [E16][E20][E25]
 All 10 Phase 1 templates seeded, normalized, and verified (`nda`, `service-agreement`, `consultancy`, `mou`, `employment`, `leave-licence`, `lease-deed`, `agreement-to-sell`, `joint-venture`, `software-dev`).
-8.5 Technical Debt & Stabilization — ✅ ALL ISSUES RESOLVED [E21][E22][E24][E25][E26]
-Backend `SEC-01`, `PERF-01`, LLM Gateway intra-provider model pool failover [E24], canonical template key normalization [E25], and Matter-Centric Loading Model [E26] are fully implemented and verified.
+8.5 Technical Debt & Stabilization — ✅ ALL ISSUES RESOLVED [E21][E22][E24][E25][E26][E27]
+Backend `SEC-01`, `PERF-01`, LLM Gateway intra-provider model pool failover [E24], canonical template key normalization [E25], Matter-Centric Loading Model [E26], and PROFILE-01 advocate profile isolation [E27] are fully implemented and verified.
 ---
 9. Open Decisions
 Nitesh's design involvement: 📐 confirmed zero involvement in UI decisions; his review is legal-content only.
@@ -213,7 +216,8 @@ E23	Sprint 3.5 Litigation Architecture Specification — Authored `docs/LITIGATI
 E24	LLM Gateway Intra-Provider Model Pool Failover Release — Refactored `api/app/services/llm_gateway.py` to support intra-provider model pools with pinned versions across Gemini (4 models), Groq (5 models), SambaNova (1 model), and Cerebras (3 models). Removed unused `rate_limited` attribute. Added 4 unit tests. Verified 169/169 backend pytest tests passed cleanly.	Pasted 3 Aug 2026
 E25	Canonical Template Key Normalization Release — Standardized all 10 contract templates to kebab-case template keys (`service-agreement`). Created migration `0009_normalize_template_keys.sql`, updated Supabase database, seed script, JSON schema, and frontend category filter logic (`web/src/app/contracts/page.tsx`). Added 2 backend regression tests. All 10/10 templates render cleanly on Contracts Workspace grid.	Pasted 3 Aug 2026
 E26	Matter-Centric Loading Model Release — Added `template_id` column to `matters` table (`0010_add_template_id_to_matters.sql`), updated `MatterCreate`/`MatterOut` schemas, standardized `get_template()` for UUID & slug lookup, and updated all frontend navigation links (`/contracts/{matterId}`). Added regression tests. 173/173 backend pytest tests and 13/13 frontend static pages passed.	Pasted 3 Aug 2026
+E27	PROFILE-01 Advocate Profile Isolation Release — Removed all hardcoded advocate demo values (`Adv. Nitesh Sharma`, `D/1042/2018`, etc.), implemented server-first loading from Supabase Auth `user_metadata`, added a friendly onboarding alert banner for incomplete profiles, and updated `AuthedShell` header avatar synchronization. Added regression tests. 174/174 backend pytest tests and 13/13 frontend static pages passed.	Pasted 3 Aug 2026
 ---
-Document version: v10 — 3 August 2026
+Document version: v11 — 3 August 2026
 Owner: Keshav
-Change from v9: updated §2, §4, §5, §6, §7, §8, §11 to record completion of Matter-Centric Loading Model release and Evidence Log item E26.
+Change from v10: updated §2, §4, §5, §6, §7, §8, §11 to record completion of PROFILE-01 Advocate Profile Isolation release and Evidence Log item E27.
