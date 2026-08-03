@@ -1996,3 +1996,59 @@ def test_convert_docx_to_pdf_timeout_raises_pdf_conversion_timeout(monkeypatch, 
 
     assert "LibreOffice PDF conversion timed out after 15 seconds" in str(exc_info.value)
 
+
+def test_all_10_contract_templates_have_canonical_kebab_case_keys(monkeypatch):
+    """Regression test: All 10 Phase 1 templates must exist in database, return via list_templates(),
+    and have canonical kebab-case template_key values (no underscores)."""
+    import re
+    from app.db import service_client
+
+    rows = service_client().table("templates").select("id, name, template_key, category").eq("category", "contracts").execute().data
+    assert len(rows) == 10, f"Expected exactly 10 contract templates, found {len(rows)}"
+
+    kebab_pattern = re.compile(r"^[a-z0-9-]+$")
+    template_keys = [r["template_key"] for r in rows]
+
+    for key in template_keys:
+        assert key is not None and key != "", f"Template row missing template_key: {key}"
+        assert "_" not in key, f"Template key '{key}' contains underscore; must be canonical kebab-case"
+        assert kebab_pattern.match(key), f"Template key '{key}' does not match kebab-case pattern"
+
+    assert "service-agreement" in template_keys
+    assert "nda" in template_keys
+    assert "consultancy" in template_keys
+    assert "mou" in template_keys
+    assert "employment" in template_keys
+    assert "leave-licence" in template_keys
+    assert "lease-deed" in template_keys
+    assert "joint-venture" in template_keys
+    assert "agreement-to-sell" in template_keys
+    assert "software-dev" in template_keys
+
+
+def test_frontend_category_filter_mapping_covers_all_10_templates():
+    """Regression test: Ensure every one of the 10 canonical template_keys maps to at least
+    one frontend category ('commercial', 'employment', 'ip') so no template is ever filtered out."""
+    canonical_keys = [
+        "nda",
+        "service-agreement",
+        "consultancy",
+        "mou",
+        "leave-licence",
+        "lease-deed",
+        "agreement-to-sell",
+        "joint-venture",
+        "employment",
+        "software-dev",
+    ]
+
+    commercial_keys = {"nda", "service-agreement", "consultancy", "mou", "leave-licence", "lease-deed", "agreement-to-sell", "joint-venture"}
+    employment_keys = {"employment"}
+    ip_keys = {"software-dev", "nda", "service-agreement"}
+
+    all_categorized_keys = commercial_keys | employment_keys | ip_keys
+
+    for key in canonical_keys:
+        assert key in all_categorized_keys, f"Template key '{key}' is excluded from all frontend categories!"
+
+

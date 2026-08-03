@@ -1,5 +1,5 @@
 {
-  "template_key": "service_agreement",
+  "template_key": "service-agreement",
   "title": "Service Agreement",
   "fields": [
     {"key": "party_a_name", "label": "Service Provider — Full Legal Name", "type": "text", "required": true},

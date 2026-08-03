@@ -42,7 +42,7 @@ DOCX_PATH = "templates/contracts/service-agreement.docx"
 
 TEMPLATE_NAME = "Service Agreement"
 TEMPLATE_CATEGORY = "contracts"
-TEMPLATE_KEY = "service_agreement"
+TEMPLATE_KEY = "service-agreement"
 STATES_SUPPORTED = ["Delhi", "Maharashtra", "Uttar Pradesh"]
 
 CLAUSES = [

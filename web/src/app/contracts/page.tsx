@@ -51,11 +51,12 @@ export default function ContractsPage() {
   );
 
   const filteredTemplates = templates.filter((t) => {
-    const key = (t.template_key || "").toLowerCase();
+    const rawKey = (t.template_key || "").toLowerCase();
+    const key = rawKey.replace(/_/g, "-");
     const name = t.name.toLowerCase();
     const query = searchQuery.trim().toLowerCase();
 
-    const matchesSearch = !query || name.includes(query) || key.includes(query);
+    const matchesSearch = !query || name.includes(query) || key.includes(query) || rawKey.includes(query);
 
     let matchesCategory = false;
     if (
