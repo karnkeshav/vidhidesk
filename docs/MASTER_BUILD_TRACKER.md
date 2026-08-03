@@ -1,6 +1,6 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v7 — 3 August 2026 (updated after Sprint 3.5 Litigation Architecture design)
+Document version: v8 — 3 August 2026 (updated after LLM Gateway Model Pool Failover refactoring)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
@@ -68,7 +68,7 @@ Copy tone: Formal, restrained. "Draft" not "Create." "Matter" not "Case." Indian
 4. Phase (Project Plan) → Sprint (Stitch/Nav Spec) Mapping
 Project Plan Phase	Weeks	Stitch/Nav Sprint equivalent	Status
 Phase 0 — Scope freeze + template sourcing	3 wks	Sprint 1 (pre-tracker)	✅ Confirmed done [E1: commits `219a9aa`, `28e6e85`]
-Phase 1 — Contracts MVP	8–10 wks	Sprint 2 + Sprint 3	✅ Confirmed COMPLETE [E2][E3][E8][E16][E17][E20][E21][E22] — 10 of 10 Phase 1 templates live, workspace 100% complete, all P0 backend & frontend stabilization complete
+Phase 1 — Contracts MVP	8–10 wks	Sprint 2 + Sprint 3	✅ Confirmed COMPLETE [E2][E3][E8][E16][E17][E20][E21][E22][E24] — 10 of 10 Phase 1 templates live, workspace 100% complete, all P0 backend & frontend stabilization complete, LLM Gateway intra-provider model pool failover live [E24]
 Phase 2 — Litigation + citation engine	6–8 wks	Sprint 3.5 (Litigation Pleading & Case Law Workbench)	📐 Architecture designed [E23] (`docs/LITIGATION_ARCHITECTURE.md`), pending user implementation signoff
 Phase 3 — RERA + Consulting	6 wks	Sprint 4 (Consulting) + Sprint 5 (RERA)	📐 Designed only — tiles live on dashboard
 Phase 4 — Productisation (post-launch)	ongoing	Sprint 6 (Hardening) + beyond	📐 Designed only, no build evidence
@@ -81,7 +81,7 @@ Login	`/login`	✅ Confirmed [E1: Sprint 0 commit `28e6e85`, Lex Scripta V2 desi
 Dashboard	`/dashboard`	✅ Confirmed [E3: commit `6c6bdc6`, Stitch V2 4-card module layout `d928c15`]
 Contracts Template Picker (initial)	`/contracts`	✅ Confirmed live [E2: `web/src/app/contracts/page.tsx`, Stitch V2 layout `5fdf32f`]
 ---
-Sprint 2 — Contracts Module Completion — ✅ Confirmed 100% built for UI & all 10 Phase 1 templates [E16][E17][E20][E21][E22]
+Sprint 2 — Contracts Module Completion — ✅ Confirmed 100% built for UI & all 10 Phase 1 templates [E16][E17][E20][E21][E22][E24]
 Session (as planned)	Focus	Route(s)	API Endpoints	DB Tables	Status
 1	Intake Form	`/contracts` & `/contracts/[matterId]`	`POST /api/matters` · `PATCH /api/matters/[id]` · `GET /api/state-rules`	`matters`, `templates`, `state_rules`, `draft_versions`	✅ Confirmed built [E2: `intake-form.tsx`; E8: E2E walkthrough; E17: Stitch V2 intake integration]. Collapsible groups & live party title auto-generation active across all 10 templates.
 2	Draft View	`/contracts/[matterId]`	`GET /api/drafts/[id]/download`, `.pdf` · `POST /api/matters/[id]/drafts`	`draft_versions`, `matters`, `draft_clause_fills`	✅ Confirmed built [E17: `LegalDocumentSheet` serif canvas, `ContractAiAssistant` right sidebar copilot, sticky formatting toolbar, status footer bar; E21: HTTP 504 timeout protection; E22: mobile AI slide-over sheet].
@@ -99,7 +99,7 @@ Templates actually shipped (✅ Confirmed [E2][E9][E16][E20], 10 of 10 Phase 1 t
 8. Agreement to Sell — 8 clauses (`agreement-to-sell`) [E20]
 9. Joint Venture Agreement — 8 clauses (`joint-venture`) [E20]
 10. Software Development & Maintenance Agreement — 9 clauses (`software-dev`) [E20]
-Sprint 2 exit gate (✅ Confirmed met for all 10 templates [E17][E20][E21][E22]): all 10 templates generate complete drafts from intake; state selection provides stamp-duty notes; amendment commands version without loss; drafts export .docx and .pdf with 15s timeout protection.
+Sprint 2 exit gate (✅ Confirmed met for all 10 templates [E17][E20][E21][E22][E24]): all 10 templates generate complete drafts from intake; state selection provides stamp-duty notes; amendment commands version without loss; drafts export .docx and .pdf with 15s timeout protection.
 ---
 Sprint 3 — Refinements, Navigation & Admin Improvements
 Session	Focus	Route(s)	Status
@@ -111,8 +111,9 @@ S3.5	Template Expansion Helper Refactoring	`api/scripts/template_seed_utils.py`	
 S3.6	Phase A P0 Backend Stabilization Fixes	`SEC-01`, `PERF-01`	✅ Confirmed built [E21: XML prompt injection boundary delimiters across all LLM entry points + LibreOffice 15s subprocess timeout protection with HTTP 504 error response].
 S3.7	Phase 1 Frontend P0 Stabilization Fixes	`MOB-01`, `UX-01`, `UX-02`	✅ Confirmed built [E22: Mobile AI Assistant floating trigger & slide-over sheet + real template category filter checkboxes with combined search & empty state + Lex Scripta error recovery card with retry button].
 S3.8	Sprint 3.5 Litigation Architecture Design	`docs/LITIGATION_ARCHITECTURE.md`	📐 Designed in full [E23: complete 15-section architecture specification, database additions, RAG pipeline, IK integration, security model, and component reuse breakdown].
-S3.9	Cross-template shared-clause detection banner	`/admin/templates/[key]` (enhancement)	📐 Requested in Batch 4.5 message [E13], not confirmed built
-S3.10	Content-hash mismatch warning (clause changed since review)	`/admin/templates/[key]` (enhancement)	⚠ Gap remains — not built as far as evidence shows
+S3.9	LLM Gateway Intra-Provider Model Pool Failover	`api/app/services/llm_gateway.py`	✅ Confirmed built [E24: intra-provider model pools with pinned versions; Gemini 4 models, Groq 5 models, SambaNova 1 model, Cerebras 3 models; per-model transient retry + position logging].
+S3.10	Cross-template shared-clause detection banner	`/admin/templates/[key]` (enhancement)	📐 Requested in Batch 4.5 message [E13], not confirmed built
+S3.11	Content-hash mismatch warning (clause changed since review)	`/admin/templates/[key]` (enhancement)	⚠ Gap remains — not built as far as evidence shows
 ---
 Sprint 4 — Consulting & Litigation Support Module
 Session	Focus	Route(s)	Status
@@ -126,7 +127,7 @@ All sessions (S6.1–S6.2): ⬜ Designed only.
 ---
 6. Cross-Cutting Backend Subsystems
 Subsystem	Status
-LLM Gateway (Gemini → Groq → SambaNova → Cerebras)	✅ Confirmed built, Sprint 0 [E1: commit `28e6e85`], 4-tier failover, SEC-01 prompt isolation [E21]
+LLM Gateway (Gemini → Groq → SambaNova → Cerebras)	✅ Confirmed built, Sprint 0 [E1: commit `28e6e85`], 4-tier provider failover, intra-provider model pools [E24], SEC-01 prompt isolation [E21]
 Conversation history across turns	✅ Confirmed built [E12]: bounded 6-message window using stored `masked_prompt`
 PII Masker & Unmasker	✅ Confirmed built [E12: per-string masking, statute-abbreviation allowlist, `pii_masks` DB table]
 RAG Retriever (statute knowledge base)	✅ Confirmed built, Sprint 1 [E1: commit `0b165e8` — statute RAG + hybrid retrieval]; 📐 Extended for Litigation [E23]
@@ -152,6 +153,7 @@ Phase 1 Contract Template Expansion [E20]: 5 new production contract templates b
 Phase A P0 Backend Stabilization Fixes [E21]: Implemented `SEC-01` (XML-style prompt boundary isolation `<user_instruction>` / `<user_amendment>` across all LLM entry points) and `PERF-01` (LibreOffice PDF conversion 15s subprocess timeout cap with `PdfConversionTimeout` and HTTP 504 error response). Added 3 unit tests. All 165 backend pytest tests passed cleanly.
 Phase 1 Frontend P0 Stabilization Fixes [E22]: Implemented `MOB-01` (Mobile AI Assistant floating trigger button & slide-over sheet), `UX-01` (Template category filter checkboxes with real filtering, combined search, and structured empty state), and `UX-02` (Lex Scripta structured error recovery cards with actionable retry buttons). Verified `npm run lint` (0 errors) and `npm run build` (13/13 static routes).
 Sprint 3.5 Litigation Architecture Design [E23]: Delivered `docs/LITIGATION_ARCHITECTURE.md` comprehensive architecture specification for Sprint 3.5 Litigation Pleading & Case Law Workbench.
+LLM Gateway Intra-Provider Model Pool Failover [E24]: Refactored `api/app/services/llm_gateway.py` to try an ordered pool of pinned models within each provider tier before escalating to the next provider. Configured 4 Gemini models (`gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.5-flash-lite`), 5 Groq models (`llama-3.3-70b-versatile`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, `openai/gpt-oss-20b`, `llama-3.1-8b-instant`), 1 SambaNova model (`Meta-Llama-3.3-70B-Instruct`), and 3 Cerebras models (`gpt-oss-120b`, `zai-glm-4.7`, `gemma-4-31b`). Added explicit model exclusion documentation. Cleaned up unused `rate_limited` attribute. Added 4 unit tests verifying in-pool failover, pool exhaustion escalation, per-model transient retry, and detailed audit log cascade. All 169 backend pytest tests passed cleanly.
 Deployment [E15]: backend live on Render (`vidhidesk.onrender.com`), frontend live on Vercel; confirmed working end-to-end.
 7.2 Not started / no evidence
 Litigation pleading generator workspace implementation (architecture designed [E23]), RERA filing wizard, Consulting advisory brief generator.
@@ -165,8 +167,8 @@ Defined and built via migration 0007 [E5] — `template_clauses`, `clause_review
 Cross-template shared-clause detection requested in Batch 4.5 message [E13] but no build confirmation exists. Content-hash mismatch warning has no build evidence.
 8.4 Template Inventory Completed — ✅ 10 of 10 Phase 1 templates live in production [E16][E20]
 All 10 Phase 1 templates seeded and verified (`NDA`, `Service Agreement`, `Consultancy`, `MoU`, `Employment`, `Leave and Licence`, `Lease Deed`, `Agreement to Sell`, `Joint Venture`, `Software Development`).
-8.5 Technical Debt & P0 Stabilization — ✅ ALL P0 ITEMS RESOLVED [E21][E22]
-Backend `SEC-01` (prompt isolation) and `PERF-01` (15s PDF timeout) + Frontend `MOB-01` (mobile AI assistant slide-over), `UX-01` (template category filters), and `UX-02` (error recovery card with retry buttons) are fully implemented and verified.
+8.5 Technical Debt & P0 Stabilization — ✅ ALL P0 ITEMS RESOLVED [E21][E22][E24]
+Backend `SEC-01` (prompt isolation), `PERF-01` (15s PDF timeout), and LLM Gateway intra-provider model pool failover [E24] + Frontend `MOB-01` (mobile AI assistant slide-over), `UX-01` (template category filters), and `UX-02` (error recovery card with retry buttons) are fully implemented and verified.
 ---
 9. Open Decisions
 Nitesh's design involvement: 📐 confirmed zero involvement in UI decisions; his review is legal-content only.
@@ -203,7 +205,8 @@ E20	Phase 1 Contract Template Expansion (Batches 5–7) — 5 new templates impl
 E21	Phase A P0 Backend Stabilization Release — Implemented `SEC-01` (XML-style prompt boundary isolation `<user_instruction>` / `<user_amendment>` across all LLM entry points) and `PERF-01` (LibreOffice PDF conversion 15s subprocess timeout cap with `PdfConversionTimeout` and HTTP 504 error response). Added 3 unit tests. Verified 165/165 backend pytest tests passed cleanly.	Pasted 3 Aug 2026
 E22	Phase 1 Frontend P0 Stabilization Release — Implemented `MOB-01` (Mobile AI Assistant floating trigger button & slide-over sheet), `UX-01` (Template category filter checkboxes with real filtering, combined search, and structured empty state), and `UX-02` (Lex Scripta structured error recovery cards with actionable retry buttons). Verified `npm run lint` (0 errors) and `npm run build` (13/13 static routes).	Pasted 3 Aug 2026
 E23	Sprint 3.5 Litigation Architecture Specification — Authored `docs/LITIGATION_ARCHITECTURE.md` comprehensive architecture document covering 15 structural domains, database additions, RAG pipeline, Indian Kanoon API integration, security model, and component reuse analysis.	Pasted 3 Aug 2026
+E24	LLM Gateway Intra-Provider Model Pool Failover Release — Refactored `api/app/services/llm_gateway.py` to support intra-provider model pools with pinned versions across Gemini (4 models), Groq (5 models), SambaNova (1 model), and Cerebras (3 models). Removed unused `rate_limited` attribute. Added 4 unit tests. Verified 169/169 backend pytest tests passed cleanly.	Pasted 3 Aug 2026
 ---
-Document version: v7 — 3 August 2026
+Document version: v8 — 3 August 2026
 Owner: Keshav
-Change from v6: updated §1, §2, §4, §5, §6, §7, §8, §11 to reference `docs/LITIGATION_ARCHITECTURE.md` and Evidence Log item E23.
+Change from v7: updated §1, §4, §5, §6, §7, §8, §11 to record completion of LLM Gateway model pool failover refactoring and Evidence Log item E24.

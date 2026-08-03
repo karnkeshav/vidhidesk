@@ -63,10 +63,9 @@ SYSTEM_PROMPTS: dict[str, str] = {
 
 
 class ProviderError(Exception):
-    def __init__(self, provider: str, message: str, rate_limited: bool = False):
+    def __init__(self, provider: str, message: str):
         super().__init__(f"{provider}: {message}")
         self.provider = provider
-        self.rate_limited = rate_limited
 
 
 @dataclass
@@ -79,9 +78,8 @@ class GenerationResult:
 
 
 # Transient network failures (timeout, connection reset) get one retry
-# within the same provider before we fail over. Rate limits and 4xx/5xx
-# responses fail over immediately — retrying a 429 against the same
-# provider just burns more quota for no benefit.
+# within the same provider/model before moving to the next model in the pool.
+# Rate limits and 4xx/5xx responses fail over immediately.
 _retry_transient = retry(
     reraise=True,
     stop=stop_after_attempt(2),
@@ -92,9 +90,8 @@ _retry_transient = retry(
 
 @_retry_transient
 def _call_gemini(
-    settings: Settings, system_prompt: str, turns: list[tuple[str, str]]
+    settings: Settings, model: str, system_prompt: str, turns: list[tuple[str, str]]
 ) -> tuple[str, str]:
-    model = "gemini-2.5-flash"
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         f"?key={settings.gemini_api_key}"
@@ -146,37 +143,66 @@ def _call_openai_compatible(
 
 def _raise_for_provider(provider: str, resp: httpx.Response) -> None:
     if resp.status_code == 429:
-        raise ProviderError(provider, "rate limited", rate_limited=True)
+        raise ProviderError(provider, "rate limited")
     if resp.is_error:
         raise ProviderError(provider, f"HTTP {resp.status_code}: {resp.text[:300]}")
 
 
+# Model pools per provider (pinned versions only, CLAUDE.md Decision 3).
+# The following models are explicitly EXCLUDED from provider pools and must not be added:
+# - groq/compound, groq/compound-mini: agentic/tool-use systems, not plain completion — would change response shape unpredictably
+# - whisper-large-v3, whisper-large-v3-turbo: speech-to-text models
+# - canopylabs/orpheus-*: text-to-speech models
+# - openai/gpt-oss-safeguard-20b: moderation-tuned, not drafting
+# - allam-2-7b: Arabic-specialized, wrong fit for Indian-English legal drafting
+# - meta-llama/llama-prompt-guard-2-22m and -86m: prompt-injection classifiers, not generation models (could be evaluated for SEC-01 injection detection in a separate task)
 def _providers(settings: Settings):
-    """Ordered failover chain. Each entry is (name, callable(system_prompt, turns) -> (text, model))."""
+    """Ordered failover chain. Each entry is (provider_name, model_pool, callable(model, system_prompt, turns) -> (text, model))."""
     return [
         (
             "gemini",
-            lambda sp, turns: _call_gemini(settings, sp, turns),
+            [
+                "gemini-2.5-pro",
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-2.5-flash-lite",
+            ],
+            lambda model, sp, turns: _call_gemini(settings, model, sp, turns),
         ),
         (
             "groq",
-            lambda sp, turns: _call_openai_compatible(
+            [
+                "llama-3.3-70b-versatile",
+                "openai/gpt-oss-120b",
+                "qwen/qwen3.6-27b",
+                "openai/gpt-oss-20b",
+                "llama-3.1-8b-instant",
+            ],
+            lambda model, sp, turns: _call_openai_compatible(
                 "groq", "https://api.groq.com/openai/v1", settings.groq_api_key,
-                "llama-3.3-70b-versatile", sp, turns,
+                model, sp, turns,
             ),
         ),
         (
             "sambanova",
-            lambda sp, turns: _call_openai_compatible(
+            [
+                "Meta-Llama-3.3-70B-Instruct",
+            ],
+            lambda model, sp, turns: _call_openai_compatible(
                 "sambanova", "https://api.sambanova.ai/v1", settings.sambanova_api_key,
-                "Meta-Llama-3.3-70B-Instruct", sp, turns,
+                model, sp, turns,
             ),
         ),
         (
             "cerebras",
-            lambda sp, turns: _call_openai_compatible(
+            [
+                "gpt-oss-120b",
+                "zai-glm-4.7",
+                "gemma-4-31b",
+            ],
+            lambda model, sp, turns: _call_openai_compatible(
                 "cerebras", "https://api.cerebras.ai/v1", settings.cerebras_api_key,
-                "llama-3.3-70b", sp, turns,
+                model, sp, turns,
             ),
         ),
     ]
@@ -192,26 +218,7 @@ def generate(
     history: list[dict] | None = None,
     auto_detect_names: bool = True,
 ) -> GenerationResult:
-    """Mask -> call providers in failover order -> unmask.
-
-    If `mask_map` is None, masking is skipped entirely (only acceptable for
-    prompts that are already known to contain no client data, e.g. the
-    IK spike script). Production callers must always pass a matter's
-    MaskMap.
-
-    `history` is prior conversation turns, each `{"role": "user"|
-    "assistant", "content": str}` — the caller is responsible for making
-    sure `content` is already masked (see app/routers/matters.py's
-    _build_history) before it ever reaches this function. generate()
-    itself only masks the *current* `prompt`; it has no way to verify a
-    caller-supplied history entry is safe.
-
-    `auto_detect_names` is passed straight through to mask_text() — see
-    its docstring (TICKET-1). Pass False when `prompt` mixes the caller's
-    own static wording with data that was already individually masked
-    before being interpolated in (e.g. Contracts clause-fill prompts);
-    leave it True (default) when `prompt` is entirely user-authored.
-    """
+    """Mask -> call providers/models in pool failover order -> unmask."""
     settings = settings or get_settings()
     system_prompt = SYSTEM_PROMPTS.get(task_type, SYSTEM_PROMPTS["chat"])
 
@@ -230,44 +237,42 @@ def generate(
     ] + [("user", formatted_prompt)]
 
     last_error: Exception | None = None
-    failed_providers: list[str] = []
-    # Cumulative wall-clock from the first attempt, not just the winning
-    # provider's own call — a request that failed over Gemini -> Groq ->
-    # Cerebras took the sum of all three, and that's the number that
-    # matters for capacity planning / user-perceived latency, not just
-    # whichever provider happened to finally answer.
+    failed_attempts: list[str] = []
     sequence_start = time.monotonic()
-    for provider_name, call in _providers(settings):
-        start = time.monotonic()
-        try:
-            text, model = call(system_prompt, turns)
-            latency_ms = int((time.monotonic() - start) * 1000)
-            total_latency_ms = int((time.monotonic() - sequence_start) * 1000)
-            logger.info(
-                "llm_gateway.generate provider=%s model=%s task_type=%s "
-                "latency_ms=%d status=ok failed_providers=%s",
-                provider_name, model, task_type, total_latency_ms, failed_providers,
-            )
-            unmasked_text = unmask_text(text, mask_map) if mask_map else text
-            return GenerationResult(
-                text=unmasked_text,
-                provider=provider_name,
-                model=model,
-                latency_ms=latency_ms,
-                masked_prompt=masked_prompt,
-            )
-        except Exception as exc:  # noqa: BLE001 — deliberately broad: any failure fails over
-            latency_ms = int((time.monotonic() - start) * 1000)
-            reason = str(exc)
-            logger.warning(
-                "llm_gateway.generate provider=%s task_type=%s latency_ms=%d "
-                "status=error reason=%s",
-                provider_name, task_type, latency_ms, reason,
-            )
-            failed_providers.append(provider_name)
-            last_error = exc
-            continue
+    for provider_name, model_pool, call in _providers(settings):
+        pool_size = len(model_pool)
+        for pos, model_name in enumerate(model_pool, start=1):
+            attempt_label = f"{provider_name}:{model_name} ({pos}/{pool_size})"
+            start = time.monotonic()
+            try:
+                text, model = call(model_name, system_prompt, turns)
+                latency_ms = int((time.monotonic() - start) * 1000)
+                total_latency_ms = int((time.monotonic() - sequence_start) * 1000)
+                logger.info(
+                    "llm_gateway.generate provider=%s model=%s attempt=%d/%d task_type=%s "
+                    "latency_ms=%d status=ok failed_attempts=%s",
+                    provider_name, model, pos, pool_size, task_type, total_latency_ms, failed_attempts,
+                )
+                unmasked_text = unmask_text(text, mask_map) if mask_map else text
+                return GenerationResult(
+                    text=unmasked_text,
+                    provider=provider_name,
+                    model=model,
+                    latency_ms=latency_ms,
+                    masked_prompt=masked_prompt,
+                )
+            except Exception as exc:  # noqa: BLE001 — deliberately broad: any failure fails over
+                latency_ms = int((time.monotonic() - start) * 1000)
+                reason = str(exc)
+                logger.warning(
+                    "llm_gateway.generate provider=%s model=%s attempt=%d/%d task_type=%s "
+                    "latency_ms=%d status=error reason=%s",
+                    provider_name, model_name, pos, pool_size, task_type, latency_ms, reason,
+                )
+                failed_attempts.append(attempt_label)
+                last_error = exc
+                continue
 
     raise ProviderError(
-        "all", f"all providers failed; last error: {last_error}"
+        "all", f"all providers and models failed; last error: {last_error}"
     ) from last_error
