@@ -34,6 +34,8 @@ import {
   Sparkles,
   FileCheck,
   Zap,
+  AlertCircle,
+  RotateCcw,
 } from "lucide-react";
 
 type Mode = "form" | "draft";
@@ -55,6 +57,7 @@ export default function ContractMatterPage() {
   const [busy, setBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mobileAiOpen, setMobileAiOpen] = useState(false);
 
   // Auto-generating title
   const [titleManuallySet, setTitleManuallySet] = useState(false);
@@ -151,10 +154,31 @@ export default function ContractMatterPage() {
     }
   }
 
-  if (error) {
+  if (error && !template) {
     return (
-      <AuthedShell>
-        <p className="font-sans text-sm text-[#7A2A2A]">{error}</p>
+      <AuthedShell wide>
+        <div role="alert" className="mx-auto my-8 max-w-lg rounded-sm border border-[#FFDAD6] bg-[#FFF5F5] p-5 shadow-sm space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0 text-[#7A2A2A]" />
+            <div className="flex-1">
+              <h4 className="font-sans text-xs font-bold uppercase tracking-wider text-[#7A2A2A]">
+                Unable to Load Matter
+              </h4>
+              <p className="mt-1 font-serif text-xs text-[#1A1A1A]">{error}</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#FFDAD6] pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+              className="h-8 gap-1.5 rounded-sm border-[#7A2A2A] font-sans text-xs font-semibold text-[#7A2A2A] hover:bg-[#FFDAD6]/30"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reload Page
+            </Button>
+          </div>
+        </div>
       </AuthedShell>
     );
   }
@@ -348,13 +372,42 @@ export default function ContractMatterPage() {
             </div>
           </section>
 
-          {/* Right Sidebar: AI Copilot Assistant (320px Stitch Design) */}
-          <ContractAiAssistant
-            documentTitle={displayTitle}
-            onApplyAmendment={handleAmend}
-            busy={busy}
-          />
+          {/* Desktop Right Sidebar: AI Copilot Assistant (320px Stitch Design) */}
+          <div className="hidden lg:flex">
+            <ContractAiAssistant
+              documentTitle={displayTitle}
+              onApplyAmendment={handleAmend}
+              busy={busy}
+            />
+          </div>
         </div>
+
+        {/* Mobile AI Assistant Trigger Button (MOB-01) */}
+        <button
+          type="button"
+          onClick={() => setMobileAiOpen(true)}
+          className="fixed bottom-10 right-4 z-40 flex items-center gap-2 rounded-full bg-[#081534] px-4 py-2.5 shadow-lg text-white font-sans text-xs font-semibold lg:hidden hover:bg-[#1E2A4A] transition-transform active:scale-95"
+        >
+          <Sparkles className="h-4 w-4" strokeWidth={1.5} />
+          <span>AI Assistant</span>
+        </button>
+
+        {/* Mobile Slide-Over AI Sheet (MOB-01) */}
+        {mobileAiOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-black/40 lg:hidden">
+            <div className="h-full w-[340px] max-w-[85vw] bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+              <ContractAiAssistant
+                documentTitle={displayTitle}
+                onApplyAmendment={(note) => {
+                  handleAmend(note);
+                  setMobileAiOpen(false);
+                }}
+                busy={busy}
+                onClose={() => setMobileAiOpen(false)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Bottom Status Bar (Stitch Approved Design) */}
         <footer className="flex h-7 items-center justify-between border-t border-[#E4E2DD] bg-white px-4 text-xs text-[#76777F]">

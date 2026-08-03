@@ -14,6 +14,7 @@ as-is from the reviewed template.
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 import subprocess
@@ -27,6 +28,8 @@ from docxtpl import DocxTemplate
 from app.db import service_client
 from app.services.llm_gateway import GenerationResult, generate
 from app.services.pii_mask import SupabaseMaskStore, mask_text
+
+logger = logging.getLogger("vidhidesk.contracts")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DRAFTS_DIR = Path(__file__).resolve().parent.parent.parent / "generated_drafts"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, AlertTriangle, ExternalLink, Send, CheckCircle2 } from "lucide-react";
+import { Sparkles, AlertTriangle, ExternalLink, Send, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -9,10 +9,12 @@ export function ContractAiAssistant({
   documentTitle = "Master Service Agreement v2.1",
   onApplyAmendment,
   busy = false,
+  onClose,
 }: {
   documentTitle?: string;
   onApplyAmendment?: (note: string) => void;
   busy?: boolean;
+  onClose?: () => void;
 }) {
   const [prompt, setPrompt] = useState("");
 
@@ -24,18 +26,30 @@ export function ContractAiAssistant({
   };
 
   return (
-    <aside className="sticky top-16 hidden h-[calc(100vh-64px)] w-[320px] shrink-0 flex-col border-l border-[#E4E2DD] bg-white lg:flex">
+    <aside className="flex h-full w-full flex-col bg-white lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] lg:w-[320px] lg:shrink-0 lg:border-l lg:border-[#E4E2DD]">
       {/* Header */}
-      <div className="border-b border-[#E4E2DD] p-4">
+      <div className="flex items-center justify-between border-b border-[#E4E2DD] p-4">
         <div className="flex items-center gap-2 text-[#081534]">
           <Sparkles className="h-4 w-4 text-[#081534]" strokeWidth={1.5} />
-          <h2 className="font-sans text-xs font-bold uppercase tracking-wider text-[#081534]">
-            AI Legal Assistant
-          </h2>
+          <div>
+            <h2 className="font-sans text-xs font-bold uppercase tracking-wider text-[#081534]">
+              AI Legal Assistant
+            </h2>
+            <p className="font-serif text-[11px] text-[#76777F] truncate max-w-[200px]">
+              Analyzing &quot;{documentTitle}&quot;
+            </p>
+          </div>
         </div>
-        <p className="font-serif text-[11px] text-[#76777F] truncate">
-          Analyzing &quot;{documentTitle}&quot;
-        </p>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close AI Assistant"
+            className="rounded-sm p-1 text-[#45464E] hover:bg-[#F0EEE9]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Main Analysis Content Scroll */}

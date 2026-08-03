@@ -9,19 +9,21 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { createMatter, listTemplates, listMatters, Matter, Template } from "@/lib/api";
-import { Search, Plus, FolderOpen, History, FileText } from "lucide-react";
+import { Search, Plus, FolderOpen, History, FileText, AlertCircle, RotateCcw } from "lucide-react";
 
 export default function ContractsPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [matters, setMatters] = useState<Matter[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(["commercial", "employment", "ip"]);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Template | null>(null);
   const [clientName, setClientName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  function loadData() {
+    setError(null);
     listTemplates()
       .then((rows) => setTemplates(rows.filter((t) => t.category === "contracts")))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
@@ -29,7 +31,17 @@ export default function ContractsPage() {
     listMatters()
       .then(setMatters)
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadData();
   }, []);
+
+  const toggleCategory = (category: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
+    );
+  };
 
   const filteredMatters = matters.filter((m) =>
     searchQuery.trim() === ""
@@ -37,6 +49,33 @@ export default function ContractsPage() {
       : m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (m.client_name && m.client_name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const filteredTemplates = templates.filter((t) => {
+    const key = (t.template_key || "").toLowerCase();
+    const name = t.name.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+
+    const matchesSearch = !query || name.includes(query) || key.includes(query);
+
+    let matchesCategory = false;
+    if (
+      selectedCategories.includes("commercial") &&
+      ["nda", "service-agreement", "consultancy", "mou", "leave-licence", "lease-deed", "agreement-to-sell", "joint-venture"].includes(key)
+    ) {
+      matchesCategory = true;
+    }
+    if (selectedCategories.includes("employment") && ["employment"].includes(key)) {
+      matchesCategory = true;
+    }
+    if (
+      selectedCategories.includes("ip") &&
+      ["software-dev", "nda", "service-agreement"].includes(key)
+    ) {
+      matchesCategory = true;
+    }
+
+    return matchesSearch && matchesCategory;
+  });
 
   async function handleStart(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +101,7 @@ export default function ContractsPage() {
         {/* Left Sidebar: Matter Navigator (280px Stitch Design) */}
         <aside className="w-full shrink-0 space-y-4 rounded-sm border border-[#E4E2DD] bg-[#F6F3EE] p-4 lg:w-[280px]">
           <Button
-            onClick={() => setSelected(templates[0] || null)}
+            onClick={() => setSelected(filteredTemplates[0] || templates[0] || null)}
             className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#081534] py-2.5 font-sans text-xs font-semibold uppercase tracking-wider text-white hover:bg-[#1E2A4A]"
           >
             <Plus className="h-4 w-4" strokeWidth={1.5} />
@@ -73,7 +112,7 @@ export default function ContractsPage() {
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#76777F]" />
             <Input
               type="text"
-              placeholder="Search matters..."
+              placeholder="Search matters & templates..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-8 rounded-sm border-[#E4E2DD] bg-white pl-8 font-sans text-xs text-[#1A1A1A]"
@@ -131,15 +170,30 @@ export default function ContractsPage() {
               </p>
               <div className="mt-1.5 space-y-1.5 px-1 font-sans text-xs text-[#45464E]">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="rounded border-[#E4E2DD]" />
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes("commercial")}
+                    onChange={() => toggleCategory("commercial")}
+                    className="rounded border-[#E4E2DD]"
+                  />
                   Commercial & Service
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-[#E4E2DD]" />
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes("employment")}
+                    onChange={() => toggleCategory("employment")}
+                    className="rounded border-[#E4E2DD]"
+                  />
                   Employment & HR
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-[#E4E2DD]" />
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes("ip")}
+                    onChange={() => toggleCategory("ip")}
+                    className="rounded border-[#E4E2DD]"
+                  />
                   Intellectual Property
                 </label>
               </div>
@@ -159,16 +213,54 @@ export default function ContractsPage() {
           </div>
 
           {error && (
-            <p role="alert" className="font-sans text-sm text-[#7A2A2A]">
-              {error}
-            </p>
+            <div role="alert" className="rounded-sm border border-[#FFDAD6] bg-[#FFF5F5] p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 shrink-0 text-[#7A2A2A]" />
+                <div className="flex-1">
+                  <h4 className="font-sans text-xs font-bold uppercase tracking-wider text-[#7A2A2A]">
+                    System Error
+                  </h4>
+                  <p className="mt-1 font-serif text-xs text-[#1A1A1A]">{error}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadData}
+                  className="h-8 gap-1.5 rounded-sm border-[#7A2A2A] font-sans text-xs font-semibold text-[#7A2A2A] hover:bg-[#FFDAD6]/30"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Try Again
+                </Button>
+              </div>
+            </div>
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {templates.length === 0 && !error && (
               <p className="font-serif text-sm text-[#45464E]">Loading contract templates…</p>
             )}
-            {templates.map((t) => (
+            {templates.length > 0 && filteredTemplates.length === 0 && (
+              <div className="col-span-full rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-6 text-center space-y-3">
+                <p className="font-sans text-sm font-semibold text-[#081534]">
+                  No contract templates match your filters
+                </p>
+                <p className="font-serif text-xs text-[#76777F]">
+                  Try clearing your search query or enabling additional category checkboxes.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedCategories(["commercial", "employment", "ip"]);
+                  }}
+                  className="rounded-sm border-[#E4E2DD] font-sans text-xs font-semibold text-[#081534]"
+                >
+                  Reset Filters
+                </Button>
+              </div>
+            )}
+            {filteredTemplates.map((t) => (
               <Card
                 key={t.id}
                 className={

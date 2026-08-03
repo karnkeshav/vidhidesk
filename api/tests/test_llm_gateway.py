@@ -258,7 +258,8 @@ def test_history_turns_are_included_in_outbound_request_in_order(settings):
     assert contents[1]["role"] == "model"  # assistant -> Gemini's "model" role
     assert contents[1]["parts"][0]["text"] == "Understood, PARTY_A's PAN is PAN_1."
     assert contents[2]["role"] == "user"
-    assert contents[2]["parts"][0]["text"] == "What is his PAN?"
+    assert "What is his PAN?" in contents[2]["parts"][0]["text"]
+    assert "<user_instruction>" in contents[2]["parts"][0]["text"]
 
 
 @respx.mock
@@ -316,7 +317,11 @@ def test_pre_wrapped_user_amendment_is_preserved_without_double_wrapping(setting
     )
     generate(wrapped_prompt, mask_map=mm, settings=settings)
 
-    assert "<user_amendment>" in captured["body"]
-    assert "</user_amendment>" in captured["body"]
-    assert captured["body"].count("<user_instruction>") == 0
+    import json
+
+    body = json.loads(captured["body"])
+    user_turn_text = body["contents"][-1]["parts"][0]["text"]
+    assert "<user_amendment>" in user_turn_text
+    assert "</user_amendment>" in user_turn_text
+    assert "<user_instruction>" not in user_turn_text
 
