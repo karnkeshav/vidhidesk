@@ -84,7 +84,9 @@ def test_success_log_line_reports_final_provider_and_failed_providers(settings, 
     success_lines = [r.message for r in caplog.records if "status=ok" in r.message]
     assert len(success_lines) == 1
     assert "provider=sambanova" in success_lines[0]
-    assert "failed_providers=['gemini', 'groq']" in success_lines[0]
+    assert "failed_attempts" in success_lines[0]
+    assert "gemini:gemini-2.5-pro" in success_lines[0]
+    assert "groq:llama-3.3-70b-versatile" in success_lines[0]
 
 
 @respx.mock
@@ -360,7 +362,7 @@ def test_gemini_pool_exhaustion_escalates_to_groq(settings):
 
     def _gemini_fail_all(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
-        for m in ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"]:
+        for m in ["gemini-2.5-pro", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]:
             if m in url_str:
                 gemini_models_tried.append(m)
                 break
