@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Software Development & Maintenance Agreement Intake Schema",
+  "type": "object",
+  "groups": [
+    {
+      "id": "parties",
+      "title": "Developer & Client Information",
+      "fields": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"]
+    },
+    {
+      "id": "software_scope",
+      "title": "Software Scope & Commercials",
+      "fields": ["effective_date", "software_name", "scope_of_development", "total_project_fee", "maintenance_support_included", "warranty_period_months", "ip_ownership_model"]
+    },
+    {
+      "id": "jurisdiction_legal",
+      "title": "State Rules & Dispute Resolution",
+      "fields": ["state", "arbitration", "arbitration_seat"]
+    }
+  ],
+  "properties": {
+    "party_a_name": {
+      "type": "string",
+      "title": "Developer / Vendor Name",
+      "description": "Full legal name of software developer / IT vendor"
+    },
+    "party_a_entity_type": {
+      "type": "string",
+      "title": "Developer Entity Type",
+      "enum": ["Private Limited Company", "LLP", "Partnership Firm", "Sole Proprietorship"],
+      "default": "Private Limited Company"
+    },
+    "party_a_address": {
+      "type": "string",
+      "title": "Developer Address"
+    },
+    "party_b_name": {
+      "type": "string",
+      "title": "Client / Customer Name",
+      "description": "Full legal name of client receiving software"
+    },
+    "party_b_entity_type": {
+      "type": "string",
+      "title": "Client Entity Type",
+      "enum": ["Private Limited Company", "LLP", "Partnership Firm", "Sole Proprietorship", "Individual"],
+      "default": "Private Limited Company"
+    },
+    "party_b_address": {
+      "type": "string",
+      "title": "Client Address"
+    },
+    "effective_date": {
+      "type": "string",
+      "title": "Effective Date",
+      "format": "date"
+    },
+    "software_name": {
+      "type": "string",
+      "title": "Software / Application Name",
+      "description": "Name of custom software, platform, or mobile app being developed"
+    },
+    "scope_of_development": {
+      "type": "string",
+      "title": "Scope of Work & Deliverables",
+      "description": "Key modules, tech stack, acceptance criteria, and milestones"
+    },
+    "total_project_fee": {
+      "type": "string",
+      "title": "Total Project Fee (₹)"
+    },
+    "maintenance_support_included": {
+      "type": "boolean",
+      "title": "Include Annual Maintenance (AMC) Support?",
+      "default": true
+    },
+    "warranty_period_months": {
+      "type": "integer",
+      "title": "Bug Fix Warranty Period (Months)",
+      "default": 6
+    },
+    "ip_ownership_model": {
+      "type": "string",
+      "title": "IP Ownership Model",
+      "enum": ["Full Client Ownership", "Developer License Model"],
+      "default": "Full Client Ownership"
+    },
+    "state": {
+      "type": "string",
+      "title": "State Jurisdiction",
+      "enum": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+      "default": "Delhi"
+    },
+    "arbitration": {
+      "type": "boolean",
+      "title": "Include Arbitration Clause?",
+      "default": true
+    },
+    "arbitration_seat": {
+      "type": "string",
+      "title": "Arbitration Seat",
+      "default": "New Delhi"
+    }
+  },
+  "required": [
+    "party_a_name",
+    "party_a_address",
+    "party_b_name",
+    "party_b_address",
+    "effective_date",
+    "software_name",
+    "scope_of_development",
+    "total_project_fee",
+    "ip_ownership_model",
+    "state"
+  ]
+}

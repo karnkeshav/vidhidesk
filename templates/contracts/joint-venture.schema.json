@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Joint Venture Agreement Intake Schema",
+  "type": "object",
+  "groups": [
+    {
+      "id": "parties",
+      "title": "Joint Venture Partners",
+      "fields": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"]
+    },
+    {
+      "id": "jv_structure",
+      "title": "JV Purpose & Capital Structure",
+      "fields": ["effective_date", "jv_purpose", "jv_entity_type", "party_a_equity_share_pct", "party_b_equity_share_pct", "capital_contribution_details"]
+    },
+    {
+      "id": "jurisdiction_legal",
+      "title": "State Rules & Dispute Resolution",
+      "fields": ["state", "arbitration", "arbitration_seat"]
+    }
+  ],
+  "properties": {
+    "party_a_name": {
+      "type": "string",
+      "title": "JV Partner A Name",
+      "description": "Full legal name of first joint venture partner"
+    },
+    "party_a_entity_type": {
+      "type": "string",
+      "title": "Partner A Entity Type",
+      "enum": ["Private Limited Company", "LLP", "Partnership Firm", "Individual"],
+      "default": "Private Limited Company"
+    },
+    "party_a_address": {
+      "type": "string",
+      "title": "Partner A Registered Address"
+    },
+    "party_b_name": {
+      "type": "string",
+      "title": "JV Partner B Name",
+      "description": "Full legal name of second joint venture partner"
+    },
+    "party_b_entity_type": {
+      "type": "string",
+      "title": "Partner B Entity Type",
+      "enum": ["Private Limited Company", "LLP", "Partnership Firm", "Individual"],
+      "default": "Private Limited Company"
+    },
+    "party_b_address": {
+      "type": "string",
+      "title": "Partner B Registered Address"
+    },
+    "effective_date": {
+      "type": "string",
+      "title": "Agreement Date",
+      "format": "date"
+    },
+    "jv_purpose": {
+      "type": "string",
+      "title": "Joint Venture Scope & Objective",
+      "description": "Core commercial business objective of the joint venture"
+    },
+    "jv_entity_type": {
+      "type": "string",
+      "title": "JV Structure",
+      "enum": ["Incorporated Company JV", "Unincorporated Contractual JV"],
+      "default": "Incorporated Company JV"
+    },
+    "party_a_equity_share_pct": {
+      "type": "string",
+      "title": "Partner A Shareholding / Ratio (%)",
+      "default": "50%"
+    },
+    "party_b_equity_share_pct": {
+      "type": "string",
+      "title": "Partner B Shareholding / Ratio (%)",
+      "default": "50%"
+    },
+    "capital_contribution_details": {
+      "type": "string",
+      "title": "Initial Capital Contribution Details",
+      "description": "Capital amount and assets contributed by each partner"
+    },
+    "state": {
+      "type": "string",
+      "title": "State Jurisdiction",
+      "enum": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+      "default": "Delhi"
+    },
+    "arbitration": {
+      "type": "boolean",
+      "title": "Include Institutional Arbitration?",
+      "default": true
+    },
+    "arbitration_seat": {
+      "type": "string",
+      "title": "Arbitration Seat",
+      "default": "New Delhi"
+    }
+  },
+  "required": [
+    "party_a_name",
+    "party_a_address",
+    "party_b_name",
+    "party_b_address",
+    "effective_date",
+    "jv_purpose",
+    "jv_entity_type",
+    "party_a_equity_share_pct",
+    "party_b_equity_share_pct",
+    "state"
+  ]
+}

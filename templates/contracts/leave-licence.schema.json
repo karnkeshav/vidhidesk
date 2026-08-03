@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Leave & Licence Agreement Intake Schema",
+  "type": "object",
+  "groups": [
+    {
+      "id": "parties",
+      "title": "Parties Information",
+      "fields": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"]
+    },
+    {
+      "id": "property_terms",
+      "title": "Licensed Property & Commercial Terms",
+      "fields": ["effective_date", "property_address", "licence_fee_monthly", "security_deposit", "licence_period_months", "lock_in_period_months", "purpose_of_use"]
+    },
+    {
+      "id": "jurisdiction_legal",
+      "title": "State Rules & Dispute Resolution",
+      "fields": ["state", "arbitration", "arbitration_seat"]
+    }
+  ],
+  "properties": {
+    "party_a_name": {
+      "type": "string",
+      "title": "Licensor Name / Company",
+      "description": "Full legal name of the property owner / licensor"
+    },
+    "party_a_entity_type": {
+      "type": "string",
+      "title": "Licensor Entity Type",
+      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF", "Sole Proprietorship"],
+      "default": "Individual"
+    },
+    "party_a_address": {
+      "type": "string",
+      "title": "Licensor Registered Address"
+    },
+    "party_b_name": {
+      "type": "string",
+      "title": "Licensee Name / Company",
+      "description": "Full legal name of the licensee / occupant"
+    },
+    "party_b_entity_type": {
+      "type": "string",
+      "title": "Licensee Entity Type",
+      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF", "Sole Proprietorship"],
+      "default": "Individual"
+    },
+    "party_b_address": {
+      "type": "string",
+      "title": "Licensee Permanent / Registered Address"
+    },
+    "effective_date": {
+      "type": "string",
+      "title": "Licence Commencement Date",
+      "format": "date"
+    },
+    "property_address": {
+      "type": "string",
+      "title": "Licensed Property Address",
+      "description": "Complete description of the licensed residential / commercial premises"
+    },
+    "licence_fee_monthly": {
+      "type": "string",
+      "title": "Monthly Licence Fee (₹)",
+      "description": "Monthly licence fee amount payable by licensee"
+    },
+    "security_deposit": {
+      "type": "string",
+      "title": "Interest-Free Security Deposit (₹)"
+    },
+    "licence_period_months": {
+      "type": "integer",
+      "title": "Licence Period (Months)",
+      "default": 11
+    },
+    "lock_in_period_months": {
+      "type": "integer",
+      "title": "Lock-in Period (Months)",
+      "default": 6
+    },
+    "purpose_of_use": {
+      "type": "string",
+      "title": "Purpose of Use",
+      "enum": ["Residential Premises", "Commercial Office / Workspace"],
+      "default": "Residential Premises"
+    },
+    "state": {
+      "type": "string",
+      "title": "State Jurisdiction",
+      "enum": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+      "default": "Maharashtra"
+    },
+    "arbitration": {
+      "type": "boolean",
+      "title": "Include Arbitration Clause?",
+      "default": false
+    },
+    "arbitration_seat": {
+      "type": "string",
+      "title": "Arbitration Seat / City",
+      "default": "Mumbai"
+    }
+  },
+  "required": [
+    "party_a_name",
+    "party_a_address",
+    "party_b_name",
+    "party_b_address",
+    "effective_date",
+    "property_address",
+    "licence_fee_monthly",
+    "security_deposit",
+    "licence_period_months",
+    "state"
+  ]
+}

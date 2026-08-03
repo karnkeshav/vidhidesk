@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Lease Deed Intake Schema",
+  "type": "object",
+  "groups": [
+    {
+      "id": "parties",
+      "title": "Lessor & Lessee Information",
+      "fields": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"]
+    },
+    {
+      "id": "lease_terms",
+      "title": "Demised Property & Rent Commercials",
+      "fields": ["effective_date", "property_address", "monthly_rent", "security_deposit", "lease_term_years", "rent_escalation_pct", "property_type"]
+    },
+    {
+      "id": "jurisdiction_legal",
+      "title": "State Rules & Dispute Resolution",
+      "fields": ["state", "arbitration", "arbitration_seat"]
+    }
+  ],
+  "properties": {
+    "party_a_name": {
+      "type": "string",
+      "title": "Lessor Name / Entity",
+      "description": "Full legal name of the property owner / lessor"
+    },
+    "party_a_entity_type": {
+      "type": "string",
+      "title": "Lessor Entity Type",
+      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "default": "Individual"
+    },
+    "party_a_address": {
+      "type": "string",
+      "title": "Lessor Address"
+    },
+    "party_b_name": {
+      "type": "string",
+      "title": "Lessee Name / Entity",
+      "description": "Full legal name of the tenant / lessee"
+    },
+    "party_b_entity_type": {
+      "type": "string",
+      "title": "Lessee Entity Type",
+      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "default": "Private Limited Company"
+    },
+    "party_b_address": {
+      "type": "string",
+      "title": "Lessee Address"
+    },
+    "effective_date": {
+      "type": "string",
+      "title": "Lease Commencement Date",
+      "format": "date"
+    },
+    "property_address": {
+      "type": "string",
+      "title": "Leased Property Address",
+      "description": "Complete description of demised premises"
+    },
+    "monthly_rent": {
+      "type": "string",
+      "title": "Monthly Rent Amount (₹)"
+    },
+    "security_deposit": {
+      "type": "string",
+      "title": "Interest-Free Security Deposit (₹)"
+    },
+    "lease_term_years": {
+      "type": "integer",
+      "title": "Lease Term (Years)",
+      "default": 3
+    },
+    "rent_escalation_pct": {
+      "type": "string",
+      "title": "Annual Rent Escalation (%)",
+      "default": "5%"
+    },
+    "property_type": {
+      "type": "string",
+      "title": "Property Type",
+      "enum": ["Commercial Office", "Industrial Warehouse", "Residential Property"],
+      "default": "Commercial Office"
+    },
+    "state": {
+      "type": "string",
+      "title": "State Jurisdiction",
+      "enum": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+      "default": "Delhi"
+    },
+    "arbitration": {
+      "type": "boolean",
+      "title": "Include Arbitration Clause?",
+      "default": true
+    },
+    "arbitration_seat": {
+      "type": "string",
+      "title": "Arbitration Seat",
+      "default": "New Delhi"
+    }
+  },
+  "required": [
+    "party_a_name",
+    "party_a_address",
+    "party_b_name",
+    "party_b_address",
+    "effective_date",
+    "property_address",
+    "monthly_rent",
+    "security_deposit",
+    "lease_term_years",
+    "state"
+  ]
+}

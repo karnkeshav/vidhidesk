@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agreement to Sell Intake Schema",
+  "type": "object",
+  "groups": [
+    {
+      "id": "parties",
+      "title": "Vendor & Purchaser Information",
+      "fields": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"]
+    },
+    {
+      "id": "property_consideration",
+      "title": "Property Details & Consideration",
+      "fields": ["effective_date", "property_address", "total_sale_consideration", "earnest_money", "completion_period_months", "encumbrance_free"]
+    },
+    {
+      "id": "jurisdiction_legal",
+      "title": "State Rules & Dispute Resolution",
+      "fields": ["state", "arbitration", "arbitration_seat"]
+    }
+  ],
+  "properties": {
+    "party_a_name": {
+      "type": "string",
+      "title": "Vendor / Seller Name",
+      "description": "Full legal name of property owner / seller"
+    },
+    "party_a_entity_type": {
+      "type": "string",
+      "title": "Vendor Entity Type",
+      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "default": "Individual"
+    },
+    "party_a_address": {
+      "type": "string",
+      "title": "Vendor Registered Address"
+    },
+    "party_b_name": {
+      "type": "string",
+      "title": "Purchaser / Buyer Name",
+      "description": "Full legal name of buyer / purchaser"
+    },
+    "party_b_entity_type": {
+      "type": "string",
+      "title": "Purchaser Entity Type",
+      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "default": "Individual"
+    },
+    "party_b_address": {
+      "type": "string",
+      "title": "Purchaser Address"
+    },
+    "effective_date": {
+      "type": "string",
+      "title": "Agreement Date",
+      "format": "date"
+    },
+    "property_address": {
+      "type": "string",
+      "title": "Immovable Property Schedule",
+      "description": "Complete description of plot, flat, or building being sold"
+    },
+    "total_sale_consideration": {
+      "type": "string",
+      "title": "Total Sale Consideration (₹)"
+    },
+    "earnest_money": {
+      "type": "string",
+      "title": "Earnest Money / Advance Paid (₹)"
+    },
+    "completion_period_months": {
+      "type": "integer",
+      "title": "Completion / Sale Deed Execution Period (Months)",
+      "default": 3
+    },
+    "encumbrance_free": {
+      "type": "boolean",
+      "title": "Vendor Warrants Clear & Marketable Title?",
+      "default": true
+    },
+    "state": {
+      "type": "string",
+      "title": "State Jurisdiction",
+      "enum": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+      "default": "Delhi"
+    },
+    "arbitration": {
+      "type": "boolean",
+      "title": "Include Arbitration Clause?",
+      "default": true
+    },
+    "arbitration_seat": {
+      "type": "string",
+      "title": "Arbitration Seat",
+      "default": "New Delhi"
+    }
+  },
+  "required": [
+    "party_a_name",
+    "party_a_address",
+    "party_b_name",
+    "party_b_address",
+    "effective_date",
+    "property_address",
+    "total_sale_consideration",
+    "earnest_money",
+    "completion_period_months",
+    "state"
+  ]
+}
