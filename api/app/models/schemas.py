@@ -29,6 +29,13 @@ class MatterOut(BaseModel):
     created_at: datetime
 
 
+class MatterUpdate(BaseModel):
+    # Title-only for now — the auto-generating-title UX (Sprint 2 Phase 1
+    # Session 1) needs a way to save the inferred title as party names
+    # fill in, and to save a manual override on click-to-edit.
+    title: str = Field(min_length=1, max_length=200)
+
+
 class MessageCreate(BaseModel):
     content: str = Field(min_length=1)
     # Optional: known-sensitive entities the caller wants force-masked in

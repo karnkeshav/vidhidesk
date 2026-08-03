@@ -43,6 +43,10 @@ export function listMatters(): Promise<Matter[]> {
   return authedFetch("/api/matters");
 }
 
+export function getMatter(matterId: string): Promise<Matter> {
+  return authedFetch(`/api/matters/${matterId}`);
+}
+
 export function createMatter(input: {
   title: string;
   client_name?: string;
@@ -50,6 +54,15 @@ export function createMatter(input: {
 }): Promise<Matter> {
   return authedFetch("/api/matters", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Title-only update — backs the auto-generating-title UX (debounced
+ * saves as party names fill in, and manual click-to-edit overrides). */
+export function updateMatter(matterId: string, input: { title: string }): Promise<Matter> {
+  return authedFetch(`/api/matters/${matterId}`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }
@@ -91,11 +104,31 @@ export type IntakeField = {
   max_items?: number | null;
 };
 
+/** Sprint 2 Phase 1 Session 1: schema-declared field groups, rendered as
+ * collapsible accordion sections on the intake form. `summary_template`
+ * is a string of short clauses joined by " · ", each containing one or
+ * more `{{field_key}}` placeholders — see
+ * web/src/lib/group-summary.ts for the exact rendering rule (a clause
+ * drops entirely if every placeholder inside it is empty, rather than
+ * leaving a trailing space or a dangling separator). `state` is never
+ * assigned to a group — it renders in the persistent sidebar instead,
+ * see IntakeForm. */
+export type IntakeFieldGroup = {
+  id: string;
+  label: string;
+  field_keys: string[];
+  summary_template: string;
+};
+
 export type IntakeSchema = {
   template_key: string;
   title: string;
   variant_field?: string;
   fields: IntakeField[];
+  // Optional for backward compatibility with a template that hasn't
+  // been migrated to the groups pattern yet — IntakeForm falls back to
+  // one flat ungrouped section (its pre-Session-1 behavior) when absent.
+  groups?: IntakeFieldGroup[];
 };
 
 export type Template = {

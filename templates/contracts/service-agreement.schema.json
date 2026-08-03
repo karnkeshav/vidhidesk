@@ -105,5 +105,37 @@
       "required": false, "default": "", "condition": {"field": "arbitration", "equals": true}
     },
     {"key": "effective_date", "label": "Effective Date", "type": "date", "required": true}
+  ],
+  "groups": [
+    {
+      "id": "parties",
+      "label": "Parties",
+      "field_keys": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"],
+      "summary_template": "{{party_a_name}} · {{party_b_name}}"
+    },
+    {
+      "id": "scope",
+      "label": "Scope of Work",
+      "field_keys": ["purpose", "deliverables"],
+      "summary_template": "{{purpose}} · {{deliverables}}"
+    },
+    {
+      "id": "commercials",
+      "label": "Commercials",
+      "field_keys": ["fee_structure", "fee_amount", "payment_frequency", "late_payment_interest_rate"],
+      "summary_template": "{{fee_structure}} {{fee_amount}} · {{payment_frequency}}"
+    },
+    {
+      "id": "service_levels",
+      "label": "Service Levels",
+      "field_keys": ["include_sla", "sla_response_time_hours", "sla_resolution_time_hours", "sla_uptime_percentage", "sla_credit_terms"],
+      "summary_template": "{{sla_response_time_hours}}h response · {{sla_uptime_percentage}}% uptime"
+    },
+    {
+      "id": "legal",
+      "label": "Legal",
+      "field_keys": ["ip_ownership_model", "ip_carveout_notes", "confidentiality_direction", "confidentiality_survival_period", "term_duration", "termination_notice_period", "arbitration", "arbitration_seat", "effective_date"],
+      "summary_template": "{{term_duration}} · {{ip_ownership_model}}"
+    }
   ]
 }

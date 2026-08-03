@@ -4,7 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import CurrentUser, get_current_user
 from app.db import service_client
-from app.models.schemas import MatterCreate, MatterOut, MessageCreate, MessageOut, MODULE_TASK_TYPE
+from app.models.schemas import (
+    MatterCreate,
+    MatterOut,
+    MatterUpdate,
+    MessageCreate,
+    MessageOut,
+    MODULE_TASK_TYPE,
+)
 from app.services.llm_gateway import ProviderError, generate
 from app.services.pii_mask import MaskMap, SupabaseMaskStore, mask_text
 
@@ -47,6 +54,25 @@ def _get_matter_or_404(user: CurrentUser, matter_id: str) -> dict:
         # RLS makes another user's matter look identical to a missing one —
         # that's the point: no ownership-probing oracle.
         raise HTTPException(status_code=404, detail="Matter not found")
+    return resp.data[0]
+
+
+@router.get("/{matter_id}", response_model=MatterOut)
+def get_matter(matter_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Single-matter fetch — needed so the intake-form page can display
+    (and, in form mode, live-update) a matter's title without fetching
+    the entire matters list just to find one row."""
+    return _get_matter_or_404(user, matter_id)
+
+
+@router.patch("/{matter_id}", response_model=MatterOut)
+def update_matter(matter_id: str, body: MatterUpdate, user: CurrentUser = Depends(get_current_user)):
+    """Title-only update — backs the auto-generating-title UX: the intake
+    form saves an inferred title as party names fill in (debounced
+    client-side), and a manual click-to-edit override. RLS-scoped via
+    user.db, same ownership guarantee as create_matter/list_matters."""
+    _get_matter_or_404(user, matter_id)
+    resp = user.db.table("matters").update({"title": body.title}).eq("id", matter_id).execute()
     return resp.data[0]
 
 
