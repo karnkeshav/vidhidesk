@@ -102,9 +102,9 @@ export default function ContractMatterPage() {
         setDrafts(existingDrafts);
         setMatter(matterRow);
 
-        const templateId = templateIdParam ?? existingDrafts[0]?.template_id;
+        const templateId = matterRow.template_id ?? templateIdParam ?? existingDrafts[0]?.template_id;
         if (!templateId) {
-          setError("No template specified and no existing drafts for this matter.");
+          setError("No template specified for this matter.");
           return;
         }
         const tpl = await getTemplate(templateId);

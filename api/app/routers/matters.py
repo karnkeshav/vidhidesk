@@ -25,13 +25,33 @@ router = APIRouter(prefix="/api/matters", tags=["matters"])
 MAX_HISTORY_MESSAGES = 6
 
 
+import uuid
+
+
 @router.post("", response_model=MatterOut, status_code=201)
 def create_matter(body: MatterCreate, user: CurrentUser = Depends(get_current_user)):
+    resolved_template_id = body.template_id
+    if resolved_template_id:
+        try:
+            uuid.UUID(resolved_template_id)
+        except ValueError:
+            tpl_rows = (
+                service_client()
+                .table("templates")
+                .select("id")
+                .eq("template_key", resolved_template_id)
+                .execute()
+                .data
+            )
+            if tpl_rows:
+                resolved_template_id = tpl_rows[0]["id"]
+
     row = {
         "user_id": user.id,
         "title": body.title,
         "client_name": body.client_name,
         "module": body.module,
+        "template_id": resolved_template_id,
     }
     resp = user.db.table("matters").insert(row).execute()
     return resp.data[0]

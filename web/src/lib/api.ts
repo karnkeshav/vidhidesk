@@ -7,6 +7,7 @@ export type Matter = {
   title: string;
   client_name: string | null;
   module: "litigation" | "contracts" | "rera" | "consulting";
+  template_id?: string | null;
   created_at: string;
 };
 
@@ -51,6 +52,7 @@ export function createMatter(input: {
   title: string;
   client_name?: string;
   module: Matter["module"];
+  template_id?: string;
 }): Promise<Matter> {
   return authedFetch("/api/matters", {
     method: "POST",

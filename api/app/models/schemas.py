@@ -19,6 +19,7 @@ class MatterCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     client_name: str | None = None
     module: str = Field(pattern="^(litigation|contracts|rera|consulting)$")
+    template_id: str | None = None
 
 
 class MatterOut(BaseModel):
@@ -26,6 +27,7 @@ class MatterOut(BaseModel):
     title: str
     client_name: str | None
     module: str
+    template_id: str | None = None
     created_at: datetime
 
 

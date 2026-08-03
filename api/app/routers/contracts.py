@@ -52,9 +52,17 @@ def list_templates(user: CurrentUser = Depends(get_current_user)):
     return rows
 
 
+import uuid
+
+
 @router.get("/templates/{template_id}", response_model=TemplateDetailOut)
 def get_template(template_id: str, user: CurrentUser = Depends(get_current_user)):
-    rows = user.db.table("templates").select("*").eq("id", template_id).execute().data
+    try:
+        uuid.UUID(template_id)
+        rows = user.db.table("templates").select("*").eq("id", template_id).execute().data
+    except ValueError:
+        rows = user.db.table("templates").select("*").eq("template_key", template_id).execute().data
+
     if not rows:
         raise HTTPException(status_code=404, detail="Template not found")
     row = rows[0]

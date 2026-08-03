@@ -2052,3 +2052,81 @@ def test_frontend_category_filter_mapping_covers_all_10_templates():
         assert key in all_categorized_keys, f"Template key '{key}' is excluded from all frontend categories!"
 
 
+def test_matter_centric_loading_model_stores_and_returns_template_id(monkeypatch):
+    """Regression test for Matter-centric loading model:
+    Creating a matter with template_id (UUID or slug) persists template_id on the matter record,
+    and GET /api/matters/{id} returns template_id."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.auth import get_current_user, CurrentUser
+    from app.db import service_client
+
+    client = TestClient(app)
+
+    def mock_user():
+        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=service_client())
+
+    app.dependency_overrides[get_current_user] = mock_user
+
+    # Fetch Service Agreement template UUID
+    tpl_row = service_client().table("templates").select("id").eq("template_key", "service-agreement").execute().data[0]
+    sa_uuid = tpl_row["id"]
+
+    # 1. Create matter passing template_key slug
+    res1 = client.post("/api/matters", json={
+        "title": "Matter Centric Test (Slug)",
+        "client_name": "Test Client",
+        "module": "contracts",
+        "template_id": "service-agreement"
+    })
+    assert res1.status_code == 201
+    m1 = res1.json()
+    assert m1["template_id"] == sa_uuid
+
+    # 2. GET matter and verify template_id is returned
+    res1_get = client.get(f"/api/matters/{m1['id']}")
+    assert res1_get.status_code == 200
+    assert res1_get.json()["template_id"] == sa_uuid
+
+    # 3. Create matter passing template UUID directly
+    res2 = client.post("/api/matters", json={
+        "title": "Matter Centric Test (UUID)",
+        "client_name": "Test Client",
+        "module": "contracts",
+        "template_id": sa_uuid
+    })
+    assert res2.status_code == 201
+    assert res2.json()["template_id"] == sa_uuid
+
+
+def test_template_lookup_supports_both_uuid_and_slug_keys(monkeypatch):
+    """Regression test: GET /api/templates/{template_id} works identically whether called
+    with a UUID or with a template_key slug (e.g. 'service-agreement')."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.auth import get_current_user, CurrentUser
+    from app.db import service_client
+
+    client = TestClient(app)
+
+    def mock_user():
+        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=service_client())
+
+    app.dependency_overrides[get_current_user] = mock_user
+
+    # 1. Lookup by template_key slug
+    res_slug = client.get("/api/templates/service-agreement")
+    assert res_slug.status_code == 200
+    data_slug = res_slug.json()
+    assert data_slug["name"] == "Service Agreement"
+    sa_uuid = data_slug["id"]
+
+    # 2. Lookup by UUID
+    res_uuid = client.get(f"/api/templates/{sa_uuid}")
+    assert res_uuid.status_code == 200
+    data_uuid = res_uuid.json()
+    assert data_uuid["name"] == "Service Agreement"
+    assert data_uuid["template_key"] == "service-agreement"
+
+
+

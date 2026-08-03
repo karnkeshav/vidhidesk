@@ -88,8 +88,9 @@ export default function ContractsPage() {
         title: `New ${selected.name} — Untitled`,
         client_name: clientName || undefined,
         module: "contracts",
+        template_id: selected.id,
       });
-      router.push(`/contracts/${matter.id}?template=${selected.id}`);
+      router.push(`/contracts/${matter.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
