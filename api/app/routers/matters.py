@@ -87,7 +87,12 @@ def _get_matter_or_404(user: CurrentUser, matter_id: str) -> dict:
         # RLS makes another user's matter look identical to a missing one —
         # that's the point: no ownership-probing oracle.
         raise HTTPException(status_code=404, detail="Matter not found")
-    return resp.data[0]
+    data = resp.data[0]
+    if "template_id" not in data or data["template_id"] is None:
+        drafts = service_client().table("draft_versions").select("template_id").eq("matter_id", matter_id).limit(1).execute().data
+        if drafts and drafts[0].get("template_id"):
+            data["template_id"] = drafts[0]["template_id"]
+    return data
 
 
 @router.get("/{matter_id}", response_model=MatterOut)

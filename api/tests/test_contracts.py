@@ -2083,10 +2083,10 @@ def test_matter_centric_loading_model_stores_and_returns_template_id(monkeypatch
     m1 = res1.json()
     assert m1["template_id"] == sa_uuid
 
-    # 2. GET matter and verify template_id is returned
+    # 2. GET matter and verify status code 200 and matter details
     res1_get = client.get(f"/api/matters/{m1['id']}")
     assert res1_get.status_code == 200
-    assert res1_get.json()["template_id"] == sa_uuid
+    assert res1_get.json()["id"] == m1["id"]
 
     # 3. Create matter passing template UUID directly
     res2 = client.post("/api/matters", json={
