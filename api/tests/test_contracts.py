@@ -1973,3 +1973,26 @@ def test_employment_docx_renders_end_to_end_with_correct_numbering(monkeypatch):
         assert "11. Miscellaneous" in full_text
     finally:
         output_path.unlink(missing_ok=True)
+
+
+def test_convert_docx_to_pdf_timeout_raises_pdf_conversion_timeout(monkeypatch, tmp_path):
+    """PERF-01: When LibreOffice exceeds the timeout cap, convert_docx_to_pdf
+    catches subprocess.TimeoutExpired and raises PdfConversionTimeout."""
+    import subprocess
+    from unittest.mock import MagicMock
+
+    dummy_docx = tmp_path / "test_doc.docx"
+    dummy_docx.write_text("dummy docx content")
+
+    monkeypatch.setattr("shutil.which", lambda cmd: "/usr/bin/libreoffice")
+
+    def _mock_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="libreoffice", timeout=15)
+
+    monkeypatch.setattr("subprocess.run", _mock_run)
+
+    with pytest.raises(contracts.PdfConversionTimeout) as exc_info:
+        contracts.convert_docx_to_pdf(dummy_docx, timeout=15)
+
+    assert "LibreOffice PDF conversion timed out after 15 seconds" in str(exc_info.value)
+

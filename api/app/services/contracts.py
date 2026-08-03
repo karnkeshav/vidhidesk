@@ -381,8 +381,11 @@ def generate_draft(
             prompt = _jinja_env.from_string(clause["current_text"]).render(**masked_form_data)
             if masked_amendment_note:
                 prompt += (
-                    f"\n\nAdditional amendment instruction from the advocate for this "
-                    f"revision (apply it only if relevant to this clause): {masked_amendment_note}"
+                    f"\n\n<user_amendment>\n"
+                    f"Additional amendment instruction from the advocate for this "
+                    f"revision (apply it only if relevant to this clause):\n"
+                    f"{masked_amendment_note}\n"
+                    f"</user_amendment>"
                 )
             result: GenerationResult = generate(
                 prompt,
@@ -526,6 +529,9 @@ def get_draft(draft_version_id: str, db=None) -> dict | None:
     return rows[0] if rows else None
 
 
+LIBREOFFICE_TIMEOUT_SECONDS = 15
+
+
 class PdfConversionUnavailable(Exception):
     """Raised when no LibreOffice (soffice) binary is on PATH. TRD §2/§3.4
     names LibreOffice headless as the sanctioned .docx -> .pdf path; this
@@ -534,7 +540,11 @@ class PdfConversionUnavailable(Exception):
     passwordless sudo to install it — see docs/lessons_learned.md)."""
 
 
-def convert_docx_to_pdf(docx_path: Path) -> Path:
+class PdfConversionTimeout(PdfConversionUnavailable):
+    """Raised when LibreOffice PDF conversion exceeds the timeout limit."""
+
+
+def convert_docx_to_pdf(docx_path: Path, timeout: int = LIBREOFFICE_TIMEOUT_SECONDS) -> Path:
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if not soffice:
         raise PdfConversionUnavailable(
@@ -542,12 +552,18 @@ def convert_docx_to_pdf(docx_path: Path) -> Path:
             "PDF export needs it (TRD §3.4). Docx export is unaffected."
         )
     pdf_path = docx_path.with_suffix(".pdf")
-    subprocess.run(
-        [soffice, "--headless", "--convert-to", "pdf", "--outdir", str(docx_path.parent), str(docx_path)],
-        check=True,
-        capture_output=True,
-        timeout=60,
-    )
+    try:
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "pdf", "--outdir", str(docx_path.parent), str(docx_path)],
+            check=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        logger.error("LibreOffice conversion timed out after %d seconds for %s", timeout, docx_path)
+        raise PdfConversionTimeout(
+            f"LibreOffice PDF conversion timed out after {timeout} seconds."
+        ) from exc
     if not pdf_path.exists():
         raise PdfConversionUnavailable(f"soffice ran but did not produce {pdf_path}")
     return pdf_path

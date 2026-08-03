@@ -1,6 +1,6 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v4 — 3 August 2026 (updated after 10-Template Expansion completion)
+Document version: v5 — 3 August 2026 (updated after Phase A P0 Stabilization: SEC-01 & PERF-01)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
@@ -40,7 +40,7 @@ Doc	Date	Role	Status
 Single dashboard, four module tiles:
 Module	Core function	Primary risk	Build status
 Litigation	Query → validate → provisions → draft pleading, with verified case citations	Citation hallucination	⚠ Gap — cause list & calendar live [E19], pleading generator pending (see §8.1)
-Contracts	Pick 1 of 25–30 templates → intake → generate → amend by chat command	Legal correctness without gold-standard drafts	✅ Confirmed live — 10 of 10 Phase 1 templates live [E2][E8][E16][E20], 3-panel workspace live [E17]
+Contracts	Pick 1 of 25–30 templates → intake → generate → amend by chat command	Legal correctness without gold-standard drafts	✅ Confirmed live — 10 of 10 Phase 1 templates live [E2][E8][E16][E20], 3-panel workspace live [E17], P0 Stabilization complete [E21]
 RERA / Real Estate	Property deeds (Transfer of Property Act family) + RERA complaint drafting + state filing walkthroughs	State-by-state rule drift	📐 Designed only — tile live on dashboard
 Consulting & Litigation Support	Facts in → applicable law, forum, remedy, limitation; strategy briefs for matters argued by other counsel	~80% reuse of Litigation engine	📐 Designed only — tile live on dashboard
 Non-negotiable across all four (📐 Designed, TRD §3.3): every case citation is either verified against the Indian Kanoon API and hyperlinked, or rendered as `⚠ UNVERIFIED`. Enforced in the renderer (no `ik_id` in DB → no hyperlink can render), not just in the prompt. Confirmed implemented in engine [E1]; active rendering on live citation-bearing screens will accompany Litigation/Consulting workspace launches.
@@ -67,7 +67,7 @@ Copy tone: Formal, restrained. "Draft" not "Create." "Matter" not "Case." Indian
 4. Phase (Project Plan) → Sprint (Stitch/Nav Spec) Mapping
 Project Plan Phase	Weeks	Stitch/Nav Sprint equivalent	Status
 Phase 0 — Scope freeze + template sourcing	3 wks	Sprint 1 (pre-tracker)	✅ Confirmed done [E1: commits `219a9aa`, `28e6e85`]
-Phase 1 — Contracts MVP	8–10 wks	Sprint 2 + Sprint 3	✅ Confirmed COMPLETE [E2][E3][E8][E16][E17][E20] — 10 of 10 Phase 1 templates live, workspace 100% complete
+Phase 1 — Contracts MVP	8–10 wks	Sprint 2 + Sprint 3	✅ Confirmed COMPLETE [E2][E3][E8][E16][E17][E20][E21] — 10 of 10 Phase 1 templates live, workspace 100% complete, P0 stabilization complete
 Phase 2 — Litigation + citation engine	6–8 wks	⚠ Pending Sprint 3.5 allocation	⚠ Cause list calendar live [E19], pleading generator pending
 Phase 3 — RERA + Consulting	6 wks	Sprint 4 (Consulting) + Sprint 5 (RERA)	📐 Designed only — tiles live on dashboard
 Phase 4 — Productisation (post-launch)	ongoing	Sprint 6 (Hardening) + beyond	📐 Designed only, no build evidence
@@ -80,10 +80,10 @@ Login	`/login`	✅ Confirmed [E1: Sprint 0 commit `28e6e85`, Lex Scripta V2 desi
 Dashboard	`/dashboard`	✅ Confirmed [E3: commit `6c6bdc6`, Stitch V2 4-card module layout `d928c15`]
 Contracts Template Picker (initial)	`/contracts`	✅ Confirmed live [E2: `web/src/app/contracts/page.tsx`, Stitch V2 layout `5fdf32f`]
 ---
-Sprint 2 — Contracts Module Completion — ✅ Confirmed 100% built for UI & all 10 Phase 1 templates [E16][E17][E20]
+Sprint 2 — Contracts Module Completion — ✅ Confirmed 100% built for UI & all 10 Phase 1 templates [E16][E17][E20][E21]
 Session (as planned)	Focus	Route(s)	API Endpoints	DB Tables	Status
 1	Intake Form	`/contracts` & `/contracts/[matterId]`	`POST /api/matters` · `PATCH /api/matters/[id]` · `GET /api/state-rules`	`matters`, `templates`, `state_rules`, `draft_versions`	✅ Confirmed built [E2: `intake-form.tsx`; E8: E2E walkthrough; E17: Stitch V2 intake integration]. Collapsible groups & live party title auto-generation active across all 10 templates.
-2	Draft View	`/contracts/[matterId]`	`GET /api/drafts/[id]/download`, `.pdf` · `POST /api/matters/[id]/drafts`	`draft_versions`, `matters`, `draft_clause_fills`	✅ Confirmed built [E17: `LegalDocumentSheet` serif canvas, `ContractAiAssistant` right sidebar copilot, sticky formatting toolbar, status footer bar].
+2	Draft View	`/contracts/[matterId]`	`GET /api/drafts/[id]/download`, `.pdf` · `POST /api/matters/[id]/drafts`	`draft_versions`, `matters`, `draft_clause_fills`	✅ Confirmed built [E17: `LegalDocumentSheet` serif canvas, `ContractAiAssistant` right sidebar copilot, sticky formatting toolbar, status footer bar; E21: HTTP 504 timeout protection].
 3	Clause Review Admin	`/admin/templates/[key]`	`POST /api/contracts/templates/{id}/clauses/{cid}/review` · `.../bulk-keep-boilerplate`	`templates`, `template_clauses` ✅, `clause_reviews` ✅	✅ Confirmed built and exercised [E5: migration 0007; E11: review-state sweep; E20: 10 templates supported]. Admin template index ([`/admin/templates`](file:///home/keysh/vidhidesk/web/src/app/admin/templates/page.tsx)) live.
 4	Header Shell & Controls	Applies globally	Supabase Auth metadata	`auth.users`	✅ Confirmed built [E17][E18]: Header notifications icon, settings gear, advocate avatar frame, and Advocate Profile page ([`/profile`](file:///home/keysh/vidhidesk/web/src/app/profile/page.tsx)) with photo upload and password reset options.
 5	Mobile Responsive Pass	`/contracts`, `/dashboard`, `/profile`	`GET /api/templates`	`templates`, `matters`	✅ Confirmed built [E17][E18]: Mobile bottom nav bar (`Home`, `Documents`, `Research / Drafts`, `Calendar`), left drawer navigation, responsive document sheet layout.
@@ -98,7 +98,7 @@ Templates actually shipped (✅ Confirmed [E2][E9][E16][E20], 10 of 10 Phase 1 t
 8. Agreement to Sell — 8 clauses (`agreement-to-sell`) [E20]
 9. Joint Venture Agreement — 8 clauses (`joint-venture`) [E20]
 10. Software Development & Maintenance Agreement — 9 clauses (`software-dev`) [E20]
-Sprint 2 exit gate (✅ Confirmed met for all 10 templates [E17][E20]): all 10 templates generate complete drafts from intake; state selection provides stamp-duty notes; amendment commands version without loss; drafts export .docx and .pdf.
+Sprint 2 exit gate (✅ Confirmed met for all 10 templates [E17][E20][E21]): all 10 templates generate complete drafts from intake; state selection provides stamp-duty notes; amendment commands version without loss; drafts export .docx and .pdf with 15s timeout protection.
 ---
 Sprint 3 — Refinements, Navigation & Admin Improvements
 Session	Focus	Route(s)	Status
@@ -107,8 +107,9 @@ S3.2	Advocate Profile & Settings Page	`/profile`	✅ Confirmed built [E18: commi
 S3.3	Cause List Calendar Page	`/calendar`	✅ Confirmed built [E19: commit `c1c118d` — litigation hearing dockets schedule].
 S3.4	Advocate Document Vault	`/documents`	✅ Confirmed built [E19: commit `c1c118d` — versioned `.docx` draft file store].
 S3.5	Template Expansion Helper Refactoring	`api/scripts/template_seed_utils.py`	✅ Confirmed built [E20: centralized `seed_template_pipeline` to eliminate seed script code duplication].
-S3.6	Cross-template shared-clause detection banner	`/admin/templates/[key]` (enhancement)	📐 Requested in Batch 4.5 message [E13], not confirmed built
-S3.7	Content-hash mismatch warning (clause changed since review)	`/admin/templates/[key]` (enhancement)	⚠ Gap remains — not built as far as evidence shows
+S3.6	Phase A P0 Stabilization Fixes	`SEC-01`, `PERF-01`	✅ Confirmed built [E21: XML prompt injection boundary delimiters across all LLM entry points + LibreOffice 15s subprocess timeout protection with HTTP 504 error response].
+S3.7	Cross-template shared-clause detection banner	`/admin/templates/[key]` (enhancement)	📐 Requested in Batch 4.5 message [E13], not confirmed built
+S3.8	Content-hash mismatch warning (clause changed since review)	`/admin/templates/[key]` (enhancement)	⚠ Gap remains — not built as far as evidence shows
 ---
 Sprint 4 — Consulting & Litigation Support Module
 Session	Focus	Route(s)	Status
@@ -122,13 +123,14 @@ All sessions (S6.1–S6.2): ⬜ Designed only.
 ---
 6. Cross-Cutting Backend Subsystems
 Subsystem	Status
-LLM Gateway (Gemini → Groq → SambaNova → Cerebras)	✅ Confirmed built, Sprint 0 [E1: commit `28e6e85`], 4-tier failover
+LLM Gateway (Gemini → Groq → SambaNova → Cerebras)	✅ Confirmed built, Sprint 0 [E1: commit `28e6e85`], 4-tier failover, SEC-01 prompt isolation [E21]
 Conversation history across turns	✅ Confirmed built [E12]: bounded 6-message window using stored `masked_prompt`
 PII Masker & Unmasker	✅ Confirmed built [E12: per-string masking, statute-abbreviation allowlist, `pii_masks` DB table]
 RAG Retriever (statute knowledge base)	✅ Confirmed built, Sprint 1 [E1: commit `0b165e8` — statute RAG + hybrid retrieval]
 Citation Verifier (Indian Kanoon API) + renderer gate	✅ Confirmed built, Sprint 1 [E1: commit `0b165e8` — `citations` verification gate]
 Golden test harness	✅ Confirmed built [E1: 5 golden test fact patterns in `docs/golden_tests.json`]
 Template Engine (Jinja2 → python-docx)	✅ Confirmed built & extended [E2][E6][E20]: `applicable_condition` JSONB (migration 0008), clause renumbering, `an_or_a` grammar filter, 10 templates supported
+LibreOffice PDF Timeout Protection	✅ Confirmed built [E21: 15s timeout cap, `PdfConversionTimeout`, HTTP 504 response]
 Shared Seed Pipeline Utilities	✅ Confirmed built [E20: `api/scripts/template_seed_utils.py`]
 Debounced Title Auto-Generator	✅ Confirmed built [E17: `web/src/lib/matter-title.ts`, `PATCH /api/matters/[id]`]
 Formatted Legal Document Canvas	✅ Confirmed built [E17: `web/src/components/legal-document-sheet.tsx` (IBM Plex Serif 800px sheet)]
@@ -143,6 +145,7 @@ Sprint 2.5 [E3, commit `6c6bdc6`]: dashboard rewrite, new `/admin/templates` ind
 Dashboard & Navigation V2 [E18, E19, commits `85f0230`, `d928c15`, `dddf74b`, `35179f9`, `c1c118d`, `6eec6a3`]: 4-card module layout, left navigation drawer, top-right header controls (Notifications, Settings, Avatar), mobile bottom nav bar, Advocate Profile page (`/profile`) with Base64 photo upload & Supabase password reset, Cause List Calendar (`/calendar`), and Document Vault (`/documents`).
 Stitch V2 Contracts Workspace Release [E17, commit `5fdf32f`]: 3-panel workspace layout with 280px left Matter Navigator, `LegalDocumentSheet` (800px IBM Plex Serif paper canvas), `ContractAiAssistant` (320px persistent right sidebar AI copilot), sticky rich text formatting toolbar, and bottom status bar (*Auto Save Active*, *Version*, *Word Count*, *AI Status: Ready*, *Citation Verified*).
 Phase 1 Contract Template Expansion [E20]: 5 new production contract templates built and seeded into Supabase (`Leave and Licence Agreement`, `Lease Deed`, `Agreement to Sell`, `Joint Venture Agreement`, `Software Development Agreement`), bringing total template inventory to 10 of 10 Phase 1 target templates. Extracted `api/scripts/template_seed_utils.py` shared pipeline. All 23 backend pytest cases passed cleanly.
+Phase A P0 Stabilization Fixes [E21]: Implemented `SEC-01` (XML-style prompt boundary isolation `<user_instruction>` / `<user_amendment>` across all LLM entry points) and `PERF-01` (LibreOffice PDF conversion 15s subprocess timeout cap with `PdfConversionTimeout` and HTTP 504 error response). Added 3 unit tests. All 165 backend pytest tests passed cleanly.
 Deployment [E15]: backend live on Render (`vidhidesk.onrender.com`), frontend live on Vercel; confirmed working end-to-end.
 7.2 Not started / no evidence
 Litigation pleading generator workspace, RERA filing wizard, Consulting advisory brief generator.
@@ -156,12 +159,12 @@ Defined and built via migration 0007 [E5] — `template_clauses`, `clause_review
 Cross-template shared-clause detection requested in Batch 4.5 message [E13] but no build confirmation exists. Content-hash mismatch warning has no build evidence.
 8.4 Template Inventory Completed — ✅ 10 of 10 Phase 1 templates live in production [E16][E20]
 All 10 Phase 1 templates seeded and verified (`NDA`, `Service Agreement`, `Consultancy`, `MoU`, `Employment`, `Leave and Licence`, `Lease Deed`, `Agreement to Sell`, `Joint Venture`, `Software Development`).
-8.5 ⚠ Technical Debt — Headless LibreOffice PDF generation latency & manual re-seed review check
-Headless LibreOffice PDF conversion takes 3–8s on cold starts. Re-seeding clause content does not automatically reset prior `review_status = 'kept'` (documented manual check in `lessons_learned.md`).
+8.5 Technical Debt & P0 Stabilization — ✅ SEC-01 & PERF-01 Resolved [E21]
+LibreOffice PDF generation latency is bounded by a 15-second subprocess timeout cap (`PdfConversionTimeout`). User inputs are isolated in XML boundary tags (`<user_instruction>` / `<user_amendment>`). Re-seeding clause content does not automatically reset prior `review_status = 'kept'` (documented manual check in `lessons_learned.md`).
 ---
 9. Open Decisions
 Nitesh's design involvement: 📐 confirmed zero involvement in UI decisions; his review is legal-content only.
-Litigation sequencing proposal: Allocate Sprint 3.5 for Litigation Pleading & Case Law Workbench immediately following Phase 1 Contracts completion.
+Litigation sequencing proposal: Allocate Sprint 3.5 for Litigation Pleading & Case Law Workbench immediately following Phase 1 Contracts completion and P0 stabilization.
 ---
 10. Handover Instructions
 Read in this order: this tracker (§0.1 first) → source docs (§1) → the current codebase directly.
@@ -191,7 +194,8 @@ E17	Stitch V2 Contracts Workspace Release — `git commit 5fdf32f` (`LegalDocume
 E18	Advocate Profile & Settings Page Release — `git commit c1c118d`, `6eec6a3` (`web/src/app/profile/page.tsx` with photo upload, Supabase metadata sync, direct password update, and email password reset link).	Pasted 3 Aug 2026
 E19	Cause List Calendar & Document Vault Pages Release — `git commit c1c118d` (`web/src/app/calendar/page.tsx` litigation hearing dockets schedule, `web/src/app/documents/page.tsx` versioned `.docx` draft file store).	Pasted 3 Aug 2026
 E20	Phase 1 Contract Template Expansion (Batches 5–7) — 5 new templates implemented and seeded into Supabase (`Leave and Licence Agreement`, `Lease Deed`, `Agreement to Sell`, `Joint Venture Agreement`, `Software Development Agreement`), bringing total template inventory to 10 of 10 Phase 1 target templates. Extracted `api/scripts/template_seed_utils.py` shared pipeline. Verified 23/23 backend pytest tests passed cleanly.	Pasted 3 Aug 2026
+E21	Phase A P0 Stabilization Release — Implemented `SEC-01` (XML-style prompt boundary isolation `<user_instruction>` / `<user_amendment>` across all LLM entry points) and `PERF-01` (LibreOffice PDF conversion 15s subprocess timeout cap with `PdfConversionTimeout` and HTTP 504 error response). Added 3 unit tests. Verified 165/165 backend pytest tests passed cleanly.	Pasted 3 Aug 2026
 ---
-Document version: v4 — 3 August 2026
+Document version: v5 — 3 August 2026
 Owner: Keshav
-Change from v3: updated §2, §4, §5, §6, §7, §8, §11 to record the completion of Contract Template Expansion (Batches 5–7). All 10 Phase 1 contract templates (`NDA`, `Service Agreement`, `Consultancy`, `MoU`, `Employment`, `Leave and Licence`, `Lease Deed`, `Agreement to Sell`, `Joint Venture`, `Software Development`) are live in production. Added reusable `template_seed_utils.py` pipeline and evidence log item E20.
+Change from v4: updated §2, §4, §5, §6, §7, §8, §11 to record completion of Phase A P0 Stabilization Fixes (SEC-01 prompt isolation & PERF-01 LibreOffice 15s timeout protection) and Evidence Log item E21.

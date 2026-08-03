@@ -195,6 +195,8 @@ def download_draft_pdf(draft_version_id: str, user: CurrentUser = Depends(get_cu
         raise HTTPException(status_code=404, detail="Draft file missing on disk")
     try:
         pdf_path = contracts.convert_docx_to_pdf(docx_path)
+    except contracts.PdfConversionTimeout as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
     except contracts.PdfConversionUnavailable as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
