@@ -51,10 +51,23 @@ def create_matter(body: MatterCreate, user: CurrentUser = Depends(get_current_us
         "title": body.title,
         "client_name": body.client_name,
         "module": body.module,
-        "template_id": resolved_template_id,
     }
-    resp = user.db.table("matters").insert(row).execute()
-    return resp.data[0]
+    if resolved_template_id:
+        row["template_id"] = resolved_template_id
+
+    try:
+        resp = user.db.table("matters").insert(row).execute()
+    except Exception as exc:
+        if "template_id" in str(exc) or "PGRST204" in str(exc):
+            row.pop("template_id", None)
+            resp = user.db.table("matters").insert(row).execute()
+        else:
+            raise exc
+
+    data = resp.data[0]
+    if "template_id" not in data or data["template_id"] is None:
+        data["template_id"] = resolved_template_id
+    return data
 
 
 @router.get("", response_model=list[MatterOut])
