@@ -1,10 +1,11 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v11 — 3 August 2026 (updated after PROFILE-01 Advocate Profile Data Isolation Release)
+Document version: v12 — 5 August 2026 (updated with mandatory Google Stitch UI Governance methodology)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
 Read §0.1 (evidence tagging system) first — every status claim in this document is tagged, and the tag changes what you're allowed to trust it for.
+Read §0.2 (Google Stitch UI Governance) — mandatory 5-step lifecycle for all UI screens before implementation.
 Read §1 (source docs + which plan wins where they disagree).
 Read §3 (design system) once — it applies to every screen.
 §5 is the actual tracker: Sprint → Session → Screens → Mockup ID → routes → API endpoints → DB tables → tagged Status.
@@ -21,6 +22,25 @@ Tag	Meaning	Citation requirement
 🔮 Envisioned	Future direction, intentionally outside current scope	Roadmap/future-doc reference
 ⚠ Gap	Known inconsistency, undefined behaviour, or missing implementation already identified	Note whether it's a code gap or a documentation-drift gap (spec exists but was never reconciled into the reference docs) — these need different fixes
 Bounding statement (methodology, stated once, applies everywhere): All ✅ Confirmed tags in this document are bounded by evidence pasted into this chat by Keshav — terminal output, migration file contents, commit messages, `openapi.json` dumps, click-through reports. There is no live repository access. Anything built in a Claude Code session since the last paste is invisible here and must not be assumed. Where a claim's freshness matters, the tag states the date/commit explicitly; treat anything older than the last full `git log` pull as "last known," not "current."
+---
+0.2 Google Stitch UI Governance
+Google Stitch is the single authoritative source for all UI/UX design across VidhiDesk (Contracts, Litigation, RERA, Consulting, Administration). Implementation must never become the source of UI design.
+
+Every UI screen must pass through this mandatory 5-step lifecycle before code is written:
+1. **Step 1: Architecture Design:** Define business workflow, user journey, information architecture, and required components (No UI implementation).
+2. **Step 2: Google Stitch Verification:** Audit whether an appropriate Google Stitch design already exists. Provide module, screen name, Stitch project ID, screen name/ID, availability status, confidence %, screenshot evidence link, gap analysis, and recommendation. A screen must NOT be marked "Verified Existing" or "Verified Partial" unless screenshot evidence has been reviewed.
+3. **Step 3: Design Generation:** If a screen is Partial or Missing, produce an optimized Google Stitch prompt, generate the screen in Stitch, review visual output, and refine if necessary.
+4. **Step 4: Design Approval:** Obtain explicit user signoff on the generated/verified Stitch design. Approved Stitch designs become the UI source of truth.
+5. **Step 5: Implementation:** Only after approval, build React/Next.js components, wire backend APIs, connect business logic, and integrate AI services.
+
+**Mandatory UI Tracker Lifecycle States:**
+- `Verified Existing (Screenshot attached)`
+- `Verified Partial (Screenshot attached)`
+- `Newly Generated in Stitch`
+- `Approved for Implementation`
+- `Implemented`
+
+No screen may move directly from "Designed" to "Implemented".
 ---
 1. Source Documents & Precedence
 Doc	Date	Role	Status
