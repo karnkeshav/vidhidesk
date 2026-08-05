@@ -1,6 +1,6 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v15 — 5 August 2026 (updated after Advocate Profile screen generation in Google Stitch)
+Document version: v16 — 5 August 2026 (updated after Advocate Profile schema alignment & field mapping audit)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
@@ -40,6 +40,7 @@ Every UI screen must pass through this mandatory 6-step lifecycle before code is
 - `Verified Partial (Screenshot attached)`
 - `Visual Design Review Completed`
 - `Newly Generated in Stitch`
+- `Pending Schema Alignment`
 - `Approved for Implementation`
 - `Implemented`
 
@@ -56,8 +57,10 @@ No screen may move directly from "Designed" to "Implemented".
 - Admin Dashboard (`/admin`)
 - Template Review Admin (`/admin/templates`)
 
-**2. Newly Generated in Stitch — Pending Final Approval (1 Screen):**
-- Advocate Profile (`/profile`) — Generated in Google Stitch (`projects/5020249546800500726/screens/82443021af60429aac54c6abcaca12db`). Includes Bar Council Registration No., State Bar Council of Enrollment, Primary Court Jurisdiction, High Court Roll No, SC AoR Code, Firm Name, Contact Phone, Registered Email, Chamber Address, Photo Upload Frame, Bar Council Authenticated Badge, and Password Reset & Security card.
+**2. Pending Schema Alignment (1 Screen):**
+- Advocate Profile (`/profile`) — Status: `🎨 Stitch Generated → 👀 Design Reviewed → ⏳ Pending Schema Alignment`. Screen ID: `projects/5020249546800500726/screens/82443021af60429aac54c6abcaca12db`.
+  - *Included in UI & Schema:* `full_name`, `bar_number`, `enrollment_state`, `primary_court`, `high_court_roll_no`, `aor_code`, `phone`, `office_address`, `avatar_url`, `firm_name`, `designation`, `enrollment_year`.
+  - *Explicitly Deferred to Future Phases:* `practice_areas` (Phase 2 Litigation), `states_of_practice` (Phase 2 Litigation), `languages_spoken` (Phase 3 Consulting), `rera_advocate_reg_no` (Phase 3 RERA).
 
 **3. Pending Stitch Refinement & Re-Review (2 Screens):**
 - Cause List Calendar (`/calendar`) — Requires Indian court cause-list docket table (Item No., Bench, Stage of Hearing).
