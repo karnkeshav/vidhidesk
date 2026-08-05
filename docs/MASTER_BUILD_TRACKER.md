@@ -1,11 +1,11 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v12 — 5 August 2026 (updated with mandatory Google Stitch UI Governance methodology)
+Document version: v13 — 5 August 2026 (updated with mandatory Visual Design Review phase in Google Stitch UI Governance)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
 Read §0.1 (evidence tagging system) first — every status claim in this document is tagged, and the tag changes what you're allowed to trust it for.
-Read §0.2 (Google Stitch UI Governance) — mandatory 5-step lifecycle for all UI screens before implementation.
+Read §0.2 (Google Stitch UI Governance) — mandatory 6-step lifecycle including Visual Design Review before implementation.
 Read §1 (source docs + which plan wins where they disagree).
 Read §3 (design system) once — it applies to every screen.
 §5 is the actual tracker: Sprint → Session → Screens → Mockup ID → routes → API endpoints → DB tables → tagged Status.
@@ -26,16 +26,18 @@ Bounding statement (methodology, stated once, applies everywhere): All ✅ Confi
 0.2 Google Stitch UI Governance
 Google Stitch is the single authoritative source for all UI/UX design across VidhiDesk (Contracts, Litigation, RERA, Consulting, Administration). Implementation must never become the source of UI design.
 
-Every UI screen must pass through this mandatory 5-step lifecycle before code is written:
+Every UI screen must pass through this mandatory 6-step lifecycle before code is written:
 1. **Step 1: Architecture Design:** Define business workflow, user journey, information architecture, and required components (No UI implementation).
 2. **Step 2: Google Stitch Verification:** Audit whether an appropriate Google Stitch design already exists. Provide module, screen name, Stitch project ID, screen name/ID, availability status, confidence %, screenshot evidence link, gap analysis, and recommendation. A screen must NOT be marked "Verified Existing" or "Verified Partial" unless screenshot evidence has been reviewed.
-3. **Step 3: Design Generation:** If a screen is Partial or Missing, produce an optimized Google Stitch prompt, generate the screen in Stitch, review visual output, and refine if necessary.
-4. **Step 4: Design Approval:** Obtain explicit user signoff on the generated/verified Stitch design. Approved Stitch designs become the UI source of truth.
-5. **Step 5: Implementation:** Only after approval, build React/Next.js components, wire backend APIs, connect business logic, and integrate AI services.
+3. **Step 2.5: Visual Design Review:** Open the actual Google Stitch screen. Conduct a visual inspection covering: Full-size screenshot, UX review, Missing elements, Incorrect elements, Design inconsistencies, Mobile considerations, Accessibility observations, Business workflow coverage, and Final Recommendation (`Approved without changes`, `Minor Stitch refinement required`, `Major redesign required`).
+4. **Step 3: Design Generation & Refinement:** If a screen is Partial or requires refinement, produce an updated Google Stitch prompt, generate/refine the screen in Stitch, and re-review.
+5. **Step 4: Design Approval:** Obtain explicit user signoff on the generated/verified Stitch design. Approved Stitch designs become the UI source of truth.
+6. **Step 5: Implementation:** Only after approval, build React/Next.js components, wire backend APIs, connect business logic, and integrate AI services.
 
 **Mandatory UI Tracker Lifecycle States:**
 - `Verified Existing (Screenshot attached)`
 - `Verified Partial (Screenshot attached)`
+- `Visual Design Review Completed`
 - `Newly Generated in Stitch`
 - `Approved for Implementation`
 - `Implemented`
