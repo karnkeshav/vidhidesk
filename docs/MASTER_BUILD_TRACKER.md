@@ -1,6 +1,6 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v16 — 5 August 2026 (updated after Advocate Profile schema alignment & field mapping audit)
+Document version: v17 — 5 August 2026 (updated after Advocate Profile Schema Freeze signoff & Migration 0011 draft)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
@@ -48,7 +48,7 @@ No screen may move directly from "Designed" to "Implemented".
 ---
 0.3 Official UI Signoff & Freeze State (5 August 2026)
 
-**1. Design Frozen — Approved for Implementation (7 Screens):**
+**1. Design Frozen — Approved for Implementation (8 Screens):**
 - Login (`/login`)
 - Dashboard (`/dashboard`)
 - Contracts Picker (`/contracts`)
@@ -56,11 +56,10 @@ No screen may move directly from "Designed" to "Implemented".
 - Document Vault (`/documents`)
 - Admin Dashboard (`/admin`)
 - Template Review Admin (`/admin/templates`)
+- Advocate Profile (`/profile`) — Status: `🧊 Schema Frozen — Approved for Implementation`. Migration file `api/migrations/0011_create_advocate_profiles.sql` created with conservative backfill and state-scoped Bar Council uniqueness.
 
-**2. Pending Schema Alignment (1 Screen):**
-- Advocate Profile (`/profile`) — Status: `🎨 Stitch Generated → 👀 Design Reviewed → ⏳ Pending Schema Alignment`. Screen ID: `projects/5020249546800500726/screens/82443021af60429aac54c6abcaca12db`.
-  - *Included in UI & Schema:* `full_name`, `bar_number`, `enrollment_state`, `primary_court`, `high_court_roll_no`, `aor_code`, `phone`, `office_address`, `avatar_url`, `firm_name`, `designation`, `enrollment_year`.
-  - *Explicitly Deferred to Future Phases:* `practice_areas` (Phase 2 Litigation), `states_of_practice` (Phase 2 Litigation), `languages_spoken` (Phase 3 Consulting), `rera_advocate_reg_no` (Phase 3 RERA).
+**2. Architectural Intent Comment (Array Normalization Note):**
+- *Note:* `practice_areas`, `states_of_practice`, and `languages_spoken` remain arrays for Phase 1. They may be normalized into lookup tables in a future release if advanced filtering, analytics, or many-to-many relationships become requirements.
 
 **3. Pending Stitch Refinement & Re-Review (2 Screens):**
 - Cause List Calendar (`/calendar`) — Requires Indian court cause-list docket table (Item No., Bench, Stage of Hearing).
