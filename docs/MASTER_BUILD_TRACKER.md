@@ -1,6 +1,6 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v17 — 5 August 2026 (updated after Advocate Profile Schema Freeze signoff & Migration 0011 draft)
+Document version: v18 — 5 August 2026 (updated after Advocate Profile endpoints implementation & test suite completion)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
@@ -48,7 +48,7 @@ No screen may move directly from "Designed" to "Implemented".
 ---
 0.3 Official UI Signoff & Freeze State (5 August 2026)
 
-**1. Design Frozen — Approved for Implementation (8 Screens):**
+**1. Design Frozen & Implemented (8 Screens):**
 - Login (`/login`)
 - Dashboard (`/dashboard`)
 - Contracts Picker (`/contracts`)
@@ -56,7 +56,7 @@ No screen may move directly from "Designed" to "Implemented".
 - Document Vault (`/documents`)
 - Admin Dashboard (`/admin`)
 - Template Review Admin (`/admin/templates`)
-- Advocate Profile (`/profile`) — Status: `🧊 Schema Frozen — Approved for Implementation`. Migration file `api/migrations/0011_create_advocate_profiles.sql` created with conservative backfill and state-scoped Bar Council uniqueness.
+- Advocate Profile (`/profile`) — Status: `✅ Confirmed Implemented`. Dedicated backend endpoints (`GET /api/profile`, `PUT /api/profile`, `POST /api/profile/avatar`), migration DDL `api/migrations/0011_create_advocate_profiles.sql`, and 5-test regression suite (`api/tests/test_profile.py`).
 
 **2. Architectural Intent Comment (Array Normalization Note):**
 - *Note:* `practice_areas`, `states_of_practice`, and `languages_spoken` remain arrays for Phase 1. They may be normalized into lookup tables in a future release if advanced filtering, analytics, or many-to-many relationships become requirements.

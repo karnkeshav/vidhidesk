@@ -19,6 +19,7 @@ class CurrentUser:
     id: str
     email: str | None
     db: Client
+    raw_user_meta_data: dict | None = None
 
 
 def get_current_user(authorization: str = Header(...)) -> CurrentUser:
@@ -36,4 +37,6 @@ def get_current_user(authorization: str = Header(...)) -> CurrentUser:
     if resp is None or resp.user is None:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
-    return CurrentUser(id=resp.user.id, email=resp.user.email, db=user_client(token))
+    meta = getattr(resp.user, "user_metadata", None) or getattr(resp.user, "raw_user_meta_data", None)
+    return CurrentUser(id=resp.user.id, email=resp.user.email, db=user_client(token), raw_user_meta_data=meta)
+

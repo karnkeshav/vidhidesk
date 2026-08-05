@@ -10,8 +10,14 @@ import { User, Upload, CheckCircle2, ShieldCheck, Camera, Save, KeyRound, Mail, 
 
 export type AdvocateProfile = {
   full_name: string;
+  designation: string;
   bar_number: string;
+  enrollment_state: string;
+  enrollment_year: number | null;
   primary_court: string;
+  high_court_roll_no: string;
+  aor_code: string;
+  firm_name: string;
   phone: string;
   email: string;
   office_address: string;
@@ -21,8 +27,14 @@ export type AdvocateProfile = {
 export default function ProfilePage() {
   const [profile, setProfile] = useState<AdvocateProfile>({
     full_name: "",
+    designation: "Advocate",
     bar_number: "",
+    enrollment_state: "",
+    enrollment_year: null,
     primary_court: "",
+    high_court_roll_no: "",
+    aor_code: "",
+    firm_name: "",
     phone: "",
     email: "",
     office_address: "",
@@ -32,6 +44,7 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
 
@@ -42,35 +55,68 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  const loadProfileFromSupabase = async () => {
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      const meta = data.user.user_metadata || {};
-      let cached: Partial<AdvocateProfile> = {};
-      const savedCache = localStorage.getItem("vidhidesk_advocate_profile");
-      if (savedCache) {
-        try {
-          cached = JSON.parse(savedCache);
-        } catch {}
+  const loadProfileFromApi = async () => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const userEmail = authData.user?.email || "";
+
+      if (token) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/api/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const apiData = await res.json();
+          setProfile({
+            full_name: apiData.full_name || "",
+            designation: apiData.designation || "Advocate",
+            bar_number: apiData.bar_number || "",
+            enrollment_state: apiData.enrollment_state || "",
+            enrollment_year: apiData.enrollment_year || null,
+            primary_court: apiData.primary_court || "",
+            high_court_roll_no: apiData.high_court_roll_no || "",
+            aor_code: apiData.aor_code || "",
+            firm_name: apiData.firm_name || "",
+            phone: apiData.phone || "",
+            email: userEmail,
+            office_address: apiData.office_address || "",
+            avatar_url: apiData.avatar_url || "",
+          });
+          return;
+        }
       }
 
+      // Fallback if token not available
+      const meta = authData.user?.user_metadata || {};
       setProfile({
-        full_name: meta.full_name ?? cached.full_name ?? "",
-        bar_number: meta.bar_number ?? cached.bar_number ?? "",
-        primary_court: meta.primary_court ?? cached.primary_court ?? "",
-        phone: meta.phone ?? cached.phone ?? "",
-        email: data.user.email || "",
-        office_address: meta.office_address ?? cached.office_address ?? "",
-        avatar_url: meta.avatar_url ?? cached.avatar_url ?? "",
+        full_name: meta.full_name || "",
+        designation: meta.designation || "Advocate",
+        bar_number: meta.bar_number || "",
+        enrollment_state: meta.enrollment_state || "",
+        enrollment_year: meta.enrollment_year || null,
+        primary_court: meta.primary_court || "",
+        high_court_roll_no: meta.high_court_roll_no || "",
+        aor_code: meta.aor_code || "",
+        firm_name: meta.firm_name || "",
+        phone: meta.phone || "",
+        email: userEmail,
+        office_address: meta.office_address || "",
+        avatar_url: meta.avatar_url || "",
       });
+    } catch (err) {
+      console.warn("Profile load warning:", err);
     }
   };
 
   useEffect(() => {
-    void loadProfileFromSupabase();
+    void loadProfileFromApi();
   }, []);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -79,13 +125,38 @@ export default function ProfilePage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setProfile((prev) => ({ ...prev, avatar_url: base64 }));
-      setError(null);
-    };
-    reader.readAsDataURL(file);
+    setUploadingImage(true);
+    setError(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Authentication token unavailable.");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/profile/avatar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || "Avatar upload failed.");
+      }
+
+      const updated = await res.json();
+      setProfile((prev) => ({ ...prev, avatar_url: updated.avatar_url }));
+      window.dispatchEvent(new Event("advocate_profile_updated"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -95,30 +166,43 @@ export default function ProfilePage() {
     setSavedSuccess(false);
 
     try {
-      // Save to Supabase auth user_metadata
-      const { error: updateErr } = await supabase.auth.updateUser({
-        data: {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Authentication token unavailable.");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           full_name: profile.full_name,
+          designation: profile.designation,
           bar_number: profile.bar_number,
+          enrollment_state: profile.enrollment_state,
+          enrollment_year: profile.enrollment_year,
           primary_court: profile.primary_court,
+          high_court_roll_no: profile.high_court_roll_no,
+          aor_code: profile.aor_code,
+          firm_name: profile.firm_name,
           phone: profile.phone,
           office_address: profile.office_address,
           avatar_url: profile.avatar_url,
-        },
+        }),
       });
 
-      if (updateErr) {
-        console.warn("Supabase metadata update warning:", updateErr.message);
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || "Failed to update profile.");
       }
 
-      // Persist in localStorage for instant client-side header sync
+      // Persist in localStorage cache for instant UI response & header sync
       localStorage.setItem("vidhidesk_advocate_profile", JSON.stringify(profile));
-      // Dispatch custom event to update AuthedShell header immediately
       window.dispatchEvent(new Event("advocate_profile_updated"));
 
-      // Reload fresh server metadata from Supabase
-      await loadProfileFromSupabase();
-
+      await loadProfileFromApi();
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
     } catch (err) {
@@ -127,6 +211,7 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
+
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();

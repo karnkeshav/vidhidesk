@@ -52,3 +52,44 @@ class MessageOut(BaseModel):
     content: str
     model_used: str | None
     created_at: datetime
+
+
+class AdvocateProfile(BaseModel):
+    user_id: str
+    full_name: str | None = None
+    designation: str = "Advocate"
+    bar_number: str | None = None
+    enrollment_state: str | None = None
+    enrollment_year: int | None = None
+    primary_court: str | None = None
+    high_court_roll_no: str | None = None
+    aor_code: str | None = None
+    firm_name: str | None = None
+    phone: str | None = None
+    office_address: str | None = None
+    avatar_url: str | None = None
+    practice_areas: list[str] = Field(default_factory=list)
+    states_of_practice: list[str] = Field(default_factory=list)
+    languages_spoken: list[str] = Field(default_factory=list)
+    rera_advocate_reg_no: str | None = None
+    updated_at: datetime | None = None
+
+
+class AdvocateProfileUpdate(BaseModel):
+    full_name: str | None = None
+    designation: str | None = "Advocate"
+    bar_number: str | None = None
+    enrollment_state: str | None = None
+    enrollment_year: int | None = Field(default=None, ge=1950)
+    primary_court: str | None = None
+    high_court_roll_no: str | None = None
+    aor_code: str | None = None
+    firm_name: str | None = None
+    phone: str | None = Field(default=None, pattern=r"^\+?[1-9]\d{1,14}$")
+    office_address: str | None = None
+    avatar_url: str | None = None
+    practice_areas: list[str] | None = None
+    states_of_practice: list[str] | None = None
+    languages_spoken: list[str] | None = None
+    rera_advocate_reg_no: str | None = None
+
