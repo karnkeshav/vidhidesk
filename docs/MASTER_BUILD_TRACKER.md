@@ -1,6 +1,6 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v14 — 5 August 2026 (updated with official Google Stitch UI Signoff & Freeze decision)
+Document version: v15 — 5 August 2026 (updated after Advocate Profile screen generation in Google Stitch)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
@@ -56,12 +56,14 @@ No screen may move directly from "Designed" to "Implemented".
 - Admin Dashboard (`/admin`)
 - Template Review Admin (`/admin/templates`)
 
-**2. Pending Stitch Refinement & Re-Review (3 Screens):**
-- Advocate Profile (`/profile`) — Requires Bar Council Registration No., Primary Court Jurisdiction, and Chamber Address field updates in Stitch.
+**2. Newly Generated in Stitch — Pending Final Approval (1 Screen):**
+- Advocate Profile (`/profile`) — Generated in Google Stitch (`projects/5020249546800500726/screens/82443021af60429aac54c6abcaca12db`). Includes Bar Council Registration No., State Bar Council of Enrollment, Primary Court Jurisdiction, High Court Roll No, SC AoR Code, Firm Name, Contact Phone, Registered Email, Chamber Address, Photo Upload Frame, Bar Council Authenticated Badge, and Password Reset & Security card.
+
+**3. Pending Stitch Refinement & Re-Review (2 Screens):**
 - Cause List Calendar (`/calendar`) — Requires Indian court cause-list docket table (Item No., Bench, Stage of Hearing).
 - Clause Review Detail (`/admin/templates/[key]`) — Requires legal boilerplate toggle switch and bulk-keep audit bar.
 
-**3. Litigation Module Gating Rule:**
+**4. Litigation Module Gating Rule:**
 - Implementation of Litigation features is strictly gated. No Litigation implementation may begin until all Litigation Stitch designs complete the 6-step lifecycle and obtain user signoff.
 ---
 1. Source Documents & Precedence
