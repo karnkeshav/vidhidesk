@@ -1,11 +1,12 @@
 VidhiDesk — Master Build Tracker & Developer Handover
 Consolidates: `UI/UX Design Notes` (design system) + `Stitch_Mockup_Plan.md` (what to mock up, in order) + `Navigation_and_Functional_Spec.md` (how every screen behaves/connects/talks to the backend), reconciled against the original `01_Scope_of_Work.md` / `02_Technical_Requirements.md` / `03_Implementation_Plan.md`, the revised `Project_Plan_Legal_AI_Assistant.md`, and actual implementation evidence pasted into chat since.
-Document version: v13 — 5 August 2026 (updated with mandatory Visual Design Review phase in Google Stitch UI Governance)
+Document version: v14 — 5 August 2026 (updated with official Google Stitch UI Signoff & Freeze decision)
 Status: Living tracker — update the Status column, and its evidence tag, as work lands.
 ---
 0. How to use this document
 Read §0.1 (evidence tagging system) first — every status claim in this document is tagged, and the tag changes what you're allowed to trust it for.
 Read §0.2 (Google Stitch UI Governance) — mandatory 6-step lifecycle including Visual Design Review before implementation.
+Read §0.3 (Official UI Signoff & Freeze State) — current approved design freeze status per module.
 Read §1 (source docs + which plan wins where they disagree).
 Read §3 (design system) once — it applies to every screen.
 §5 is the actual tracker: Sprint → Session → Screens → Mockup ID → routes → API endpoints → DB tables → tagged Status.
@@ -43,6 +44,25 @@ Every UI screen must pass through this mandatory 6-step lifecycle before code is
 - `Implemented`
 
 No screen may move directly from "Designed" to "Implemented".
+---
+0.3 Official UI Signoff & Freeze State (5 August 2026)
+
+**1. Design Frozen — Approved for Implementation (7 Screens):**
+- Login (`/login`)
+- Dashboard (`/dashboard`)
+- Contracts Picker (`/contracts`)
+- Contract Workspace (`/contracts/[matterId]`)
+- Document Vault (`/documents`)
+- Admin Dashboard (`/admin`)
+- Template Review Admin (`/admin/templates`)
+
+**2. Pending Stitch Refinement & Re-Review (3 Screens):**
+- Advocate Profile (`/profile`) — Requires Bar Council Registration No., Primary Court Jurisdiction, and Chamber Address field updates in Stitch.
+- Cause List Calendar (`/calendar`) — Requires Indian court cause-list docket table (Item No., Bench, Stage of Hearing).
+- Clause Review Detail (`/admin/templates/[key]`) — Requires legal boilerplate toggle switch and bulk-keep audit bar.
+
+**3. Litigation Module Gating Rule:**
+- Implementation of Litigation features is strictly gated. No Litigation implementation may begin until all Litigation Stitch designs complete the 6-step lifecycle and obtain user signoff.
 ---
 1. Source Documents & Precedence
 Doc	Date	Role	Status
