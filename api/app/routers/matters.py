@@ -54,6 +54,20 @@ def create_matter(body: MatterCreate, user: CurrentUser = Depends(get_current_us
     }
     if resolved_template_id:
         row["template_id"] = resolved_template_id
+    if body.court_category:
+        row["court_category"] = body.court_category
+    if body.jurisdiction_state:
+        row["jurisdiction_state"] = body.jurisdiction_state
+    if body.cnr_number:
+        row["cnr_number"] = body.cnr_number
+    if body.case_number_formatted:
+        row["case_number_formatted"] = body.case_number_formatted
+    if body.litigation_stage:
+        row["litigation_stage"] = body.litigation_stage
+    if body.court_name:
+        row["court_name"] = body.court_name
+    if body.bench_name:
+        row["bench_name"] = body.bench_name
 
     try:
         resp = user.db.table("matters").insert(row).execute()

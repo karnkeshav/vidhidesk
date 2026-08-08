@@ -1,0 +1,309 @@
+Running verify_environment.py ...
+Running verify_migrations.py (static file checks) ...
+Running verify_database.py (live schema checks) ...
+Running verify_storage.py ...
+Running verify_llm_providers.py ...
+Running verify_runtime.py against a freshly-started local instance ...
+Running backend pytest suite ...
+
+========================================================================
+Environment Verification (Part 5)
+========================================================================
+  ✅ PASS  Backend (.env) exists
+           /home/keysh/vidhidesk/.env
+  ✅ PASS  Backend (.env): INDIAN_KANOON_API_TOKEN
+           40 chars, non-placeholder
+  ✅ PASS  Backend (.env): GEMINI_API_KEY
+           39 chars, non-placeholder
+  ✅ PASS  Backend (.env): GROQ_API_KEY
+           56 chars, non-placeholder
+  ✅ PASS  Backend (.env): SAMBANOVA_API_KEY
+           36 chars, non-placeholder
+  ✅ PASS  Backend (.env): CEREBRAS_API_KEY
+           48 chars, non-placeholder
+  ✅ PASS  Backend (.env): SUPABASE_URL
+           40 chars, non-placeholder
+  ✅ PASS  Backend (.env): SUPABASE_ANON_KEY
+           46 chars, non-placeholder
+  ✅ PASS  Backend (.env): SUPABASE_SERVICE_KEY
+           41 chars, non-placeholder
+  ✅ PASS  Backend (.env): duplicate keys
+           No duplicate keys found
+  ✅ PASS  Frontend (web/.env.local) exists
+           /home/keysh/vidhidesk/web/.env.local
+  ✅ PASS  Frontend (web/.env.local): NEXT_PUBLIC_SUPABASE_URL
+           40 chars, non-placeholder
+  ✅ PASS  Frontend (web/.env.local): NEXT_PUBLIC_SUPABASE_ANON_KEY
+           46 chars, non-placeholder
+  ✅ PASS  Frontend (web/.env.local): NEXT_PUBLIC_API_URL
+           21 chars, non-placeholder
+  ✅ PASS  Frontend (web/.env.local): duplicate keys
+           No duplicate keys found
+  ✅ PASS  CORS origins — no wildcard
+           ['http://localhost:3000', 'https://vidhidesk.vercel.app']
+  ✅ PASS  SUPABASE_URL shape
+           Starts with https://
+
+  Overall: PASS
+
+========================================================================
+Migration File Verification (Part 2, static)
+========================================================================
+  ✅ PASS  Migrations directory exists
+           14 .sql files found
+  ✅ PASS  Duplicate migration numbers
+           Every migration has a unique number prefix
+  ✅ PASS  Sequence gaps
+           Continuous from 0001 to 0014, no gaps
+  ✅ PASS  Idempotency: 0001_schema.sql
+           No bare CREATE/ADD COLUMN patterns found; consistent with its idempotency claim
+  ✅ PASS  Idempotency: 0002_rls.sql
+           No bare CREATE/ADD COLUMN patterns found; consistent with its idempotency claim
+  ✅ PASS  Idempotency: 0003_sprint1_rag_and_citation_verifier.sql
+           No bare CREATE/ADD COLUMN patterns found; consistent with its idempotency claim
+  ✅ PASS  Idempotency: 0004_retrieval_rpc.sql
+           No bare CREATE/ADD COLUMN patterns found; consistent with its idempotency claim
+  ⚠️  WARN  Idempotency: 0005_case_name_normalization.sql
+           ADD COLUMN without IF NOT EXISTS
+  ⚠️  WARN  Idempotency: 0006_statute_fulltext_search.sql
+           Doesn't explicitly claim idempotency in its header comment, but no non-idempotent pattern detected either — likely fine, worth a header note
+  ✅ PASS  Idempotency: 0007_contracts_clause_review.sql
+           No bare CREATE/ADD COLUMN patterns found; consistent with its idempotency claim
+  ✅ PASS  Idempotency: 0008_generic_clause_conditions_and_numbering.sql
+           No bare CREATE/ADD COLUMN patterns found; consistent with its idempotency claim
+  ✅ PASS  Idempotency: 0009_normalize_template_keys.sql
+           No bare CREATE/ADD COLUMN patterns found; consistent with its idempotency claim
+  ⚠️  WARN  Idempotency: 0010_add_template_id_to_matters.sql
+           Doesn't explicitly claim idempotency in its header comment, but no non-idempotent pattern detected either — likely fine, worth a header note
+  ⚠️  WARN  Idempotency: 0011_create_advocate_profiles.sql
+           CREATE POLICY without a matching DROP POLICY IF EXISTS first (re-run would fail): advocate_profiles_delete_owner, advocate_profiles_insert_owner, advocate_profiles_select_owner, advocate_profiles_update_owner
+  ⚠️  WARN  Idempotency: 0012_simplify_advocate_profiles.sql
+           Doesn't explicitly claim idempotency in its header comment, but no non-idempotent pattern detected either — likely fine, worth a header note
+  ⚠️  WARN  Idempotency: 0013_litigation_schema.sql
+           CREATE POLICY without a matching DROP POLICY IF EXISTS first (re-run would fail): litigation_facts_delete_owner, litigation_facts_insert_owner, litigation_facts_select_owner, litigation_facts_update_owner, litigation_hearings_delete_owner, litigation_hearings_insert_owner, litigation_hearings_select_owner, litigation_hearings_update_owner, litigation_parties_delete_owner, litigation_parties_insert_owner, litigation_parties_select_owner, litigation_parties_update_owner
+  ⚠️  WARN  Idempotency: 0014_litigation_case_analysis.sql
+           CREATE POLICY without a matching DROP POLICY IF EXISTS first (re-run would fail): litigation_case_analyses_insert_owner, litigation_case_analyses_select_owner
+
+  Overall: WARN
+
+========================================================================
+Database Verification (Part 2)
+========================================================================
+  ✅ PASS  Fetch PostgREST schema (service role)  (476.4ms)
+           13 objects exposed
+  ✅ PASS  Table exists: matters
+           defined in migration 0001
+  ✅ PASS  Table exists: messages
+           defined in migration 0001
+  ✅ PASS  Table exists: citations
+           defined in migration 0001
+  ✅ PASS  Table exists: templates
+           defined in migration 0001
+  ✅ PASS  Table exists: draft_versions
+           defined in migration 0001
+  ✅ PASS  Table exists: statute_chunks
+           defined in migration 0001
+  ✅ PASS  Table exists: state_rules
+           defined in migration 0001
+  ✅ PASS  Table exists: rera_guides
+           defined in migration 0001
+  ✅ PASS  Table exists: pii_masks
+           defined in migration 0001
+  ✅ PASS  Table exists: template_clauses
+           defined in migration 0007
+  ✅ PASS  Table exists: clause_reviews
+           defined in migration 0007
+  ✅ PASS  Table exists: draft_clause_fills
+           defined in migration 0007
+  ✅ PASS  Table exists: advocate_profiles
+           defined in migration 0011 (modified 0012)
+  ❌ FAIL  Table exists: litigation_parties
+           MISSING — expected per migration 0013, not found in live schema
+  ❌ FAIL  Table exists: litigation_facts_evidence
+           MISSING — expected per migration 0013, not found in live schema
+  ❌ FAIL  Table exists: litigation_hearings
+           MISSING — expected per migration 0013, not found in live schema
+  ❌ FAIL  Table exists: litigation_case_analyses
+           MISSING — expected per migration 0014, not found in live schema
+  ✅ PASS  Column exists: templates.review_status
+           added in migration 0007
+  ✅ PASS  Column exists: templates.template_key
+           added in migration 0007
+  ✅ PASS  Column exists: template_clauses.applicable_condition
+           added in migration 0008
+  ✅ PASS  Column exists: template_clauses.heading
+           added in migration 0008
+  ✅ PASS  Column exists: matters.template_id
+           added in migration 0010
+  ✅ PASS  Column exists: citations.case_name_normalized
+           added in migration 0005
+  ✅ PASS  Column exists: statute_chunks.text_search
+           added in migration 0006
+  ❌ FAIL  Column exists: litigation_facts_evidence.file_url
+           MISSING — expected per migration 0014
+  ❌ FAIL  Column exists: litigation_facts_evidence.file_name
+           MISSING — expected per migration 0014
+  ❌ FAIL  Column exists: litigation_facts_evidence.file_size_bytes
+           MISSING — expected per migration 0014
+  ❌ FAIL  Column exists: litigation_facts_evidence.mime_type
+           MISSING — expected per migration 0014
+  ✅ PASS  Deprecated columns removed: advocate_profiles
+           0012's drops confirmed applied
+  ✅ PASS  RPC exists: match_statute_chunks
+           defined in migration 0004
+  ✅ PASS  RPC exists: search_statute_chunks_fulltext
+           defined in migration 0006
+  ✅ PASS  Row count: matters  (240.7ms)
+           73 rows
+  ✅ PASS  Row count: messages  (173.4ms)
+           8 rows
+  ✅ PASS  Row count: citations  (163.0ms)
+           0 rows
+  ✅ PASS  Row count: templates  (172.7ms)
+           10 rows
+  ✅ PASS  Row count: draft_versions  (168.8ms)
+           6 rows
+  ✅ PASS  Row count: statute_chunks  (169.6ms)
+           633 rows
+  ✅ PASS  Row count: state_rules  (167.4ms)
+           27 rows
+  ✅ PASS  Row count: rera_guides  (170.6ms)
+           0 rows
+  ✅ PASS  Row count: pii_masks  (293.2ms)
+           79 rows
+  ✅ PASS  Row count: template_clauses  (172.5ms)
+           100 rows
+  ✅ PASS  Row count: clause_reviews  (165.5ms)
+           0 rows
+  ✅ PASS  Row count: draft_clause_fills  (175.1ms)
+           18 rows
+  ✅ PASS  Row count: advocate_profiles  (176.1ms)
+           1 rows
+  ✅ PASS  RLS blocks anon: matters  (202.4ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: messages  (147.4ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: draft_versions  (145.0ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: pii_masks  (142.8ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: citations  (161.8ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: templates  (144.8ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: statute_chunks  (151.1ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: state_rules  (148.1ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: rera_guides  (138.6ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: template_clauses  (382.0ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: clause_reviews  (211.7ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: draft_clause_fills  (218.0ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  RLS blocks anon: advocate_profiles  (250.5ms)
+           0 rows visible to unauthenticated anon key
+  ✅ PASS  Anon cannot execute RPC: match_statute_chunks  (202.0ms)
+           Denied as expected: APIError
+  ✅ PASS  Anon cannot execute RPC: search_statute_chunks_fulltext  (249.8ms)
+           Denied as expected: APIError
+  ⏭️  SKIP  Named index existence
+           Requires a direct Postgres connection (DATABASE_URL) to query pg_indexes; not configured in this environment. PostgREST does not expose index metadata.
+  ⏭️  SKIP  Named constraint / trigger existence
+           Same limitation — requires pg_constraint/pg_trigger access via a direct Postgres connection, not available via the REST API alone.
+  ❌ FAIL  Migration history matches repository
+           4 of 17 expected tables are missing from the live database despite their migration files existing in the repository: litigation_parties, litigation_facts_evidence, litigation_hearings, litigation_case_analyses
+
+  Overall: FAIL
+
+========================================================================
+Storage Verification (Part 3)
+========================================================================
+  ✅ PASS  List storage buckets  (903.1ms)
+           0 bucket(s) found: (none)
+  ❌ FAIL  Bucket exists: avatars
+           Not provisioned — see TICKET-10
+  ⏭️  SKIP  Upload round-trip: avatars
+           Bucket does not exist — nothing to test
+  ⏭️  SKIP  Download round-trip: avatars
+           Bucket does not exist — nothing to test
+  ⏭️  SKIP  Permissions: avatars
+           Bucket does not exist — nothing to test
+  ❌ FAIL  Bucket exists: evidence
+           Not provisioned — see TICKET-10
+  ⏭️  SKIP  Upload round-trip: evidence
+           Bucket does not exist — nothing to test
+  ⏭️  SKIP  Download round-trip: evidence
+           Bucket does not exist — nothing to test
+  ⏭️  SKIP  Permissions: evidence
+           Bucket does not exist — nothing to test
+
+  Overall: FAIL
+
+========================================================================
+LLM & Citation Provider Verification (Part 4)
+========================================================================
+  ❌ FAIL  Gemini (GEMINI_API_KEY)  (1012.9ms)
+           Configured but unreachable/unauthorized: ProviderError: gemini: rate limited
+  ✅ PASS  Groq (GROQ_API_KEY)  (531.2ms)
+           model=llama-3.1-8b-instant  response='OK'
+  ✅ PASS  SambaNova (SAMBANOVA_API_KEY)  (983.5ms)
+           model=Meta-Llama-3.3-70B-Instruct  response='OK'
+  ❌ FAIL  Cerebras (CEREBRAS_API_KEY)  (315.4ms)
+           Configured but unreachable/unauthorized: ProviderError: cerebras: HTTP 401: {"message":"Wrong API Key","type":"invalid_request_error","param":"api_key","code":"wrong_api_key"}
+  ✅ PASS  Indian Kanoon (INDIAN_KANOON_API_TOKEN)  (385.8ms)
+           10 search results returned
+  ✅ PASS  LLM Gateway failover chain has at least one working tier
+           Working: Groq, SambaNova — generate() will succeed even if other tiers are down
+
+  Overall: FAIL
+
+========================================================================
+Runtime Verification (Part 1/7) — http://127.0.0.1:51975
+========================================================================
+  ✅ PASS  GET /health  (17.7ms)
+           HTTP 200: {'status': 'ok', 'notice': 'AI-generated draft for advocate review. Not legal advice.'}
+  ✅ PASS  Health response carries the advocate-review disclaimer
+           Present
+  ✅ PASS  GET /openapi.json  (501.6ms)
+           27 routes registered
+  ✅ PASS  Expected feature routes registered
+           All 8 representative feature routes present
+  ✅ PASS  Unauthenticated request to /api/matters is rejected  (18.9ms)
+           HTTP 422 as expected
+
+  Overall: PASS
+
+==================================
+VIDHIDESK HEALTH REPORT
+==================================
+
+Environment
+PASS
+
+Migrations (file hygiene)
+WARN
+
+Database (live schema)
+FAIL
+
+Storage
+FAIL
+
+Providers
+FAIL
+
+Runtime
+PASS
+
+Tests
+214 passed, 3 warnings in 53.69s  (57.6s)
+
+Validation Ready
+NO
+
+==================================
+
+OVERALL STATUS: FAIL — see section reports above for exact evidence.

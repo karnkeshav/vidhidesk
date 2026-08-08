@@ -1,0 +1,150 @@
+name: CI — Lint, Test, Verify, Deploy Gate
+
+# Sprint 3.5.5B. Extends the existing .github/workflows/recheck_citations.yml
+# (a separate, unrelated nightly job) rather than replacing it.
+#
+# Pipeline: Lint -> Unit Tests -> Migration Verification -> Infrastructure
+# Verification -> Deployment -> Runtime Verification.
+#
+# Honesty note (read before assuming this fully gates production
+# deploys): Render and Vercel are currently configured to auto-deploy
+# directly from pushes to `main` via their own git integration, outside
+# of GitHub Actions entirely (docs/40_Operations/Deployment.md). That
+# means this workflow's `deploy_gate` job does NOT currently stop a bad
+# push from reaching production by itself — it can only do that once
+# either (a) branch protection on `main` is configured to require this
+# workflow's jobs to pass before merge (a repo settings change, not a
+# file change, and not something this workflow can configure itself), or
+# (b) Render/Vercel's auto-deploy-on-push is switched to a deploy hook
+# triggered only from this workflow's `deploy_gate` job, which needs a
+# `RENDER_DEPLOY_HOOK_URL` secret that does not exist yet. Both are
+# documented as explicit next steps in
+# docs/40_Operations/Deployment_Verification_Guide.md — this file
+# implements everything that CAN be automated without those two things,
+# and does not pretend to implement the parts that need them.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r api/requirements.txt
+      - name: Backend — import sanity (no dedicated Python linter configured yet)
+        working-directory: api
+        run: python -c "from app.main import app; print(len(app.routes), 'routes registered')"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run lint
+        working-directory: web
+
+  unit_tests:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r api/requirements.txt
+      - run: python -m pytest tests/ -q
+        working-directory: api
+      - name: Frontend build (typecheck + static generation)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+
+  migration_verification:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r api/requirements.txt
+      - name: Static migration file checks (no credentials needed)
+        run: python scripts/verify_migrations.py
+        working-directory: api
+
+  infrastructure_verification:
+    needs: unit_tests
+    runs-on: ubuntu-latest
+    # Requires real credentials as GitHub Secrets — same set the existing
+    # recheck_citations.yml workflow already uses, extended with the LLM
+    # provider keys. This job will FAIL if any of these secrets are
+    # unset/wrong, per this project's "never produce a false PASS" rule —
+    # it does not skip silently.
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+      INDIAN_KANOON_API_TOKEN: ${{ secrets.INDIAN_KANOON_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r api/requirements.txt
+      - run: python scripts/verify_database.py
+        working-directory: api
+      - run: python scripts/verify_storage.py
+        working-directory: api
+      - run: python scripts/verify_llm_providers.py
+        working-directory: api
+
+  deploy_gate:
+    needs: [migration_verification, infrastructure_verification]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Deployment
+        run: |
+          echo "All upstream verification jobs passed."
+          echo "NOTE: Render/Vercel currently auto-deploy from git push independently of this workflow."
+          echo "To make this job an actual deploy gate (not just a status marker), add a"
+          echo "RENDER_DEPLOY_HOOK_URL secret and curl it here, and/or add branch protection"
+          echo "on main requiring this workflow to pass before merge. See"
+          echo "docs/40_Operations/Deployment_Verification_Guide.md for exact steps — not done"
+          echo "in this workflow file because neither the secret nor the repo-settings change"
+          echo "can be made from a file-only change."
+
+  runtime_verification:
+    needs: deploy_gate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r api/requirements.txt
+      - name: Verify the actual deployed backend responds correctly
+        working-directory: api
+        env:
+          RUNTIME_VERIFY_BASE_URL: https://vidhidesk.onrender.com
+        run: python scripts/verify_runtime.py

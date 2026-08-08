@@ -5,10 +5,12 @@ reads their matters"):
 
 - `service_client()` — service-role key, bypasses RLS. Used only for
   operations on shared/reference data that isn't user-owned (citation
-  cache, statute corpus, templates) or for trusted server-side writes.
+  cache, statute corpus, templates) or for trusted server-side writes —
+  including pii_masks, which carries no RLS policies at all (see
+  migrations/0002_rls.sql) and is reachable only via this client.
 - `user_client(access_token)` — anon key with the caller's JWT attached,
   so every query goes through Postgres RLS as that user. Used for all
-  matter/message/draft/pii_mask access.
+  matter/message/draft access.
 """
 
 from __future__ import annotations
