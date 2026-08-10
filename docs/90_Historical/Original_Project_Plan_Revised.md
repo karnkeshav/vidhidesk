@@ -1,3 +1,17 @@
+> **Title:** Original Project Plan — Revised (Contracts-First, Citation Policy)
+> **Version:** 1.0 (as originally issued, revised after IK API procurement)
+> **Status:** Historical
+> **Owner:** Keshav
+> **Audience:** Historical record for founders, engineers, future AI agents
+> **Last Updated:** 23 July 2026 (frozen; not maintained further)
+> **Canonical Reference:** No — see Superseded By
+> **Supersedes:** [`Original_Scope_of_Work.md`](Original_Scope_of_Work.md) (build order only), [`Original_Implementation_Plan.md`](Original_Implementation_Plan.md) (build order only)
+> **Superseded By:** [`00_Product/Roadmap.md`](../00_Product/Roadmap.md) (phasing), [`30_Implementation/ADR/`](../30_Implementation/ADR/) (citation gate, contracts-first, and freeware-constraint decisions extracted as standalone ADRs), [`30_Implementation/Build_Tracker.md`](../30_Implementation/Build_Tracker.md) (live status)
+> **Reason:** This document was previously the CLAUDE.md-designated tie-breaker ("where /docs conflict, this file wins") and Build Tracker's "authoritative for build order and phasing" source. As of this documentation refactor, the Product Constitution and the Documentation Precedence Policy (`docs/README.md`) now hold that role, and this plan's live decisions have been extracted into the Roadmap and ADRs so they carry forward with current status rather than a July 2026 snapshot. Preserved verbatim as the original decision record — the citation-verification design in §3 and the "working without sample drafts" quality process in §6 are still the accurate account of why those mechanisms exist.
+> **Related Documents:** [`Original_Scope_of_Work.md`](Original_Scope_of_Work.md), [`Original_Implementation_Plan.md`](Original_Implementation_Plan.md)
+
+---
+
 # Project Plan — AI Legal Assistant for an Independent Advocate
 
 **Client / Domain Expert:** Nitesh (Delhi-based advocate, moving from employment → independent & online practice)

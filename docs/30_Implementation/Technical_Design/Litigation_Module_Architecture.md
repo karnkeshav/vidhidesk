@@ -1,3 +1,15 @@
+> **Title:** Litigation Module Architecture & Functional Specification (Sprint 3.5)
+> **Version:** 1.0
+> **Status:** Active — approved architecture, pending implementation signoff (see Build Tracker §8.1 / §9)
+> **Owner:** Keshav
+> **Audience:** Engineers, architects
+> **Last Updated:** 3 August 2026
+> **Canonical Reference:** Yes, for Litigation module implementation — subordinate to [`10_Architecture/Engineering_Architecture_Handbook.md`](../../10_Architecture/Engineering_Architecture_Handbook.md) and the ADRs
+> **Supersedes:** N/A
+> **Related Documents:** [`30_Implementation/Build_Tracker.md`](../Build_Tracker.md), [`10_Architecture/AI_Architecture.md`](../../10_Architecture/AI_Architecture.md), [`30_Implementation/ADR/ADR-005-zero-hallucination-citation-gate.md`](../ADR/ADR-005-zero-hallucination-citation-gate.md), [`30_Implementation/ADR/ADR-008-prompt-injection-boundary-isolation.md`](../ADR/ADR-008-prompt-injection-boundary-isolation.md)
+
+---
+
 # Sprint 3.5 — Litigation Module Architecture & Functional Specification
 
 **Document Version:** v1.0  

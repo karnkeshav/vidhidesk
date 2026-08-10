@@ -1,3 +1,15 @@
+> **Title:** Local Development Setup
+> **Version:** 1.0
+> **Status:** Active
+> **Owner:** Keshav
+> **Audience:** Engineers setting up a fresh checkout
+> **Last Updated:** 1 August 2026
+> **Canonical Reference:** Yes, for local dev environment setup. See "Known gaps" section for what this document does NOT cover (CI/deployment, sandboxed E2E).
+> **Supersedes:** N/A
+> **Related Documents:** [`40_Operations/Deployment.md`](Deployment.md), [`40_Operations/Runbooks.md`](Runbooks.md), [`20_Engineering/Lessons_Learned.md`](../20_Engineering/Lessons_Learned.md)
+
+---
+
 # Setup — First-Time Environment
 
 Everything a fresh checkout needs on a bare Ubuntu machine, in the order
@@ -87,7 +99,7 @@ cd api && source .venv/bin/activate && python -m pytest tests/ -q
 ```
 
 Should show all tests passing, including `test_golden.py` (the
-retrieval regression guardrail — see `docs/lessons_learned.md` /
+retrieval regression guardrail — see `docs/20_Engineering/Lessons_Learned.md` /
 Sprint 1 signoff for what that suite protects). If `test_golden.py`'s
 `recall@3` prints below 4/5, something in retrieval regressed — see
 Sprint 1's signoff notes on the one documented, accepted miss (GT-02)

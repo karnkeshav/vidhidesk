@@ -1,3 +1,17 @@
+> **Title:** Original Technical Requirements Document (TRD)
+> **Version:** 1.0 (as originally issued)
+> **Status:** Historical
+> **Owner:** Keshav
+> **Audience:** Historical record for engineers, architects, future AI agents
+> **Last Updated:** 23 July 2026 (frozen; not maintained further)
+> **Canonical Reference:** No — see Superseded By
+> **Supersedes:** N/A (first technical requirements document)
+> **Superseded By:** [`10_Architecture/Engineering_Architecture_Handbook.md`](../10_Architecture/Engineering_Architecture_Handbook.md), [`20_Engineering/Technical_Standards.md`](../20_Engineering/Technical_Standards.md), [`20_Engineering/Database_Architecture.md`](../20_Engineering/Database_Architecture.md)
+> **Reason:** Build Tracker §1/§8.2 records that the live schema and subsystem set have outgrown this document (e.g. Ollama was dropped from the LLM chain in favor of SambaNova/Cerebras per `CLAUDE.md` Decision 3; ChromaDB was never adopted; ~10 new tables/columns exist beyond §4's list). Preserved verbatim as the original design intent and rationale record.
+> **Related Documents:** [`Original_Scope_of_Work.md`](Original_Scope_of_Work.md), [`Original_Implementation_Plan.md`](Original_Implementation_Plan.md)
+
+---
+
 # Technical Requirements Document (TRD)
 ## Project: VidhiDesk — Phase 1
 **Version:** 1.0 | **Date:** 23 July 2026

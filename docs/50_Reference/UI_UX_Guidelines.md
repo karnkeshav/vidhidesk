@@ -1,3 +1,15 @@
+> **Title:** UI/UX Guidelines
+> **Version:** 1.0
+> **Status:** Active — Canonical for design
+> **Owner:** Keshav
+> **Audience:** Designers, frontend engineers, future AI agents touching UI
+> **Last Updated:** 3 August 2026
+> **Canonical Reference:** Yes, for visual/design-system decisions
+> **Supersedes:** N/A
+> **Related Documents:** [`50_Reference/Stitch_Guidelines.md`](Stitch_Guidelines.md), [`00_Product/Product_Constitution.md`](../00_Product/Product_Constitution.md) (§7 UX Principles)
+
+---
+
 VidhiDesk — UI/UX Design Notes
 A working document capturing the design conversation for VidhiDesk. This is intended as the reference Claude Code and any future designer should read before touching visual work. Update as decisions land.
 ---

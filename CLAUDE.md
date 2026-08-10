@@ -4,12 +4,19 @@
 A private, single-user, web-based legal assistant for a practicing Indian
 lawyer (Nitesh). Four modules: Contracts, Litigation, RERA/Real Estate,
 Consulting & Litigation Support. The lawyer always vets output before any
-client sees it. Full requirements live in /docs — read them before major work:
-- /docs/01_Scope_of_Work.md        (functional scope, acceptance criteria)
-- /docs/02_Technical_Requirements.md (architecture, stack, data model)
-- /docs/03_Implementation_Plan.md   (sprint plan)
-- /docs/Project_Plan_Legal_AI_Assistant.md (revised plan — where documents
-  conflict, THIS file wins, plus the Decisions section below)
+client sees it. Full documentation lives in /docs — start at
+/docs/README.md, which indexes the hierarchy and states the Documentation
+Precedence Policy (this replaces the old "Project_Plan wins conflicts"
+rule below). Read before major work:
+- /docs/00_Product/Product_Constitution.md (enduring product philosophy —
+  highest-precedence document in the project)
+- /docs/00_Product/Product_Vision.md (module scope, acceptance criteria)
+- /docs/10_Architecture/Engineering_Architecture_Handbook.md (architecture,
+  stack, data model — links out to Business/AI/Runtime Architecture)
+- /docs/00_Product/Roadmap.md (build order, phasing)
+- /docs/30_Implementation/Build_Tracker.md (current build status)
+- /docs/30_Implementation/ADR/ (individual architecture decisions, with
+  sources cited back to this file's Decisions section where applicable)
 
 ## Decisions (override anything contradictory in /docs)
 1. BUILD ORDER: Contracts module first, then Litigation, then Consulting,
@@ -69,7 +76,7 @@ CEREBRAS_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
   stored in the citations table. Log every API call with cost/quota impact.
 
 ## Data model
-Use the tables defined in /docs/02_Technical_Requirements.md §4
+Use the tables defined in /docs/20_Engineering/Database_Architecture.md
 (matters, messages, citations, templates, draft_versions, statute_chunks,
 state_rules, rera_guides) plus a pii_masks table for the masking layer.
 Enable Supabase RLS: only the owning user reads their matters.
@@ -79,7 +86,12 @@ Enable Supabase RLS: only the owning user reads their matters.
   test it manually.
 - Write tests for the Citation Verifier and the PII masker — these two must
   never regress.
-- When /docs conflict with each other, follow the Decisions section above;
-  if still ambiguous, ask before building.
+- When /docs conflict with each other, follow /docs/README.md's
+  Documentation Precedence Policy (Product Constitution > Engineering
+  Architecture Handbook > ADRs > Engineering standards > module-specific
+  Technical Designs > Build Tracker > Historical docs). The Decisions
+  section above and the Hard Rules below remain in force regardless —
+  they are restated and cited in ADR-001 through ADR-010 for traceability,
+  not superseded by that policy. If still ambiguous, ask before building.
 - Bilingual input (Hindi/English/Hinglish) is expected; normalize to
   English internally before retrieval.

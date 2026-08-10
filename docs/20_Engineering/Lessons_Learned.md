@@ -1,3 +1,15 @@
+> **Title:** Lessons Learned
+> **Version:** Living document (append-only)
+> **Status:** Active
+> **Owner:** Keshav
+> **Audience:** Engineers, future AI agents building templates/skeletons
+> **Last Updated:** 2 August 2026
+> **Canonical Reference:** Yes, for known non-obvious engineering traps
+> **Supersedes:** N/A
+> **Related Documents:** [`20_Engineering/Repository_Standards.md`](Repository_Standards.md), [`30_Implementation/Backlog.md`](../30_Implementation/Backlog.md)
+
+---
+
 # Lessons Learned
 
 Durable, file-based record of non-obvious traps hit during development —

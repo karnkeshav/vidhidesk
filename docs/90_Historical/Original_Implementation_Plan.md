@@ -1,3 +1,17 @@
+> **Title:** Original Implementation Plan (Litigation-First Sprint Plan)
+> **Version:** 1.0 (as originally issued)
+> **Status:** Historical
+> **Owner:** Keshav
+> **Audience:** Historical record for engineers, future AI agents
+> **Last Updated:** 23 July 2026 (frozen; not maintained further)
+> **Canonical Reference:** No — see Superseded By
+> **Supersedes:** N/A (first implementation plan)
+> **Superseded By:** [`Original_Project_Plan_Revised.md`](Original_Project_Plan_Revised.md) (build order), [`30_Implementation/Build_Tracker.md`](../30_Implementation/Build_Tracker.md) (live sprint tracking), [`00_Product/Roadmap.md`](../00_Product/Roadmap.md)
+> **Reason:** This plan's Litigation → Contracts → Consulting → RERA sequence was reversed to Contracts-first before Sprint 0 closed (see `CLAUDE.md` Decision 1 and Build Tracker §1.1). Preserved verbatim as the original sequencing rationale and risk register.
+> **Related Documents:** [`Original_Scope_of_Work.md`](Original_Scope_of_Work.md), [`Original_Technical_Requirements.md`](Original_Technical_Requirements.md)
+
+---
+
 # Implementation Plan
 ## Project: VidhiDesk — Phase 1
 **Version:** 1.0 | **Date:** 23 July 2026

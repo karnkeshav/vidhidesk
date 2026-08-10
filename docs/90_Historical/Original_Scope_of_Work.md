@@ -1,3 +1,17 @@
+> **Title:** Original Scope of Work (Phase 1)
+> **Version:** 1.0 (as originally issued)
+> **Status:** Historical
+> **Owner:** Keshav
+> **Audience:** Historical record for founders, engineers, future AI agents
+> **Last Updated:** 23 July 2026 (frozen; not maintained further)
+> **Canonical Reference:** No — see Superseded By
+> **Supersedes:** N/A (first scope document)
+> **Superseded By:** [`00_Product/Product_Vision.md`](../00_Product/Product_Vision.md) (module scope), [`00_Product/Roadmap.md`](../00_Product/Roadmap.md) (build order — this document's Litigation-first sequencing was reversed)
+> **Reason:** Build order (Litigation before Contracts) was explicitly inverted by [`Original_Project_Plan_Revised.md`](Original_Project_Plan_Revised.md) and finalized in `CLAUDE.md` Decision 1. Module scope, acceptance criteria, and the contract/statute appendices below remain historically accurate as the original requirements capture and are preserved verbatim.
+> **Related Documents:** [`Original_Implementation_Plan.md`](Original_Implementation_Plan.md), [`Original_Project_Plan_Revised.md`](Original_Project_Plan_Revised.md)
+
+---
+
 # Scope of Work (SOW)
 ## Project: "VidhiDesk" — AI Legal Assistant for Independent Practice (Working Title)
 **Version:** 1.0 (Phase 1) | **Date:** 23 July 2026
