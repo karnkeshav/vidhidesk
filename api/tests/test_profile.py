@@ -50,7 +50,6 @@ def mock_get_current_user():
         raw_user_meta_data={
             "full_name": "Adv. Keshav Karn",
             "bar_number": "D/999/2026",
-            "enrollment_state": "Delhi",
             "primary_court": "Delhi High Court",
             "phone": "+919876543210",
         },
@@ -81,8 +80,6 @@ def test_update_profile_endpoint(client):
         "full_name": "Adv. Keshav Karn",
         "designation": "Senior Partner",
         "bar_number": "D/999/2026",
-        "enrollment_state": "Delhi",
-        "enrollment_year": 2018,
         "primary_court": "Delhi High Court & Supreme Court",
         "phone": "+919876543210",
         "office_address": "Chamber 412, High Court of Delhi",
@@ -92,7 +89,7 @@ def test_update_profile_endpoint(client):
     data = res.json()
     assert data["full_name"] == "Adv. Keshav Karn"
     assert data["designation"] == "Senior Partner"
-    assert data["enrollment_year"] == 2018
+    assert data["primary_court"] == "Delhi High Court & Supreme Court"
 
 
 def test_update_profile_invalid_phone(client):
@@ -110,14 +107,22 @@ def test_upload_avatar_invalid_format(client):
     assert "Invalid image format" in res.json()["detail"]
 
 
-def test_migration_0011_idempotency_syntax():
-    """Verify migration 0011 contains required idempotent SQL constructs."""
-    assert MIGRATION_0011_PATH.exists(), "Migration 0011_create_advocate_profiles.sql must exist"
-    sql = MIGRATION_0011_PATH.read_text()
+MIGRATION_0012_PATH = REPO_ROOT / "api" / "migrations" / "0012_simplify_advocate_profiles.sql"
 
-    assert "CREATE TABLE IF NOT EXISTS public.advocate_profiles" in sql
-    assert "CREATE UNIQUE INDEX IF NOT EXISTS" in sql
-    assert "ON CONFLICT (user_id) DO NOTHING" in sql
-    assert "CONSTRAINT uq_advocate_profiles_bar_state UNIQUE" in sql
-    assert "CHECK (phone IS NULL OR phone ~ '^\\+?[1-9]\\d{1,14}$')" in sql
-    assert "raw_user_meta_data->>'full_name' IS NOT NULL" in sql
+
+def test_migration_0011_and_0012_idempotency_syntax():
+    """Verify migrations 0011 and 0012 contain required idempotent SQL constructs."""
+    assert MIGRATION_0011_PATH.exists(), "Migration 0011_create_advocate_profiles.sql must exist"
+    sql11 = MIGRATION_0011_PATH.read_text()
+
+    assert "CREATE TABLE IF NOT EXISTS public.advocate_profiles" in sql11
+    assert "CREATE UNIQUE INDEX IF NOT EXISTS" in sql11
+    assert "ON CONFLICT (user_id) DO NOTHING" in sql11
+    assert "CONSTRAINT uq_advocate_profiles_bar_state UNIQUE" in sql11
+    assert "CHECK (phone IS NULL OR phone ~ '^\\+?[1-9]\\d{1,14}$')" in sql11
+    assert "raw_user_meta_data->>'full_name' IS NOT NULL" in sql11
+
+    assert MIGRATION_0012_PATH.exists(), "Migration 0012_simplify_advocate_profiles.sql must exist"
+    sql12 = MIGRATION_0012_PATH.read_text()
+    assert "ALTER TABLE public.advocate_profiles DROP COLUMN IF EXISTS enrollment_state;" in sql12
+    assert "ALTER TABLE public.advocate_profiles DROP COLUMN IF EXISTS practice_areas;" in sql12

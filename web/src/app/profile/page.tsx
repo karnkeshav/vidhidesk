@@ -12,12 +12,7 @@ export type AdvocateProfile = {
   full_name: string;
   designation: string;
   bar_number: string;
-  enrollment_state: string;
-  enrollment_year: number | null;
   primary_court: string;
-  high_court_roll_no: string;
-  aor_code: string;
-  firm_name: string;
   phone: string;
   email: string;
   office_address: string;
@@ -29,12 +24,7 @@ export default function ProfilePage() {
     full_name: "",
     designation: "Advocate",
     bar_number: "",
-    enrollment_state: "",
-    enrollment_year: null,
     primary_court: "",
-    high_court_roll_no: "",
-    aor_code: "",
-    firm_name: "",
     phone: "",
     email: "",
     office_address: "",
@@ -75,12 +65,7 @@ export default function ProfilePage() {
             full_name: apiData.full_name || "",
             designation: apiData.designation || "Advocate",
             bar_number: apiData.bar_number || "",
-            enrollment_state: apiData.enrollment_state || "",
-            enrollment_year: apiData.enrollment_year || null,
             primary_court: apiData.primary_court || "",
-            high_court_roll_no: apiData.high_court_roll_no || "",
-            aor_code: apiData.aor_code || "",
-            firm_name: apiData.firm_name || "",
             phone: apiData.phone || "",
             email: userEmail,
             office_address: apiData.office_address || "",
@@ -96,12 +81,7 @@ export default function ProfilePage() {
         full_name: meta.full_name || "",
         designation: meta.designation || "Advocate",
         bar_number: meta.bar_number || "",
-        enrollment_state: meta.enrollment_state || "",
-        enrollment_year: meta.enrollment_year || null,
         primary_court: meta.primary_court || "",
-        high_court_roll_no: meta.high_court_roll_no || "",
-        aor_code: meta.aor_code || "",
-        firm_name: meta.firm_name || "",
         phone: meta.phone || "",
         email: userEmail,
         office_address: meta.office_address || "",
@@ -181,12 +161,7 @@ export default function ProfilePage() {
           full_name: profile.full_name,
           designation: profile.designation,
           bar_number: profile.bar_number,
-          enrollment_state: profile.enrollment_state,
-          enrollment_year: profile.enrollment_year,
           primary_court: profile.primary_court,
-          high_court_roll_no: profile.high_court_roll_no,
-          aor_code: profile.aor_code,
-          firm_name: profile.firm_name,
           phone: profile.phone,
           office_address: profile.office_address,
           avatar_url: profile.avatar_url,
@@ -270,10 +245,10 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-4xl space-y-6">
         <div>
           <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#081534]">
-            Advocate Profile & Settings
+            Advocate Profile
           </h1>
           <p className="font-serif text-sm text-[#45464E]">
-            Manage your professional credentials, chamber details, profile photo, and password security.
+            Manage your advocate identity, bar registration, contact information, profile photo, and password security.
           </p>
         </div>
 
@@ -349,7 +324,7 @@ export default function ProfilePage() {
                   className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] py-2 font-sans text-xs font-semibold text-[#081534] transition-colors hover:bg-[#E4E2DD]"
                 >
                   <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  Choose Photo File
+                  {uploadingImage ? "Uploading Photo..." : "Choose Photo File"}
                 </label>
                 <p className="font-serif text-[11px] text-[#76777F]">
                   JPG, PNG or WEBP (Max 2MB)
