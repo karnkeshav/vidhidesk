@@ -2,6 +2,31 @@ import { supabase } from "@/lib/supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
+// Frontend resilience for transient upstream failures (2026-08-10): a real,
+// live incident showed the backend's own auth check occasionally getting a
+// 520 from Supabase's Cloudflare edge (Render <-> Supabase connectivity, not
+// our code, not fixable here) — surfaced to the client as a 401 wrapping
+// "Invalid session: Server error '520' ...". Retrying the exact same
+// request a moment later succeeds, since the failure is transient at the
+// network/edge layer, not a genuinely dead session. This never changes what
+// counts as authenticated — a real invalid/expired session (no 5xx in the
+// wrapped message) is still rejected immediately, not retried.
+const TRANSIENT_RETRY_DELAYS_MS = [600, 1500, 3000];
+
+function isTransientFailure(status: number, bodyText: string): boolean {
+  if (status >= 500) return true;
+  if (status === 401) return /server error '?5\d\d/i.test(bodyText);
+  return false;
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export type Matter = {
   id: string;
   title: string;
@@ -32,19 +57,47 @@ async function authedFetch(path: string, init?: RequestInit) {
   } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in");
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}${path}`, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          ...(init?.headers ?? {}),
+        },
+      });
+    } catch (err) {
+      // A network-level failure (including a request a CORS-blocked
+      // response shows up as) never gives us a status code at all --
+      // always eligible for the same retry treatment as a 5xx.
+      if (attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
+        await new Promise((r) => setTimeout(r, TRANSIENT_RETRY_DELAYS_MS[attempt]));
+        continue;
+      }
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+
+    if (res.ok) return res.json();
+
     const body = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+    if (isTransientFailure(res.status, body) && attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
+      await new Promise((r) => setTimeout(r, TRANSIENT_RETRY_DELAYS_MS[attempt]));
+      continue;
+    }
+
+    // A genuinely rejected session (not a transient upstream hiccup) --
+    // retrying won't fix a dead token. Send the user back to sign in
+    // instead of leaving every page stuck on a raw error forever, the
+    // same way authed-shell.tsx already does when the Supabase SDK itself
+    // detects a null session -- this covers the case that check doesn't
+    // (our own backend rejecting a token the SDK still thinks is live).
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+    throw new ApiError(res.status, `${res.status} ${res.statusText}: ${body}`);
   }
-  return res.json();
 }
 
 export function listMatters(): Promise<Matter[]> {

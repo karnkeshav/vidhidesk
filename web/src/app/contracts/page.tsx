@@ -8,8 +8,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { createMatter, listTemplates, listMatters, Matter, Template } from "@/lib/api";
+import { createMatter, listTemplates, listMatters, Matter, Template, ApiError } from "@/lib/api";
 import { Search, Plus, FolderOpen, History, FileText, AlertCircle, RotateCcw } from "lucide-react";
+
+// Friendlier copy for the common failure shapes -- authedFetch (lib/api.ts)
+// already retries a transient upstream hiccup automatically before this is
+// ever shown, so reaching here means either those retries were exhausted or
+// the failure wasn't retryable in the first place (e.g. offline).
+function friendlyLoadError(err: unknown): string {
+  if (err instanceof ApiError && err.status >= 500) {
+    return "The server is temporarily unavailable. This usually resolves within a few seconds -- try again.";
+  }
+  if (err instanceof Error && /server error '?5\d\d/i.test(err.message)) {
+    return "A upstream service had a brief connectivity issue. Try again -- this is not something wrong with your account.";
+  }
+  if (err instanceof Error && /Not signed in/i.test(err.message)) {
+    return "Your session has ended. Please sign in again.";
+  }
+  if (err instanceof TypeError) {
+    return "Couldn't reach the server -- check your connection and try again.";
+  }
+  return err instanceof Error ? err.message : String(err);
+}
 
 export default function ContractsPage() {
   const router = useRouter();
@@ -26,7 +46,7 @@ export default function ContractsPage() {
     setError(null);
     listTemplates()
       .then((rows) => setTemplates(rows.filter((t) => t.category === "contracts")))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => setError(friendlyLoadError(err)));
 
     listMatters()
       .then(setMatters)
