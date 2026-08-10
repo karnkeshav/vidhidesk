@@ -43,7 +43,16 @@ from app.services.retrieval import RetrievedChunk, hybrid_retrieve
 logger = logging.getLogger("vidhidesk.case_analysis")
 
 MAX_PRECEDENTS_TO_VERIFY = 5  # bound external IK API calls per analysis run
-MAX_STATUTE_CONTEXT_CHUNKS = 5
+# Sprint 3.6 Phase 1/2 (TICKET-16 corpus expansion): raised from 5 to 8 after
+# the expanded 12-act corpus measurably crowded out smaller, more specific
+# acts at top_k=5 — the Code of Civil Procedure alone is ~48% of all chunks
+# by volume, so a query's top-5 by score sometimes fills entirely with
+# generic CPC procedure over a smaller, more on-topic act (e.g. Specific
+# Relief Act, Indian Easements Act). Measured directly against the 26 real
+# Sprint 3.5.6 certification matters: recall@5 (correct act present) was
+# 62%, recall@8 was 73% on the identical queries — see
+# docs/40_Validation/Sprint_3.6_Phase1_Foundation_Report_2026-08-09.md §2.
+MAX_STATUTE_CONTEXT_CHUNKS = 8
 
 
 class CaseAnalysisError(ValueError):
@@ -295,6 +304,7 @@ def generate_case_analysis(
         "possible_precedents": [],
     }
     model_used: str | None = None
+    model_routing: dict[str, Any] | None = None
     masked_prompt: str | None = None
 
     # A total generation failure (every provider in the failover chain
@@ -315,6 +325,17 @@ def generate_case_analysis(
     mask_store.save(mask_map)
     model_used = f"{result.provider}/{result.model}"
     masked_prompt = result.masked_prompt
+    # Sprint 3.6 Phase 4 (TICKET-20/21): record actual model used and
+    # expose fallback decisions explicitly, not just as a bare
+    # provider/model string an advocate would have no way to interpret as
+    # "this is a lower tier than the architecture leads with."
+    model_routing = {
+        "requested_model": result.requested_model,
+        "actual_provider": result.provider,
+        "actual_model": result.model,
+        "degraded": result.degraded,
+        "fallback_chain": result.fallback_chain,
+    }
 
     parsed = _extract_json(result.text)
     if parsed is None:
@@ -358,6 +379,7 @@ def generate_case_analysis(
         "recommended_next_steps": llm_result["recommended_next_steps"],
         "possible_precedents": llm_result["possible_precedents"],
         "model_used": model_used,
+        "model_routing": model_routing,
         "masked_prompt": masked_prompt,
         "retrieval_sources": applicable_statutes,
         "generation_warning": generation_warning,

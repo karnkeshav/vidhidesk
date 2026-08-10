@@ -8,7 +8,7 @@ import pytest
 import respx
 
 from app.config import Settings
-from app.services.llm_gateway import GenerationResult, ProviderError, generate
+from app.services.llm_gateway import GenerationResult, ProviderError, extract_json, generate, generate_json
 from app.services.pii_mask import MaskMap
 
 
@@ -41,6 +41,11 @@ def test_uses_gemini_first_when_it_succeeds(settings):
     assert isinstance(result, GenerationResult)
     assert result.provider == "gemini"
     assert result.text == "Gemini says hi"
+    # Sprint 3.6 Phase 4 (TICKET-20/21): top-of-pool model succeeding on
+    # the first attempt is the one case that must show degraded=False.
+    assert result.model == result.requested_model == "gemini-2.5-pro"
+    assert result.degraded is False
+    assert result.fallback_chain == []
 
 
 @respx.mock
@@ -433,10 +438,25 @@ def test_audit_log_output_reflects_full_cascade(settings, caplog):
     assert result.provider == "groq"
     assert result.model == "llama-3.3-70b-versatile"
 
+    # Sprint 3.6 Phase 4 (TICKET-20/21): model-tier degradation is now
+    # explicit on the result itself, not just discoverable by reading logs.
+    assert result.requested_model == "gemini-2.5-pro"
+    assert result.degraded is True
+    assert result.fallback_chain == [
+        "gemini:gemini-2.5-pro (1/4)",
+        "gemini:gemini-2.5-flash (2/4)",
+        "gemini:gemini-2.0-flash (3/4)",
+        "gemini:gemini-2.5-flash-lite (4/4)",
+    ]
+
     warning_logs = [r.message for r in caplog.records if r.levelname == "WARNING"]
-    assert len(warning_logs) == 4  # 4 Gemini models failed
+    # 4 Gemini attempt failures + 1 explicit "MODEL DEGRADED" summary line —
+    # the latter is new in Phase 4, so a real model-tier downgrade is never
+    # silent even to someone only watching for WARNING-level log lines.
+    assert len(warning_logs) == 5
     assert "provider=gemini model=gemini-2.5-pro attempt=1/4" in warning_logs[0]
     assert "provider=gemini model=gemini-2.5-flash-lite attempt=4/4" in warning_logs[3]
+    assert "MODEL DEGRADED: requested=gemini-2.5-pro actual=groq:llama-3.3-70b-versatile" in warning_logs[4]
 
     info_logs = [r.message for r in caplog.records if "status=ok" in r.message]
     assert len(info_logs) == 1
@@ -445,3 +465,71 @@ def test_audit_log_output_reflects_full_cascade(settings, caplog):
     assert "gemini:gemini-2.5-flash-lite (4/4)" in info_logs[0]
 
 
+
+
+# --- generate_json() / json_mode (Sprint 3.6 Phase 2A, TICKET-25) -----------
+
+def test_json_mode_sets_gemini_response_mime_type(settings, respx_mock):
+    route = respx_mock.post(url__startswith="https://generativelanguage.googleapis.com").mock(
+        return_value=_gemini_ok('{"ok": true}')
+    )
+    generate("say ok", "clause_drafter", settings=settings, json_mode=True)
+    body = route.calls[0].request.content
+    import json as _json
+    assert _json.loads(body)["generationConfig"] == {"responseMimeType": "application/json"}
+
+
+def test_json_mode_sets_openai_compatible_response_format(settings, respx_mock):
+    respx_mock.post(url__startswith="https://generativelanguage.googleapis.com").mock(
+        return_value=httpx.Response(429, json={})
+    )
+    route = respx_mock.post(url__startswith="https://api.groq.com").mock(
+        return_value=_openai_ok('{"ok": true}')
+    )
+    generate("say ok", "clause_drafter", settings=settings, json_mode=True)
+    import json as _json
+    body = _json.loads(route.calls[0].request.content)
+    assert body["response_format"] == {"type": "json_object"}
+
+
+def test_extract_json_strips_markdown_fences():
+    assert extract_json('```json\n{"a": 1}\n```') == {"a": 1}
+
+
+def test_extract_json_returns_none_for_unrecoverable_text():
+    assert extract_json("not json at all") is None
+
+
+def test_generate_json_returns_parsed_dict_on_first_success(settings, respx_mock):
+    respx_mock.post(url__startswith="https://generativelanguage.googleapis.com").mock(
+        return_value=_gemini_ok('{"grounds": []}')
+    )
+    result, parsed = generate_json("prompt", "clause_drafter", settings=settings)
+    assert parsed == {"grounds": []}
+    assert result.provider == "gemini"
+
+
+def test_generate_json_repairs_once_after_malformed_first_attempt(settings, respx_mock):
+    route = respx_mock.post(url__startswith="https://generativelanguage.googleapis.com")
+    route.side_effect = [_gemini_ok("not valid json"), _gemini_ok('{"grounds": []}')]
+    result, parsed = generate_json("prompt", "clause_drafter", settings=settings, max_repair_attempts=1)
+    assert parsed == {"grounds": []}
+    assert route.call_count == 2
+    # The repair call must be a FRESH prompt (correction suffix appended to
+    # the ORIGINAL prompt), never a continuation seeded with the first
+    # (unmasked) response — CLAUDE.md Decision 4, see generate_json's own
+    # docstring for why threading it back would be a PII leak.
+    import json as _json
+    second_body = _json.loads(route.calls[1].request.content)
+    second_text = second_body["contents"][-1]["parts"][0]["text"]
+    assert "prompt" in second_text
+    assert "not valid json" not in second_text
+
+
+def test_generate_json_gives_up_after_max_repair_attempts_returns_none(settings, respx_mock):
+    route = respx_mock.post(url__startswith="https://generativelanguage.googleapis.com")
+    route.side_effect = [_gemini_ok("bad"), _gemini_ok("still bad")]
+    result, parsed = generate_json("prompt", "clause_drafter", settings=settings, max_repair_attempts=1)
+    assert parsed is None
+    assert result.text == "still bad"
+    assert route.call_count == 2

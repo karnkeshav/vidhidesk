@@ -3,7 +3,7 @@
 > **Status:** Active
 > **Owner:** Keshav
 > **Audience:** Engineers planning upcoming sprints
-> **Last Updated:** 8 August 2026 (Deployment Recovery Sprint D1 additions — TICKET-13, TICKET-14 [shipped], TICKET-15)
+> **Last Updated:** 9 August 2026 (Sprint 3.6 Phase 2A — TICKET-25 substantially resolved, TICKET-26 partial note)
 > **Canonical Reference:** Yes, for deferred/open engineering tickets
 > **Supersedes:** N/A
 > **Related Documents:** [`30_Implementation/Build_Tracker.md`](Build_Tracker.md), [`20_Engineering/Lessons_Learned.md`](../20_Engineering/Lessons_Learned.md)
@@ -530,4 +530,272 @@ currently 3 templates share the confidentiality-variant pattern
 closely enough to matter, not yet enough to justify the abstraction.
 Revisit once a 4th genuinely reuses the same clause text, not just the
 same mechanism.
+
+## Litigation — AI Case Analysis quality (found Sprint 3.5.6 certification round)
+
+**TICKET-16: Statute corpus covers only 6 acts / 633 chunks — missing
+the acts litigation depends on most.** Classification: **Major**. A
+direct query of the live `statute_chunks` table during the Sprint 3.5.6
+certification round returned exactly Indian Contract Act 1872 (178
+chunks), Transfer of Property Act 1882 (129), Consumer Protection Act
+2019 (107), Registration Act 1908 (102), Indian Stamp Act 1899 (95),
+Carriage by Road Act 2007 (22). **Missing entirely:** the Limitation Act
+1963 itself, the Specific Relief Act 1963, the Code of Civil Procedure
+1908, the Indian Easements Act 1882, the RERA Act 2016, and the
+Commercial Courts Act 2015 — the acts the Acceptance Testing Guide
+names as the legally correct basis for a majority of its 26 scenarios.
+This explains most of the "Applicable Statutes surfaced something
+irrelevant or nothing at all" observations across that round. Fix:
+ingest these acts via the existing `scripts/ingest_statutes.py`
+pipeline (no new engineering required, a data-sourcing task). Priority:
+before Sprint 3.6 (Pleading Generation) reaches its first real drafting
+milestone, since pleading generation leans on statute grounding even
+more than case analysis does.
+*Source: `docs/40_Validation/Sprint_3.5.6_Certification_Report_2026-08-09.md`.*
+**Status update (Sprint 3.6 Phase 1, 9 Aug 2026):** corpus expanded to 12
+acts / 1,911 chunks — all 6 missing acts ingested from real India Code
+PDFs, plus a real chunking-regex bug found and fixed along the way
+(footnote-marker-prefixed amended sections were silently dropped; affected
+CPC's Order VI Rule 2 and Order VIII Rule 1 specifically). Recall@8
+measured at 73%, up from 35% before. **Not fully closed** — 73% recall
+means over a quarter of real fact patterns still don't surface the
+correct act; see `docs/40_Validation/Sprint_3.6_Phase1_Foundation_Report_2026-08-09.md` §3 for the measurement and the corpus-imbalance side effect it also surfaced.
+
+**TICKET-17: Citation Verifier shows real, reproducible non-determinism.**
+Classification: **Major**. During the live CIV-03 scenario, the model
+proposed *Anathula Sudhakar v. P. Buchi Reddy (Dead) by LRs and Ors.* —
+a real Supreme Court case — and `verify_citation()` returned
+`status: "unverified"`. An independent direct re-call of the identical
+function with the identical case-name string, minutes later, returned
+`status: "verified"` with a real doc URL
+(`https://indiankanoon.org/doc/540361/`). Same code, same input,
+different result — points to the underlying Indian Kanoon search
+ranking being non-deterministic call-to-call, which the confidence
+gate's word-overlap threshold (`_best_match`, 0.6) is fully exposed to.
+Directly affects Hard Rule 1. Not investigated further this round
+(Category B, document-only per this sprint's Defect Policy).
+*Source: same as above.*
+**Status: CLOSED (Sprint 3.6 Phase 1, 9 Aug 2026).** Root cause fixed:
+`verify_citation()` previously cached *any* result forever, verified or
+not, so a single transient miss became a permanent wrong answer. Now only
+a cached `status="verified"` row is trusted as final; a cached
+`"unverified"` row gets one fresh live re-attempt before falling back to
+it. Live-confirmed against real production infrastructure (not just a
+unit test) — see `Sprint_3.6_Phase1_Foundation_Report_2026-08-09.md` §6.
+Confidence reporting also added (`match_confidence`, migration 0017).
+
+**TICKET-18: Some real, correctly-named precedents fail to verify even
+on retry.** Classification: **Minor**. *Fateh Chand v. Balkishan Dass*
+(landmark 1963 SC authority, proposed in CONT-03) and *Ambrish Kumar
+Shukla & Ors. v. Ferrous Infrastructure (P) Ltd.* (real NCDRC landmark,
+proposed in RERA-03) both independently re-verified as unverified —
+apparently a genuine Indian Kanoon search/title-matching gap for older
+Supreme Court judgments and NCDRC-tier orders, distinct from TICKET-17's
+flakiness. Safe-failure direction (never renders a fake case as real),
+but under-serves the advocate on well-established precedent.
+*Source: same as above.*
+
+**TICKET-19: Model sometimes proposes a real but substantively
+irrelevant "famous case."** Classification: **Minor**. IA-02 proposed
+the *Best Bakery Case* (a real, famous case about witness intimidation
+in a criminal trial) to support a civil status-quo application, with a
+near-meaningless justification ("highlights the importance of fair
+procedure"). The guide's §4.5 specifically flags this risk pattern as
+worth recording; this is the first live confirmation of it.
+*Source: same as above.*
+
+**TICKET-20: `gemini-2.5-flash-lite` shows materially weaker/confused
+legal reasoning than `gemini-2.5-flash` on the same task type.**
+Classification: **Major**. APP-01/02/03 (all served by flash-lite, see
+TICKET-21) show the model reasoning about ordinary CPC first appeals as
+though Consumer Protection Act consumer-forum appellate provisions
+(District Commission → State Commission, 45-day period) might govern —
+because that was the only appeal-shaped content the corpus (see
+TICKET-16) had to retrieve, and flash-lite did not reliably override
+with correct background legal knowledge the way flash consistently did
+elsewhere in the same round. `possible_causes_of_action` came back
+empty for all three. Compounds TICKET-16; also a standalone model-choice
+finding.
+*Source: same as above.*
+**Status update (Sprint 3.6 Phase 1, 9 Aug 2026):** partially addressed
+via TICKET-16's corpus fix — a fresh case analysis for APP-01 on the
+expanded corpus now correctly retrieves `Code of Civil Procedure, 1908,
+Order XLI Rule 37` (the real, correct appellate provision) instead of
+Consumer Protection Act content, and a pleading outline built from that
+fresh analysis correctly frames the issue as "Appeal against District
+Court decree" with no CPA confusion — a full, demonstrated resolution for
+this specific scenario. **Not closed generally** — this was one
+scenario's fix verified, not a systematic guarantee the same confusion
+can't recur elsewhere the corpus still has gaps (TICKET-16 is at 73%
+recall, not 100%). See `Sprint_3.6_Phase1_Foundation_Report_2026-08-09.md` §7.
+
+**TICKET-21: Model-tier degradation (pro → flash/flash-lite) is
+completely silent to the advocate.** Classification: **Major**. Every
+one of the 26 real `generate()` calls in the Sprint 3.5.6 round first
+attempted `gemini-2.5-pro` and was rate-limited (52 confirmed
+`status=error reason="gemini: rate limited"` log lines) — `gemini-2.5-pro`
+served zero real requests the entire round. Nothing in the API response,
+the persisted `litigation_case_analyses` row, or the reviewed frontend
+surfaces which tier actually produced a given analysis. Combined with
+TICKET-20, this means an advocate has no way to know a given analysis
+came from a materially weaker model.
+*Source: same as above.*
+**Status: CLOSED as "no longer silent" (Sprint 3.6 Phase 1, 9 Aug 2026),
+but see the new capacity concern this closure itself surfaced.**
+`GenerationResult` now carries `requested_model`/`degraded`/
+`fallback_chain` explicitly; an explicit `MODEL DEGRADED` warning-level
+log line fires on every downgrade; `litigation_case_analyses` was
+retrofitted with a `model_routing` column (migration 0016), not just the
+new pleading table. Making this visible revealed something new and
+concerning, not previously quantified: in Sprint 3.6 Phase 1's own
+evaluation, every one of 6 real pleading-outline generations degraded
+past `gemini-2.5-flash`/`flash-lite` all the way to Groq — worse than the
+certification round. Plausibly cumulative free-tier rate-limit pressure
+from this project's own heavy same-day real-call volume, not a code
+regression, but a real capacity-planning question before Sprint 3.6
+Phase 2 assumes case-analysis-round quota margins hold for
+pleading-generation-round volumes too. See
+`Sprint_3.6_Phase1_Foundation_Report_2026-08-09.md` §5/§8.
+
+**TICKET-22: LLM Gateway success-path logs are suppressed by the
+effective logging configuration.** Classification: **Minor**. 52
+`WARNING`-level failure log lines were captured live; zero `INFO`-level
+success log lines were, despite 26 real successful generations —
+`generate()`'s success path logs at `INFO` (`llm_gateway.py` ~line 273),
+which the app's effective logging level does not surface in practice.
+The module's own docstring claim ("every attempt is logged... for
+auditability") does not hold operationally for successes today, though
+Hard Rule 4's actual DB-level requirement is independently met via the
+`litigation_case_analyses` row.
+*Source: same as above.*
+**Status: CLOSED (Sprint 3.6 Phase 1, 9 Aug 2026).** `app/main.py` now
+explicitly configures the `vidhidesk.*` logger hierarchy at `INFO` with a
+real handler at startup. Confirmed live: both `status=ok` and the new
+`MODEL DEGRADED` lines (TICKET-21) are now actually emitted, not just
+logged-and-discarded.
+
+**TICKET-23: No token-usage or cost capture anywhere in the LLM
+Gateway.** Classification: **Enhancement**. `GenerationResult`
+(`llm_gateway.py`) carries `text`, `provider`, `model`, `latency_ms`,
+`masked_prompt` — no token-count field, and none of Gemini's, Groq's,
+or SambaNova's raw response bodies are parsed for usage data anywhere
+in the codebase. This made real cost-per-request/per-scenario reporting
+impossible in the Sprint 3.5.6 certification round (correctly reported
+as "not measured," not estimated).
+*Source: same as above.*
+
+## Litigation — Clause-Based Drafting Engine (found Sprint 3.6 Phase 2 live evaluation)
+
+**TICKET-24: PII auto-mask placeholder leaked into final, unmasked clause
+text.** Classification: **Major** (upgrades TICKET-15's "Minor, cosmetic"
+finding — this is the same over-masking root cause producing a directly
+user-visible corruption, not just a harmless extra round-trip). Live
+evaluation of `clause_generator.py`'s `facts` generator against the real
+CIV-01 matter produced version 1 text reading `"...annexed herewith as
+Exhibit PARTY_I2"` / `"Exhibit PARTY_I1"` — a raw, internal PII-mask
+placeholder token, never restored to the real exhibit label (`Exhibit
+P-2`/`Exhibit P-1`), visible directly in advocate-facing drafted clause
+text. A second, independent generation of the same clause (version 2, same
+matter, same context) did NOT reproduce the corruption and correctly read
+`Exhibit P-2`/`Exhibit P-1` — confirming this is the same non-deterministic
+auto-detection behavior TICKET-15 already found (the NER-based
+`auto_detect_names` flagging a non-name token, here plausibly the exhibit
+label text embedded in `_facts_context()`, as a `PARTY`-kind entity),
+not a deterministic bug reproducible on every run. Not fixed this sprint
+per the Defect Policy (Category B, document-only). Fix direction: either
+tighten `auto_detect_names`'s NER filtering to exclude short
+alphanumeric-with-hyphen tokens (exhibit labels, case numbers), or exclude
+exhibit-number strings from the auto-detection pass entirely in
+`clause_generator.py`'s prompt-building (they are already structured data,
+not free text needing NER).
+*Source: Sprint 3.6 Phase 2 live evaluation, matter CIV-01 (real production
+data), 9 August 2026 — see `docs/40_Validation/Sprint_3.6_Phase2_Clause_Engine_Report_2026-08-09.md` §5.*
+
+**TICKET-25: `legal_grounds` clause generator has a disproportionate
+malformed-JSON failure rate.** Classification: **Major**. Live evaluation
+across 6 real matters: `legal_grounds` failed to parse as valid JSON in
+2/6 runs (33%) — COM-01 and PROP-03 — the highest failure rate of any of
+the 5 LLM clause generators (all others: 0/6). `legal_grounds`'s prompt is
+also the longest/most context-dense of the five (legal issues + causes of
+action + statute context + case-law context in one call), and both
+failures happened on `gemini-2.5-flash-lite` (the weaker fallback tier —
+consistent with, though not proven to share the same cause as, Phase 1's
+TICKET-20 "flash-lite shows materially weaker reasoning" finding). Not
+investigated further this sprint (Category B, document-only). Fix
+direction: either shorten/simplify the `legal_grounds` prompt, or route it
+preferentially to a stronger model tier if/when the LLM Gateway supports
+per-task-type tier preference (it currently does not — every task_type
+shares the same provider/model failover pool).
+*Source: Sprint 3.6 Phase 2 live evaluation, 9 August 2026 — see
+`Sprint_3.6_Phase2_Clause_Engine_Report_2026-08-09.md` §5/§6.*
+**Status: SUBSTANTIALLY RESOLVED (Sprint 3.6 Phase 2A, 9 August 2026)**, root
+cause found and fixed, not just worked around. Regenerating the ONE known
+malformed sample's raw text live (Phase 2 never persisted it) found a
+literal, unescaped newline inside a JSON string value — not a structural
+JSON error. A targeted follow-up reproduced the EXACT trigger 3/3 times on
+the same matter/model: the model copying a text span across an ambiguous
+prompt-section boundary (including the literal blank-line separator)
+directly into a field value. Fixed by (a) restructuring `legal_grounds`
+from one free-form "content" string into a structured, per-issue "grounds"
+list (shorter fields = less surface area for the same failure class), (b)
+explicit `=== SECTION ===` delimiters + an explicit "copy the issue
+verbatim from exactly one bullet" instruction, re-verified 3/3 fixed on the
+identical reproducing case, and (c) two gateway-level structural defenses
+applied to all 5 LLM clause types: native provider JSON-mode
+(`generate_json()`, `llm_gateway.py`) and one automatic, PII-safe repair
+retry on a still-malformed response. Full 6-matter regression: 0/6
+malformed (target was <5%), up from 33%. **Not fully closed**: this
+session's Gemini quota was exhausted after the diagnostic work, so the fix
+could only be regression-tested against Groq — the specific
+`gemini-2.5-flash-lite` tier responsible for 100% of known failures to
+date was not re-tested. Close once a `gemini-2.5-flash-lite`-targeted
+re-run (`api/scripts/diagnose_legal_grounds_flash_lite.py`, already built)
+confirms the same result on that tier. See
+`Sprint_3.6_Phase2A_Legal_Grounds_Report_2026-08-09.md`.
+
+**TICKET-26: Most LLM-drafted clauses claim zero statute/case-law
+references, even when grounding material was available.** Classification:
+**Minor** (safe-by-construction — an LLM clause that claims nothing is
+never wrongly trusted, since there is nothing to ground; the gap is
+missed grounding *coverage*, not incorrect grounding). Live evaluation:
+of 24 LLM clause runs eligible to cite something (excluding `facts`/
+`prayer`, whose prompts don't ask for citations by design), only 6/24
+claimed any statute ref at all — `cause_of_action` cited a statute in
+just 2/6 runs despite every one of those 6 matters having at least one
+applicable statute available in its outline. `legal_grounds` and
+`reliefs`' prompts do not explicitly instruct the model to actively
+attempt a citation for every relevant claim, only to cite one if it
+appears in context — worth tightening prompt language to push for higher
+grounding *attempts* (never at the cost of Hard Rule 3's "never invent
+one" guarantee). Separately and NOT part of this ticket: 0/24 case-law
+refs were claimed at all, which is fully explained by the same 6 matters'
+outlines all having empty `applicable_case_law` (Phase 1's already-open,
+still-unresolved case-law-recall gap, Foundation Report §9 point 3) —
+correct behavior given empty upstream data, not a new defect.
+*Source: same as TICKET-25.*
+**Not closed, incidental partial improvement noted (Sprint 3.6 Phase 2A,
+9 August 2026):** `legal_grounds`'s own statute-citation-attempt rate rose
+from 50% to 67% of attempts (§5 of the Phase 2A report) as a side effect of
+its redesigned, more explicit prompt structure — not a deliberate fix for
+this ticket, and `cause_of_action`/`reliefs`'s own prompts were not
+touched. Remains open for those two clause types; not re-measured this
+sprint per its own "do not optimize prematurely" instruction.
+
+**TICKET-27: Clause regeneration is not guaranteed to reuse the same
+underlying model tier, and can therefore produce materially different
+prose on the same context.** Classification: **Minor** (expected
+consequence of the existing failover architecture, not a bug in the
+clause engine itself — flagged as a UX/expectation-setting gap). Live
+evaluation: regenerating the `facts` clause a second time (same matter,
+same context, minutes apart) sometimes landed on a different model in the
+failover chain than the first generation did, because real-time
+Gemini rate-limit state shifted between the two calls (see TICKET-21/§7 of
+the Phase 2 report for the underlying capacity pressure). An advocate
+clicking "Regenerate" on a clause with an eye toward "get a slightly
+different phrasing of the same facts" has no way to know whether the
+regeneration came from the same model tier as the original — worth
+surfacing `model_used` prominently in a future Human Review UI so this is
+visible, not fixing at the gateway level (the failover behavior itself is
+correct and intentional).
+*Source: same as TICKET-25.*
 *Source: observed across Batches 1-3 (Service Agreement, Consultancy, MoU).*

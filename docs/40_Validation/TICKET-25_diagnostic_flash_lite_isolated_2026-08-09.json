@@ -1,0 +1,74 @@
+[
+  {
+    "label": "APP-01",
+    "attempt": 1,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "APP-01",
+    "attempt": 2,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "CIV-01",
+    "attempt": 1,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "CIV-01",
+    "attempt": 2,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "COM-01",
+    "attempt": 1,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "COM-01",
+    "attempt": 2,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "IA-01",
+    "attempt": 1,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "IA-01",
+    "attempt": 2,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "PROP-03",
+    "attempt": 1,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "PROP-03",
+    "attempt": 2,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "RERA-01",
+    "attempt": 1,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  },
+  {
+    "label": "RERA-01",
+    "attempt": 2,
+    "parsed_ok": null,
+    "error": "gemini: rate limited"
+  }
+]

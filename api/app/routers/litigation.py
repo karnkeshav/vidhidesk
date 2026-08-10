@@ -10,6 +10,9 @@ from app.db import service_client
 from app.models.schemas import (
     CaseAnalysisGenerateRequest,
     CaseAnalysisOut,
+    ClauseGenerateRequest,
+    ClauseReviewRequest,
+    ComposePleadingRequest,
     ForumAdvisorRequest,
     ForumAdvisorResponse,
     LimitationRequest,
@@ -22,8 +25,12 @@ from app.models.schemas import (
     LitigationPartyCreate,
     LitigationPartyOut,
     MatterOut,
+    PleadingClauseOut,
+    PleadingDraftOut,
+    PleadingOutlineGenerateRequest,
+    PleadingOutlineOut,
 )
-from app.services import case_analysis, forum, limitation, litigation
+from app.services import case_analysis, clause_generator, document_composer, forum, limitation, litigation, pleading_outline
 from app.services.llm_gateway import ProviderError
 
 router = APIRouter(prefix="/api", tags=["litigation"])
@@ -278,3 +285,131 @@ def list_case_analyses(matter_id: str, user: CurrentUser = Depends(get_current_u
     """List all AI Case Analysis versions for a matter, most recent first."""
     _get_matter_or_404(user, matter_id)
     return case_analysis.list_case_analyses(matter_id, user.db)
+
+
+# --- Pleading Outline (Sprint 3.6 Phase 1/3 — AI Pleading Generation
+# foundation) ---------------------------------------------------------------
+
+@router.post(
+    "/matters/{matter_id}/pleading-outline",
+    response_model=PleadingOutlineOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def generate_pleading_outline_endpoint(
+    matter_id: str,
+    payload: PleadingOutlineGenerateRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Generate a new versioned, STRUCTURED PLEADING PLAN for a litigation
+    matter, built strictly from an already-generated, advocate-reviewable
+    AI Case Analysis version (payload.case_analysis_id) — never a
+    freestanding re-derivation from raw facts, and never a drafted
+    pleading document. See app/services/pleading_outline.py for the
+    deterministic-vs-LLM trust boundary and the fixed-section-list
+    enforcement this endpoint's output is held to."""
+    _get_matter_or_404(user, matter_id)
+    try:
+        result = pleading_outline.generate_pleading_outline(
+            matter_id, payload.case_analysis_id, db=user.db
+        )
+    except pleading_outline.PleadingOutlineError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"All LLM providers failed: {exc}") from exc
+    return result
+
+
+@router.get("/matters/{matter_id}/pleading-outline", response_model=list[PleadingOutlineOut])
+def list_pleading_outlines_endpoint(matter_id: str, user: CurrentUser = Depends(get_current_user)):
+    """List all Pleading Outline versions for a matter, most recent first."""
+    _get_matter_or_404(user, matter_id)
+    return pleading_outline.list_pleading_outlines(matter_id, user.db)
+
+
+# --- Clause-Based Drafting Engine (Sprint 3.6 Phase 2) -----------------------
+
+@router.post(
+    "/matters/{matter_id}/clauses/{clause_type}/generate",
+    response_model=PleadingClauseOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def generate_clause_endpoint(
+    matter_id: str,
+    clause_type: str,
+    payload: ClauseGenerateRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Generate a new version of ONE clause (see
+    app/services/clause_generator.py::CLAUSE_TYPES for the fixed 14-type
+    list). Independently regenerable — this call never touches any other
+    clause_type's rows for this matter/outline."""
+    _get_matter_or_404(user, matter_id)
+    try:
+        result = clause_generator.generate_clause(
+            matter_id, payload.pleading_outline_id, clause_type, db=user.db
+        )
+    except clause_generator.ClauseGeneratorError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"All LLM providers failed: {exc}") from exc
+    return result
+
+
+@router.get("/matters/{matter_id}/clauses", response_model=list[PleadingClauseOut])
+def list_clauses_endpoint(
+    matter_id: str,
+    pleading_outline_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """List every clause version (every clause_type, every version_no) for
+    a given pleading outline, most recent first."""
+    _get_matter_or_404(user, matter_id)
+    return clause_generator.list_clauses(matter_id, pleading_outline_id, user.db)
+
+
+@router.post("/matters/{matter_id}/clauses/{clause_id}/review", response_model=PleadingClauseOut)
+def review_clause_endpoint(
+    matter_id: str,
+    clause_id: str,
+    payload: ClauseReviewRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Advocate approves or rejects one specific clause version — the
+    Human Review gate the composer requires before that clause can appear
+    in a composed pleading."""
+    _get_matter_or_404(user, matter_id)
+    try:
+        return clause_generator.review_clause(clause_id, matter_id, payload.review_status, db=user.db)
+    except clause_generator.ClauseGeneratorError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post(
+    "/matters/{matter_id}/pleading-draft/compose",
+    response_model=PleadingDraftOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def compose_pleading_endpoint(
+    matter_id: str,
+    payload: ComposePleadingRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Assemble the latest advocate-APPROVED version of each clause into
+    one composed pleading. Pure assembly — no LLM call, no legal reasoning
+    (see app/services/document_composer.py)."""
+    _get_matter_or_404(user, matter_id)
+    try:
+        return document_composer.compose_pleading(matter_id, payload.pleading_outline_id, db=user.db)
+    except document_composer.DocumentComposerError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/matters/{matter_id}/pleading-draft", response_model=list[PleadingDraftOut])
+def list_pleading_drafts_endpoint(
+    matter_id: str,
+    pleading_outline_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """List all composed pleading draft versions for a given outline, most recent first."""
+    _get_matter_or_404(user, matter_id)
+    return document_composer.list_drafts(matter_id, pleading_outline_id, user.db)

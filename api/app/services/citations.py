@@ -107,10 +107,18 @@ def _normalize(text: str) -> set[str]:
     return {w for w in cleaned.split() if w and w not in _STOPWORDS}
 
 
-def _best_match(target_text: str, docs: list[dict]) -> dict | None:
+_MATCH_CONFIDENCE_THRESHOLD = 0.6
+
+
+def _best_match(target_text: str, docs: list[dict]) -> tuple[dict, float] | None:
     """Does a search result's title share a strong majority of the query's
     significant words? This is the confidence gate before we ever fetch a
-    doc and treat it as a real match."""
+    doc and treat it as a real match.
+
+    Sprint 3.6 Phase 5 (TICKET-17/18): returns (doc, score) rather than
+    just doc — the score was already computed here and simply discarded
+    before this sprint, leaving every "verified" citation as a bare
+    boolean with no confidence signal at all."""
     target_words = _normalize(target_text)
     if not target_words or not docs:
         return None
@@ -128,8 +136,8 @@ def _best_match(target_text: str, docs: list[dict]) -> dict | None:
             best_score = score
             best = doc
 
-    if best is not None and best_score >= 0.6:
-        return best
+    if best is not None and best_score >= _MATCH_CONFIDENCE_THRESHOLD:
+        return best, best_score
     return None
 
 
@@ -149,6 +157,12 @@ class CitationRecord:
     decided_on: str | None
     stale: bool
     from_cache: bool
+    # Sprint 3.6 Phase 5 (TICKET-17/18): confidence reporting.
+    # match_confidence is the _best_match() word-overlap score (0.0-1.0)
+    # for a "verified" result, None for "unverified" (there is no match to
+    # score) or for legacy rows persisted before this column existed.
+    match_confidence: float | None = None
+    recheck_count: int = 0
 
 
 def _row_to_record(row: dict, from_cache: bool) -> CitationRecord:
@@ -162,6 +176,8 @@ def _row_to_record(row: dict, from_cache: bool) -> CitationRecord:
         decided_on=row.get("decided_on"),
         stale=bool(row.get("stale", False)),
         from_cache=from_cache,
+        match_confidence=row.get("match_confidence"),
+        recheck_count=row.get("recheck_count", 0) or 0,
     )
 
 
@@ -194,6 +210,49 @@ def _confirm_via_doc_fetch(
     return str(tid), court, decided_on
 
 
+def _attempt_live_verification(
+    ik_client: IndianKanoonClient,
+    party_a: str,
+    party_b: str,
+    year: int | None,
+    court: str | None,
+) -> tuple[tuple[str, str | None, str | None] | None, float | None]:
+    """The actual two-pass live Indian Kanoon search (first pass: party/
+    year/court; retry pass: party names only). Split out of
+    verify_citation() in Sprint 3.6 Phase 5 so it can be called a second
+    time for a cached-unverified recheck without duplicating the two-pass
+    logic. Returns ((tid, court, decided_on) | None, match_confidence)."""
+    confirmed: tuple[str, str | None, str | None] | None = None
+    confidence: float | None = None
+
+    first_pass_query = f"{party_a} vs {party_b}".strip() if party_b else party_a
+    if year:
+        first_pass_query = f"{first_pass_query} {year}"
+    try:
+        result = ik_client.search(first_pass_query, court=court, max_pages=1)
+        match = _best_match(f"{party_a} {party_b} {year or ''}".strip(), result.get("docs", []))
+        if match is not None:
+            doc, confidence = match
+            confirmed = _confirm_via_doc_fetch(ik_client, doc)
+    except IndianKanoonError as exc:
+        logger.warning("citations.verify_citation first-pass IK API error: %s", exc)
+
+    # Retry pass: party names only, no year, no court — only if party_b
+    # is known (a single-party query is too weak a signal to bother with).
+    if confirmed is None and party_b:
+        retry_query = f"{party_a} {party_b}".strip()
+        try:
+            result = ik_client.search(retry_query, court=None, max_pages=1)
+            match = _best_match(f"{party_a} {party_b}", result.get("docs", []))
+            if match is not None:
+                doc, confidence = match
+                confirmed = _confirm_via_doc_fetch(ik_client, doc)
+        except IndianKanoonError as exc:
+            logger.warning("citations.verify_citation retry-pass IK API error: %s", exc)
+
+    return confirmed, confidence
+
+
 def verify_citation(
     case_name: str,
     neutral_citation: str | None = None,
@@ -208,6 +267,18 @@ def verify_citation(
     `court`, if given, is used only as a search filter on the first pass —
     it is not required for a match and is dropped entirely on retry.
     `year`, if not given, is parsed out of `case_name`/`neutral_citation`.
+
+    Sprint 3.6 Phase 5 (TICKET-17): only a cached `status == "verified"`
+    row is trusted as final — a real, well-known case was independently
+    confirmed to come back "unverified" live during the Sprint 3.5.6
+    certification round, then "verified" on an immediate identical retry,
+    pointing to live IK search-ranking non-determinism rather than a real
+    "doesn't exist" answer. Caching that transient miss forever (the prior
+    behavior — this function used to `return` immediately on any cache
+    hit, verified or not) turned a one-time flake into a permanent wrong
+    answer. A cached "unverified" row now gets exactly one fresh live
+    re-attempt per call before falling back to it — not fabricating a
+    verification, just no longer trusting a single past negative forever.
     """
     db = db if db is not None else service_client()
     ik_client = ik_client or IndianKanoonClient()
@@ -224,41 +295,26 @@ def verify_citation(
         else query.is_("neutral_citation", "null")
     )
     resp = query.limit(1).execute()
-    if resp.data:
-        logger.info("citations.verify_citation cache_hit case_name=%r", case_name)
-        return _row_to_record(resp.data[0], from_cache=True)
+    cached_row = resp.data[0] if resp.data else None
 
-    logger.info("citations.verify_citation cache_miss case_name=%r — calling IK API", case_name)
+    if cached_row is not None and cached_row["status"] == "verified":
+        logger.info("citations.verify_citation cache_hit (verified) case_name=%r", case_name)
+        return _row_to_record(cached_row, from_cache=True)
+
+    if cached_row is not None:
+        logger.info(
+            "citations.verify_citation cache_hit (unverified, rechecking live) case_name=%r recheck_count=%d",
+            case_name, cached_row.get("recheck_count", 0),
+        )
+    else:
+        logger.info("citations.verify_citation cache_miss case_name=%r — calling IK API", case_name)
+
     party_a, party_b, parsed_year = parse_case_name(case_name, neutral_citation)
     year = year or parsed_year
-
-    confirmed: tuple[str, str | None, str | None] | None = None
-
-    # First pass: structured party/year query + court filter.
-    first_pass_query = f"{party_a} vs {party_b}".strip() if party_b else party_a
-    if year:
-        first_pass_query = f"{first_pass_query} {year}"
-    try:
-        result = ik_client.search(first_pass_query, court=court, max_pages=1)
-        match = _best_match(f"{party_a} {party_b} {year or ''}".strip(), result.get("docs", []))
-        if match is not None:
-            confirmed = _confirm_via_doc_fetch(ik_client, match)
-    except IndianKanoonError as exc:
-        logger.warning("citations.verify_citation first-pass IK API error: %s", exc)
-
-    # Retry pass: party names only, no year, no court — only if party_b
-    # is known (a single-party query is too weak a signal to bother with).
-    if confirmed is None and party_b:
-        retry_query = f"{party_a} {party_b}".strip()
-        try:
-            result = ik_client.search(retry_query, court=None, max_pages=1)
-            match = _best_match(f"{party_a} {party_b}", result.get("docs", []))
-            if match is not None:
-                confirmed = _confirm_via_doc_fetch(ik_client, match)
-        except IndianKanoonError as exc:
-            logger.warning("citations.verify_citation retry-pass IK API error: %s", exc)
+    confirmed, confidence = _attempt_live_verification(ik_client, party_a, party_b, year, court)
 
     now = datetime.now(timezone.utc).isoformat()
+    recheck_count = (cached_row.get("recheck_count", 0) if cached_row else 0) + (1 if cached_row is not None else 0)
     if confirmed is not None:
         tid, matched_court, decided_on = confirmed
         record = {
@@ -273,6 +329,8 @@ def verify_citation(
             "verified_at": now,
             "last_checked_at": now,
             "stale": False,
+            "match_confidence": confidence,
+            "recheck_count": recheck_count,
         }
     else:
         record = {
@@ -285,9 +343,15 @@ def verify_citation(
             "ik_url": None,
             "decided_on": None,
             "verified_at": None,
-            "last_checked_at": None,
+            "last_checked_at": now,
             "stale": False,
+            "match_confidence": None,
+            "recheck_count": recheck_count,
         }
+
+    if cached_row is not None:
+        updated = db.table("citations").update(record).eq("id", cached_row["id"]).execute()
+        return _row_to_record(updated.data[0] if updated.data else record, from_cache=False)
 
     inserted = db.table("citations").insert(record).execute()
     return _row_to_record(inserted.data[0] if inserted.data else record, from_cache=False)

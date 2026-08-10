@@ -60,6 +60,31 @@ ACT_CONFIG: dict[str, dict] = {
         "act": "Transfer of Property Act, 1882",
         "year": 1882,
     },
+    # --- Sprint 3.6 Phase 1 corpus expansion (TICKET-16) ---------------
+    "limitation_act_1963.pdf": {
+        "act": "Limitation Act, 1963",
+        "year": 1963,
+    },
+    "code_of_civil_procedure_1908.pdf": {
+        "act": "Code of Civil Procedure, 1908",
+        "year": 1908,
+    },
+    "specific_relief_act_1963.pdf": {
+        "act": "Specific Relief Act, 1963",
+        "year": 1963,
+    },
+    "indian_easements_act_1882.pdf": {
+        "act": "Indian Easements Act, 1882",
+        "year": 1882,
+    },
+    "real_estate_regulation_development_act_2016.pdf": {
+        "act": "Real Estate (Regulation and Development) Act, 2016",
+        "year": 2016,
+    },
+    "commercial_courts_act_2015.pdf": {
+        "act": "Commercial Courts Act, 2015",
+        "year": 2015,
+    },
 }
 
 
@@ -93,8 +118,21 @@ class Chunk:
 # followed immediately by ". " and then a capital letter, dash, or "("
 # achieves that: "(2) It extends..." starts with "(", not a digit, so it
 # can never match the boundary pattern in the first place.
+# Sprint 3.6 Phase 1 (TICKET-16) extension: an inserted/amended provision
+# is conventionally rendered "1[2. Pleading to state material facts...—...]"
+# — a footnote-reference digit and "[" bracket glued directly in front of
+# the real section/rule number, with no whitespace between them. The
+# original pattern's `^\s*` line-start anchor never reaches the real
+# number in that shape, silently merging the whole provision into whatever
+# boundary preceded it (found via CPC Order VI Rule 2 and Order VIII Rule
+# 1 both going missing/wrong during the First Schedule ingestion this
+# sprint — not new to CPC, just newly exercised heavily enough by CPC's
+# amendment-marker density to surface). The optional non-capturing
+# `(?:\d{1,3}[A-Z]?\[)?` prefix absorbs that footnote marker without
+# capturing it, so group(1) is always the real section/rule number either
+# way.
 _SECTION_BOUNDARY_RE = re.compile(
-    r"(?m)^\s*(\d{1,3}[A-Z]?)\.[ \t]+(?=[A-Z—–(])"
+    r"(?m)^\s*(?:\d{1,3}[A-Z]?\[)?(\d{1,3}[A-Z]?)\.[ \t]+(?=[A-Z—–(])"
 )
 
 _ENACTING_CLAUSE_RE = re.compile(r"BE it enacted by Parliament", re.IGNORECASE)
@@ -199,6 +237,82 @@ def chunk_sections(full_text: str, act: str, year: int | None) -> list[Chunk]:
     return chunks
 
 
+# --- CPC First Schedule (Orders/Rules) — Sprint 3.6 Phase 1 extension ------
+# CPC 1908 is the one act in this corpus with a second body of substantive
+# text — the First Schedule's 51 Orders, each containing its own Rules —
+# governed by a completely different numbering scheme ("ORDER VII" / "Rule
+# 1") than the numbered-Section boundary regex above handles. Two real
+# problems if this is ignored: (1) the Order VI/VII/VIII pleading-structure
+# rules and Order XXXVIII/XXXIX injunction/attachment rules — exactly what
+# pleading generation depends on — would simply never be ingested; (2) each
+# Order's own Rule numbering restarts at 1, so a rule boundary looks
+# identical in shape to a Section boundary ("1. Particulars to be contained
+# in plaint.—...") — reusing chunk_sections()'s dedup-by-section_no as-is
+# would either silently drop every Rule 1..N behind whichever Section 1..N
+# was chunked first, or (worse) collide two unrelated chunks under the same
+# key. Keying Schedule chunks as "Order VII Rule 1" rather than bare "1"
+# avoids both failure modes without changing chunk_sections() or its
+# dedup logic at all.
+_ORDER_BOUNDARY_RE = re.compile(r"(?m)^ORDER\s+([IVXLCM]+[A-Z]?)\b")
+
+
+def _find_schedule_body_start(text: str) -> int | None:
+    """The First Schedule's real Rule text is preceded by an
+    "Arrangement of Rules" table of contents earlier in the document,
+    using the identical "ORDER <roman>" heading shape but title-only, no
+    rule bodies. Distinguish the two by requiring an em-dash within the
+    first 400 characters after "ORDER I" — every real bare-act rule body
+    in this corpus's format carries one ("1. Who may be joined as
+    plaintiffs.—All persons..."), the TOC listing never does (bare
+    titles, no dash)."""
+    for m in re.finditer(r"(?m)^ORDER\s+I\b", text):
+        if "—" in text[m.start() : m.start() + 400]:
+            return m.start()
+    return None
+
+
+def chunk_cpc_schedule(full_text: str, act: str, year: int | None) -> list[Chunk]:
+    """Chunk the First Schedule's Orders/Rules, additive to (never
+    replacing) chunk_sections()'s numbered-Section chunks for the same
+    PDF. Returns [] harmlessly if the body marker isn't found rather than
+    raising — a schema/format change in a future India Code re-download
+    should degrade to "no Schedule content", not break Section
+    ingestion, which chunk_sections() handles independently."""
+    body_start = _find_schedule_body_start(full_text)
+    if body_start is None:
+        return []
+
+    order_boundaries = list(_ORDER_BOUNDARY_RE.finditer(full_text, body_start))
+    if not order_boundaries:
+        return []
+
+    chunks: list[Chunk] = []
+    seen: set[str] = set()
+    for i, om in enumerate(order_boundaries):
+        order_no = om.group(1)
+        order_start = om.start()
+        order_end = order_boundaries[i + 1].start() if i + 1 < len(order_boundaries) else len(full_text)
+        order_text = full_text[order_start:order_end]
+
+        rule_boundaries = list(_SECTION_BOUNDARY_RE.finditer(order_text))
+        for j, rm in enumerate(rule_boundaries):
+            rule_no = rm.group(1)
+            r_start = rm.start()
+            r_end = rule_boundaries[j + 1].start() if j + 1 < len(rule_boundaries) else len(order_text)
+            raw = order_text[r_start:r_end].strip()
+            cleaned = _clean_chunk_text(raw, act)
+            if not cleaned or len(cleaned) < 20:
+                continue
+
+            section_no = f"Order {order_no} Rule {rule_no}"
+            if section_no in seen:
+                continue
+            seen.add(section_no)
+            chunks.append(Chunk(act=act, section_no=section_no, year=year, text=cleaned))
+
+    return chunks
+
+
 # --- Embeddings + upsert -----------------------------------------------------
 
 _model = None
@@ -250,7 +364,13 @@ def ingest_pdf(pdf_path: Path, db=None, dry_run: bool = False) -> list[Chunk]:
     full_text = extract_text(pdf_path)
     chunks = chunk_sections(full_text, config["act"], config["year"])
 
-    print(f"{pdf_path.name}: {len(chunks)} section chunk(s) for {config['act']!r}")
+    schedule_chunks: list[Chunk] = []
+    if config["act"] == "Code of Civil Procedure, 1908":
+        schedule_chunks = chunk_cpc_schedule(full_text, config["act"], config["year"])
+        chunks = chunks + schedule_chunks
+
+    print(f"{pdf_path.name}: {len(chunks)} chunk(s) for {config['act']!r}"
+          + (f" ({len(chunks) - len(schedule_chunks)} Sections + {len(schedule_chunks)} First Schedule Order/Rule chunks)" if schedule_chunks else ""))
     for c in chunks[:3]:
         preview = c.text[:160].replace("\n", " ")
         print(f"  section {c.section_no}: {preview}...")

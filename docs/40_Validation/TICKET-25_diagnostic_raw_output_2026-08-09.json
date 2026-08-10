@@ -1,0 +1,885 @@
+[
+  {
+    "prompt_chars": 4376,
+    "prompt": "Matter: [TEST] APP-01 \u2014 First appeal to High Court (off-by-one regression check)\n\nReviewed legal issues:\n- Appeal against District Court decree\n\nReviewed causes of action:\n- Appeal against District Court decree: Rajiv Malhotra is appealing against the District Court decree passed on 2026-06-20\n\nRetrieved statutory context (cite only from this list):\n- Code of Civil Procedure, 1908 Section Order XLI Rule 37: 37. Certified copy of decree to be sent to Court whose decree appealed from.\u2014A copy of the\njudgment and of the decree, certified by the Appellate Court or such officer as it appoints in this behalf, shall\nbe sent to the Court which passed the decree appealed from and shall be filed with the original proceedings in\nthe suit, and an entry of the judgment of the Appellate Court shall be made in the r\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Real Estate (Regulation and Development) Act, 2016 Section 58: 58. Appeal to High Court.\u2014(1) Any person aggrieved by any decision or order of the Appellate\nTribunal, may, file an appeal to the High Court, within a period of sixty days from the date of\ncommunication of the decision or order of the Appellate Tribunal, to him, on any one or more of the\ngrounds specified in section 100 of the Code of Civil Procedure, 1908 (5 of 1908):\nProvided that the High Court\n- Commercial Courts Act, 2015 Section 8: 8. Bar against revision application or petition against an interlocutory order.\u2014Notwithstanding\nanything contained in any other law for the time being in force, no civil revision application or petition\nshall be entertained against any interlocutory order of a Commercial Court, including an order on the\nissue of jurisdiction, and any such challenge, subject to the provisions of section 13, shall b\n- Code of Civil Procedure, 1908 Section Order XLI Rule 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section Order XLV Rule 2: 2. Application to Court whose decree complained of.\u20142[(1)] Whoever desires to appeal 3[the\nSupreme Court] shall apply by petition to the Court whose decree is complained of.\n4[(2) Every petition under sub-rule (1) shall be heard as expeditiously as possible and endeavour shall\nbe made to conclude the disposal of the petition within sixty days from the date on which the petition is\npresented to the\n- Code of Civil Procedure, 1908 Section Order XLIV Rule 3: 3. Inquiry as to whether applicant is an indigent person.\u2014(1) Where an applicant, referred to in\nrule 1, was allowed to sue or appeal as an indigent person in the Court from whose decree the appeal is\npreferred, no further inquiry in respect of the question whether or not he is an indigent person shall be\nnecessary if the applicant has made an affidavit stating that he has not ceased to be an indi\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)"
+    ],
+    "latency_ms": 17935,
+    "raw_text": "```json\n{\n  \"content\": \"That the impugned decree dated 2026-06-20 passed by the Learned District Court is contrary to law, facts, and the evidence on record, thereby warranting interference by this Hon'ble Court in the exercise of its appellate jurisdiction.\",\n  \"statute_refs\": [\n    {\n      \"act\": \"Code of Civil Procedure, 1908\",\n      \"section_no\": \"\"\n    }\n  ],\n  \"case_law_refs\": [],\n  \"confidence\": 0.7\n}\n```",
+    "raw_text_chars": 415,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "That the impugned decree dated 2026-06-20 passed by the Learned District Court is contrary to law, facts, and the evidence on record, thereby warranting interference by this Hon'ble Court in the exercise of its appellate jurisdiction.",
+      "statute_refs": [
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "section_no": ""
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.7
+    },
+    "n_statutes_in_context": 8,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "APP-01",
+    "attempt": 1
+  },
+  {
+    "prompt_chars": 4376,
+    "prompt": "Matter: [TEST] APP-01 \u2014 First appeal to High Court (off-by-one regression check)\n\nReviewed legal issues:\n- Appeal against District Court decree\n\nReviewed causes of action:\n- Appeal against District Court decree: Rajiv Malhotra is appealing against the District Court decree passed on 2026-06-20\n\nRetrieved statutory context (cite only from this list):\n- Code of Civil Procedure, 1908 Section Order XLI Rule 37: 37. Certified copy of decree to be sent to Court whose decree appealed from.\u2014A copy of the\njudgment and of the decree, certified by the Appellate Court or such officer as it appoints in this behalf, shall\nbe sent to the Court which passed the decree appealed from and shall be filed with the original proceedings in\nthe suit, and an entry of the judgment of the Appellate Court shall be made in the r\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Real Estate (Regulation and Development) Act, 2016 Section 58: 58. Appeal to High Court.\u2014(1) Any person aggrieved by any decision or order of the Appellate\nTribunal, may, file an appeal to the High Court, within a period of sixty days from the date of\ncommunication of the decision or order of the Appellate Tribunal, to him, on any one or more of the\ngrounds specified in section 100 of the Code of Civil Procedure, 1908 (5 of 1908):\nProvided that the High Court\n- Commercial Courts Act, 2015 Section 8: 8. Bar against revision application or petition against an interlocutory order.\u2014Notwithstanding\nanything contained in any other law for the time being in force, no civil revision application or petition\nshall be entertained against any interlocutory order of a Commercial Court, including an order on the\nissue of jurisdiction, and any such challenge, subject to the provisions of section 13, shall b\n- Code of Civil Procedure, 1908 Section Order XLI Rule 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section Order XLV Rule 2: 2. Application to Court whose decree complained of.\u20142[(1)] Whoever desires to appeal 3[the\nSupreme Court] shall apply by petition to the Court whose decree is complained of.\n4[(2) Every petition under sub-rule (1) shall be heard as expeditiously as possible and endeavour shall\nbe made to conclude the disposal of the petition within sixty days from the date on which the petition is\npresented to the\n- Code of Civil Procedure, 1908 Section Order XLIV Rule 3: 3. Inquiry as to whether applicant is an indigent person.\u2014(1) Where an applicant, referred to in\nrule 1, was allowed to sue or appeal as an indigent person in the Court from whose decree the appeal is\npreferred, no further inquiry in respect of the question whether or not he is an indigent person shall be\nnecessary if the applicant has made an affidavit stating that he has not ceased to be an indi\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1074,
+    "raw_text": "{\"content\": \"The appellant is entitled to appeal against the District Court decree passed on 2026-06-20, as provided under Section 58 of the Real Estate (Regulation and Development) Act, 2016, which allows for an appeal to the High Court within sixty days from the date of communication of the decision or order of the Appellate Tribunal. The grounds for this appeal are based on the provisions of Section 100 of the Code of Civil Procedure, 1908. Furthermore, in accordance with Order XLI Rule 37 of the Code of Civil Procedure, 1908, a certified copy of the decree shall be sent to the Court whose decree is appealed from. The appeal is being filed within the prescribed timeframe, and the appellant has complied with the necessary procedural requirements. The appellant seeks to challenge the decree passed by the District Court, and this appeal is being filed on the grounds that the decree is erroneous and unlawful.\", \"statute_refs\": [{\"act\": \"Real Estate (Regulation and Development) Act, 2016\", \"section_no\": \"58\"}, {\"act\": \"Code of Civil Procedure, 1908\", \"section_no\": \"Order XLI Rule 37\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1141,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The appellant is entitled to appeal against the District Court decree passed on 2026-06-20, as provided under Section 58 of the Real Estate (Regulation and Development) Act, 2016, which allows for an appeal to the High Court within sixty days from the date of communication of the decision or order of the Appellate Tribunal. The grounds for this appeal are based on the provisions of Section 100 of the Code of Civil Procedure, 1908. Furthermore, in accordance with Order XLI Rule 37 of the Code of Civil Procedure, 1908, a certified copy of the decree shall be sent to the Court whose decree is appealed from. The appeal is being filed within the prescribed timeframe, and the appellant has complied with the necessary procedural requirements. The appellant seeks to challenge the decree passed by the District Court, and this appeal is being filed on the grounds that the decree is erroneous and unlawful.",
+      "statute_refs": [
+        {
+          "act": "Real Estate (Regulation and Development) Act, 2016",
+          "section_no": "58"
+        },
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "section_no": "Order XLI Rule 37"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 8,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "APP-01",
+    "attempt": 2
+  },
+  {
+    "prompt_chars": 4376,
+    "prompt": "Matter: [TEST] APP-01 \u2014 First appeal to High Court (off-by-one regression check)\n\nReviewed legal issues:\n- Appeal against District Court decree\n\nReviewed causes of action:\n- Appeal against District Court decree: Rajiv Malhotra is appealing against the District Court decree passed on 2026-06-20\n\nRetrieved statutory context (cite only from this list):\n- Code of Civil Procedure, 1908 Section Order XLI Rule 37: 37. Certified copy of decree to be sent to Court whose decree appealed from.\u2014A copy of the\njudgment and of the decree, certified by the Appellate Court or such officer as it appoints in this behalf, shall\nbe sent to the Court which passed the decree appealed from and shall be filed with the original proceedings in\nthe suit, and an entry of the judgment of the Appellate Court shall be made in the r\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Real Estate (Regulation and Development) Act, 2016 Section 58: 58. Appeal to High Court.\u2014(1) Any person aggrieved by any decision or order of the Appellate\nTribunal, may, file an appeal to the High Court, within a period of sixty days from the date of\ncommunication of the decision or order of the Appellate Tribunal, to him, on any one or more of the\ngrounds specified in section 100 of the Code of Civil Procedure, 1908 (5 of 1908):\nProvided that the High Court\n- Commercial Courts Act, 2015 Section 8: 8. Bar against revision application or petition against an interlocutory order.\u2014Notwithstanding\nanything contained in any other law for the time being in force, no civil revision application or petition\nshall be entertained against any interlocutory order of a Commercial Court, including an order on the\nissue of jurisdiction, and any such challenge, subject to the provisions of section 13, shall b\n- Code of Civil Procedure, 1908 Section Order XLI Rule 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section Order XLV Rule 2: 2. Application to Court whose decree complained of.\u20142[(1)] Whoever desires to appeal 3[the\nSupreme Court] shall apply by petition to the Court whose decree is complained of.\n4[(2) Every petition under sub-rule (1) shall be heard as expeditiously as possible and endeavour shall\nbe made to conclude the disposal of the petition within sixty days from the date on which the petition is\npresented to the\n- Code of Civil Procedure, 1908 Section Order XLIV Rule 3: 3. Inquiry as to whether applicant is an indigent person.\u2014(1) Where an applicant, referred to in\nrule 1, was allowed to sue or appeal as an indigent person in the Court from whose decree the appeal is\npreferred, no further inquiry in respect of the question whether or not he is an indigent person shall be\nnecessary if the applicant has made an affidavit stating that he has not ceased to be an indi\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1098,
+    "raw_text": "{\"content\": \"The appeal against the District Court decree is grounded in the provisions of the Code of Civil Procedure, 1908, specifically Order XLI Rule 37, which mandates that a certified copy of the decree be sent to the Court whose decree is appealed from. Furthermore, the appeal is supported by the grounds specified in section 100 of the Code of Civil Procedure, 1908, as contemplated under Section 58 of the Real Estate (Regulation and Development) Act, 2016. The appellant, Rajiv Malhotra, is aggrieved by the decision of the District Court and has filed this appeal to the High Court within the prescribed timeframe, as per the provisions of Section 58 of the Real Estate (Regulation and Development) Act, 2016. The appeal is also governed by the provisions of Order XLV Rule 2 of the Code of Civil Procedure, 1908, which pertains to applications to the Court whose decree is complained of.\", \"statute_refs\": [{\"act\": \"Code of Civil Procedure, 1908\", \"section_no\": \"Order XLI Rule 37\"}, {\"act\": \"Real Estate (Regulation and Development) Act, 2016\", \"section_no\": \"58\"}, {\"act\": \"Code of Civil Procedure, 1908\", \"section_no\": \"Order XLV Rule 2\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1196,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The appeal against the District Court decree is grounded in the provisions of the Code of Civil Procedure, 1908, specifically Order XLI Rule 37, which mandates that a certified copy of the decree be sent to the Court whose decree is appealed from. Furthermore, the appeal is supported by the grounds specified in section 100 of the Code of Civil Procedure, 1908, as contemplated under Section 58 of the Real Estate (Regulation and Development) Act, 2016. The appellant, Rajiv Malhotra, is aggrieved by the decision of the District Court and has filed this appeal to the High Court within the prescribed timeframe, as per the provisions of Section 58 of the Real Estate (Regulation and Development) Act, 2016. The appeal is also governed by the provisions of Order XLV Rule 2 of the Code of Civil Procedure, 1908, which pertains to applications to the Court whose decree is complained of.",
+      "statute_refs": [
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "section_no": "Order XLI Rule 37"
+        },
+        {
+          "act": "Real Estate (Regulation and Development) Act, 2016",
+          "section_no": "58"
+        },
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "section_no": "Order XLV Rule 2"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 8,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "APP-01",
+    "attempt": 3
+  },
+  {
+    "prompt_chars": 4376,
+    "prompt": "Matter: [TEST] APP-01 \u2014 First appeal to High Court (off-by-one regression check)\n\nReviewed legal issues:\n- Appeal against District Court decree\n\nReviewed causes of action:\n- Appeal against District Court decree: Rajiv Malhotra is appealing against the District Court decree passed on 2026-06-20\n\nRetrieved statutory context (cite only from this list):\n- Code of Civil Procedure, 1908 Section Order XLI Rule 37: 37. Certified copy of decree to be sent to Court whose decree appealed from.\u2014A copy of the\njudgment and of the decree, certified by the Appellate Court or such officer as it appoints in this behalf, shall\nbe sent to the Court which passed the decree appealed from and shall be filed with the original proceedings in\nthe suit, and an entry of the judgment of the Appellate Court shall be made in the r\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Real Estate (Regulation and Development) Act, 2016 Section 58: 58. Appeal to High Court.\u2014(1) Any person aggrieved by any decision or order of the Appellate\nTribunal, may, file an appeal to the High Court, within a period of sixty days from the date of\ncommunication of the decision or order of the Appellate Tribunal, to him, on any one or more of the\ngrounds specified in section 100 of the Code of Civil Procedure, 1908 (5 of 1908):\nProvided that the High Court\n- Commercial Courts Act, 2015 Section 8: 8. Bar against revision application or petition against an interlocutory order.\u2014Notwithstanding\nanything contained in any other law for the time being in force, no civil revision application or petition\nshall be entertained against any interlocutory order of a Commercial Court, including an order on the\nissue of jurisdiction, and any such challenge, subject to the provisions of section 13, shall b\n- Code of Civil Procedure, 1908 Section Order XLI Rule 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of Civil Procedure, 1908 Section Order XLV Rule 2: 2. Application to Court whose decree complained of.\u20142[(1)] Whoever desires to appeal 3[the\nSupreme Court] shall apply by petition to the Court whose decree is complained of.\n4[(2) Every petition under sub-rule (1) shall be heard as expeditiously as possible and endeavour shall\nbe made to conclude the disposal of the petition within sixty days from the date on which the petition is\npresented to the\n- Code of Civil Procedure, 1908 Section Order XLIV Rule 3: 3. Inquiry as to whether applicant is an indigent person.\u2014(1) Where an applicant, referred to in\nrule 1, was allowed to sue or appeal as an indigent person in the Court from whose decree the appeal is\npreferred, no further inquiry in respect of the question whether or not he is an indigent person shall be\nnecessary if the applicant has made an affidavit stating that he has not ceased to be an indi\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1316,
+    "raw_text": "{\"content\": \"The appeal against the District Court decree passed on 2026-06-20 is well-founded and sustainable in law, as the provisions of the Code of Civil Procedure, 1908, particularly Order XLI Rule 37 and Section 235, govern the procedure for filing an appeal against a decree. The instant appeal is predicated on the decree of the District Court, which is a judgment that can be appealed against under the aforesaid provisions. Furthermore, in terms of the requirement for sending a certified copy of the decree to the Court whose decree is appealed from, the same will be complied with in accordance with Order XLI Rule 37. The grounds of appeal, as permissible under Section 58 of the Real Estate (Regulation and Development) Act, 2016, read with Section 100 of the Code of Civil Procedure, 1908, will be specifically pleaded in the ensuing paragraphs. The appeal is therefore properly before this Hon'ble Court and is liable to be heard on merits.\", \"statute_refs\": [{\"act\": \"Code of Civil Procedure, 1908\", \"section_no\": \"Order XLI Rule 37\"}, {\"act\": \"Code of Civil Procedure, 1908\", \"section_no\": \"Section 235\"}, {\"act\": \"Real Estate (Regulation and Development) Act, 2016\", \"section_no\": \"Section 58\"}], \"case_law_refs\": [], \"confidence\": 0.9}",
+    "raw_text_chars": 1255,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The appeal against the District Court decree passed on 2026-06-20 is well-founded and sustainable in law, as the provisions of the Code of Civil Procedure, 1908, particularly Order XLI Rule 37 and Section 235, govern the procedure for filing an appeal against a decree. The instant appeal is predicated on the decree of the District Court, which is a judgment that can be appealed against under the aforesaid provisions. Furthermore, in terms of the requirement for sending a certified copy of the decree to the Court whose decree is appealed from, the same will be complied with in accordance with Order XLI Rule 37. The grounds of appeal, as permissible under Section 58 of the Real Estate (Regulation and Development) Act, 2016, read with Section 100 of the Code of Civil Procedure, 1908, will be specifically pleaded in the ensuing paragraphs. The appeal is therefore properly before this Hon'ble Court and is liable to be heard on merits.",
+      "statute_refs": [
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "section_no": "Order XLI Rule 37"
+        },
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "section_no": "Section 235"
+        },
+        {
+          "act": "Real Estate (Regulation and Development) Act, 2016",
+          "section_no": "Section 58"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.9
+    },
+    "n_statutes_in_context": 8,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "APP-01",
+    "attempt": 4
+  },
+  {
+    "prompt_chars": 2574,
+    "prompt": "Matter: [TEST] CIV-01 \u2014 Unsecured personal loan (canary)\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Recovery of Loan Amount with Interest: Sanjay Malhotra's failure to repay the loan amount with interest as per the agreement\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n- Indian Contract Act, 1872 Section 141: 141. Surety\u2019s right to benefit of creditor\u2019s securities.\n- Carriage by Road Act, 2007 Section 12: 12. Conditions limiting exonerating the liability of the common carrier.\u2014(1) Every common\ncarrier shall be liable to the consignor for the loss or damage to any consignment in accordance with the\ngoods forwarding note, where such loss or damage has arisen on account of any criminal act of the\ncommon carrier, or any of his servants or agents.\n(2) In any suit brought against the common carrier for t\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 899,
+    "raw_text": "{\"content\": \"The defendant's failure to repay the Loan Amount with interest as per the agreement constitutes a breach of contract, entitling the plaintiff to relief under the Indian Contract Act, 1872. The plaintiff's claim for recovery of the Loan Amount with interest is grounded in the defendant's obligations under the agreement, which are enforceable under the law of contract. The Transfer of Property Act, 1882 and the Consumer Protection Act, 2019, while relevant to the broader context of the dispute, do not directly bear on the plaintiff's claim for breach of contract. The plaintiff is entitled to seek recovery of the Loan Amount with interest, as the defendant's failure to repay the same has caused loss and damage to the plaintiff.\", \"statute_refs\": [{\"act\": \"Indian Contract Act, 1872\", \"section_no\": \"141\"}, {\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 928,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The defendant's failure to repay the Loan Amount with interest as per the agreement constitutes a breach of contract, entitling the plaintiff to relief under the Indian Contract Act, 1872. The plaintiff's claim for recovery of the Loan Amount with interest is grounded in the defendant's obligations under the agreement, which are enforceable under the law of contract. The Transfer of Property Act, 1882 and the Consumer Protection Act, 2019, while relevant to the broader context of the dispute, do not directly bear on the plaintiff's claim for breach of contract. The plaintiff is entitled to seek recovery of the Loan Amount with interest, as the defendant's failure to repay the same has caused loss and damage to the plaintiff.",
+      "statute_refs": [
+        {
+          "act": "Indian Contract Act, 1872",
+          "section_no": "141"
+        },
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "CIV-01",
+    "attempt": 1
+  },
+  {
+    "prompt_chars": 2574,
+    "prompt": "Matter: [TEST] CIV-01 \u2014 Unsecured personal loan (canary)\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Recovery of Loan Amount with Interest: Sanjay Malhotra's failure to repay the loan amount with interest as per the agreement\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n- Indian Contract Act, 1872 Section 141: 141. Surety\u2019s right to benefit of creditor\u2019s securities.\n- Carriage by Road Act, 2007 Section 12: 12. Conditions limiting exonerating the liability of the common carrier.\u2014(1) Every common\ncarrier shall be liable to the consignor for the loss or damage to any consignment in accordance with the\ngoods forwarding note, where such loss or damage has arisen on account of any criminal act of the\ncommon carrier, or any of his servants or agents.\n(2) In any suit brought against the common carrier for t\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash-lite",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)"
+    ],
+    "latency_ms": 1639,
+    "raw_text": "```json\n{\n \"content\": \"Sanjay Malhotra's failure to repay the principal sum along with accrued interest, as stipulated in the loan agreement, constitutes a clear breach of contract. The said loan was granted by Contract\n\nReviewed to Sanjay Malhotra based on the mutual understanding and covenants agreed upon by both parties, and Sanjay Malhotra's non-compliance therewith directly gives rise to the cause of action for recovery of the principal amount together with the agreed-upon interest.\",\n \"statute_refs\": [],\n \"case_law_refs\": [],\n \"confidence\": 0.8\n}\n```",
+    "raw_text_chars": 562,
+    "parsed_ok": false,
+    "parsed": null,
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "CIV-01",
+    "attempt": 2
+  },
+  {
+    "prompt_chars": 2574,
+    "prompt": "Matter: [TEST] CIV-01 \u2014 Unsecured personal loan (canary)\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Recovery of Loan Amount with Interest: Sanjay Malhotra's failure to repay the loan amount with interest as per the agreement\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n- Indian Contract Act, 1872 Section 141: 141. Surety\u2019s right to benefit of creditor\u2019s securities.\n- Carriage by Road Act, 2007 Section 12: 12. Conditions limiting exonerating the liability of the common carrier.\u2014(1) Every common\ncarrier shall be liable to the consignor for the loss or damage to any consignment in accordance with the\ngoods forwarding note, where such loss or damage has arisen on account of any criminal act of the\ncommon carrier, or any of his servants or agents.\n(2) In any suit brought against the common carrier for t\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 816,
+    "raw_text": "{\"content\": \"The defendant's failure to repay the Loan Amount with interest as per the agreement constitutes a breach of contract, thereby entitling the plaintiff to recover the amount with interest. The plaintiff relies on the provisions of the Indian Contract Act, 1872, which governs the terms of the agreement between the parties. The plaintiff submits that the defendant's actions are in contravention of the contractual obligations, and the plaintiff is entitled to seek relief under the provisions of the Indian Contract Act, 1872. The plaintiff further submits that the defendant's liability to repay the Loan Amount with interest is absolute, and the defendant cannot claim any exemption or exemption from such liability.\", \"statute_refs\": [{\"act\": \"Indian Contract Act, 1872\", \"section_no\": \"141\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 849,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The defendant's failure to repay the Loan Amount with interest as per the agreement constitutes a breach of contract, thereby entitling the plaintiff to recover the amount with interest. The plaintiff relies on the provisions of the Indian Contract Act, 1872, which governs the terms of the agreement between the parties. The plaintiff submits that the defendant's actions are in contravention of the contractual obligations, and the plaintiff is entitled to seek relief under the provisions of the Indian Contract Act, 1872. The plaintiff further submits that the defendant's liability to repay the Loan Amount with interest is absolute, and the defendant cannot claim any exemption or exemption from such liability.",
+      "statute_refs": [
+        {
+          "act": "Indian Contract Act, 1872",
+          "section_no": "141"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "CIV-01",
+    "attempt": 3
+  },
+  {
+    "prompt_chars": 2574,
+    "prompt": "Matter: [TEST] CIV-01 \u2014 Unsecured personal loan (canary)\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Recovery of Loan Amount with Interest: Sanjay Malhotra's failure to repay the loan amount with interest as per the agreement\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n- Indian Contract Act, 1872 Section 141: 141. Surety\u2019s right to benefit of creditor\u2019s securities.\n- Carriage by Road Act, 2007 Section 12: 12. Conditions limiting exonerating the liability of the common carrier.\u2014(1) Every common\ncarrier shall be liable to the consignor for the loss or damage to any consignment in accordance with the\ngoods forwarding note, where such loss or damage has arisen on account of any criminal act of the\ncommon carrier, or any of his servants or agents.\n(2) In any suit brought against the common carrier for t\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1201,
+    "raw_text": "{\"content\": \"The defendant's failure to repay the Loan Amount with interest as per the agreement constitutes a breach of the contractual obligations, and as such, the plaintiff is entitled to recover the same. The Indian Contract Act, 1872 does not provide a specific section that directly applies to this cause of action, however, the agreement between the parties is governed by the principles of contract law. The plaintiff relies on the contractual terms agreed upon by the parties for the recovery of the Loan Amount with interest. The Transfer of Property Act, 1882, while relevant to the creation and enforcement of certain interests in property, does not directly apply to the present cause of action, which is grounded in contract law. The Consumer Protection Act, 2019 is also not directly applicable to this cause of action, as the dispute arises from a private contractual agreement rather than a consumer transaction. The plaintiff is entitled to recover the Loan Amount with interest, as per the terms of the agreement, and the defendant's failure to repay the same amounts to a breach of the said agreement.\", \"statute_refs\": [{\"act\": \"Indian Contract Act, 1872\", \"section_no\": \"\"}, {\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}, {\"act\": \"Consumer Protection Act, 2019\", \"section_no\": \"21\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1362,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The defendant's failure to repay the Loan Amount with interest as per the agreement constitutes a breach of the contractual obligations, and as such, the plaintiff is entitled to recover the same. The Indian Contract Act, 1872 does not provide a specific section that directly applies to this cause of action, however, the agreement between the parties is governed by the principles of contract law. The plaintiff relies on the contractual terms agreed upon by the parties for the recovery of the Loan Amount with interest. The Transfer of Property Act, 1882, while relevant to the creation and enforcement of certain interests in property, does not directly apply to the present cause of action, which is grounded in contract law. The Consumer Protection Act, 2019 is also not directly applicable to this cause of action, as the dispute arises from a private contractual agreement rather than a consumer transaction. The plaintiff is entitled to recover the Loan Amount with interest, as per the terms of the agreement, and the defendant's failure to repay the same amounts to a breach of the said agreement.",
+      "statute_refs": [
+        {
+          "act": "Indian Contract Act, 1872",
+          "section_no": ""
+        },
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        },
+        {
+          "act": "Consumer Protection Act, 2019",
+          "section_no": "21"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "CIV-01",
+    "attempt": 4
+  },
+  {
+    "prompt_chars": 3324,
+    "prompt": "Matter: [TEST] COM-01 \u2014 SaaS licensing at Commercial Courts Act threshold\n\nReviewed legal issues:\n- Whether Bluewave Retail Technologies LLP is liable for breach of contract due to non-payment of services rendered by Vertex Software Solutions Pvt. Ltd..\n\nReviewed causes of action:\n- Breach of Contract (Non-Payment of Services): Bluewave Retail Technologies LLP has failed to fulfill its contractual obligation to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by Vertex Software Solutions Pvt. Ltd., despite the payment due date passing and a formal demand letter being sent.\n\nRetrieved statutory context (cite only from this list):\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 39: 39. (1) Where the District Commission is satisfied that the goods complained against\nsuffer from any of the defects specified in the complaint or that any of the allegations\ncontained in the complaint about the services or any unfair trade practices, or claims for\ncompensation under product liability are proved, it shall issue an order to the opposite party\ndirecting him to do one or more of the f\n- Consumer Protection Act, 2019 Section 81: 81. (1) The District Commission or the State Commission or the National Commission,\nas the case may be, shall, within seven days of the receipt of the settlement report, pass\nsuitable order recording such settlement of consumer dispute and dispose of the matter\naccordingly.\n(2) Where the consumer dispute is settled only in part, the District Commission or the\nState Commission or the National Commi\n- Consumer Protection Act, 2019 Section 47: 47. (1) Subject to the other provisions of this Act, the State Commission shall have\njurisdiction\u2014\n(a) to entertain\u2014\n(i) complaints where the value of the goods or services paid as\nconsideration, exceeds rupees one crore, but does not exceed rupees ten crore:\nProvided that where the Central Government deems it necessary so to do,\nit may prescribe such other value, as it deems fit;\n(ii) complaints \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 956,
+    "raw_text": "{\"content\": \"The defendant's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services rendered by the plaintiff constitutes a breach of contract, as the payment due date has passed and a formal demand letter has been sent. This breach is actionable under the contractual terms agreed upon by the parties. Although the Consumer Protection Act, 2019 is not directly applicable to the present dispute as it does not involve a consumer complaint, the plaintiff relies on the contractual obligations and the principles of breach of contract to seek relief. The plaintiff submits that the defendant's actions demonstrate a clear intention to avoid payment, thereby breaching the contractual agreement. The plaintiff seeks compensation for the breach of contract and relies on the evidence of the outstanding invoice and the formal demand letter sent to the defendant. The plaintiff is entitled to seek relief for the breach of contract and claims compensation for the amount due.\", \"statute_refs\": [], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1106,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The defendant's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services rendered by the plaintiff constitutes a breach of contract, as the payment due date has passed and a formal demand letter has been sent. This breach is actionable under the contractual terms agreed upon by the parties. Although the Consumer Protection Act, 2019 is not directly applicable to the present dispute as it does not involve a consumer complaint, the plaintiff relies on the contractual obligations and the principles of breach of contract to seek relief. The plaintiff submits that the defendant's actions demonstrate a clear intention to avoid payment, thereby breaching the contractual agreement. The plaintiff seeks compensation for the breach of contract and relies on the evidence of the outstanding invoice and the formal demand letter sent to the defendant. The plaintiff is entitled to seek relief for the breach of contract and claims compensation for the amount due.",
+      "statute_refs": [],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "COM-01",
+    "attempt": 1
+  },
+  {
+    "prompt_chars": 3324,
+    "prompt": "Matter: [TEST] COM-01 \u2014 SaaS licensing at Commercial Courts Act threshold\n\nReviewed legal issues:\n- Whether Bluewave Retail Technologies LLP is liable for breach of contract due to non-payment of services rendered by Vertex Software Solutions Pvt. Ltd..\n\nReviewed causes of action:\n- Breach of Contract (Non-Payment of Services): Bluewave Retail Technologies LLP has failed to fulfill its contractual obligation to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by Vertex Software Solutions Pvt. Ltd., despite the payment due date passing and a formal demand letter being sent.\n\nRetrieved statutory context (cite only from this list):\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 39: 39. (1) Where the District Commission is satisfied that the goods complained against\nsuffer from any of the defects specified in the complaint or that any of the allegations\ncontained in the complaint about the services or any unfair trade practices, or claims for\ncompensation under product liability are proved, it shall issue an order to the opposite party\ndirecting him to do one or more of the f\n- Consumer Protection Act, 2019 Section 81: 81. (1) The District Commission or the State Commission or the National Commission,\nas the case may be, shall, within seven days of the receipt of the settlement report, pass\nsuitable order recording such settlement of consumer dispute and dispose of the matter\naccordingly.\n(2) Where the consumer dispute is settled only in part, the District Commission or the\nState Commission or the National Commi\n- Consumer Protection Act, 2019 Section 47: 47. (1) Subject to the other provisions of this Act, the State Commission shall have\njurisdiction\u2014\n(a) to entertain\u2014\n(i) complaints where the value of the goods or services paid as\nconsideration, exceeds rupees one crore, but does not exceed rupees ten crore:\nProvided that where the Central Government deems it necessary so to do,\nit may prescribe such other value, as it deems fit;\n(ii) complaints \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1001,
+    "raw_text": "{\"content\": \"The defendant's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by the plaintiff constitutes a breach of contract. This is evident as the payment due date has passed and a formal demand letter has been sent, yet the defendant has failed to fulfill its contractual obligations. The Consumer Protection Act, 2019, although primarily dealing with consumer disputes, underscores the importance of contractual obligations and the need for parties to adhere to the terms of their agreements. In this case, the plaintiff's claim falls within the ambit of the Commercial Courts Act, given the threshold of Rs. 3,00,000. The plaintiff submits that the defendant's actions constitute a clear breach of contract, and as such, the plaintiff is entitled to remedy for the same. It is further submitted that the defendant's breach has caused financial loss to the plaintiff, and therefore, the plaintiff is entitled to damages for the same.\", \"statute_refs\": [{\"act\": \"Consumer Protection Act, 2019\", \"section_no\": \"47\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1150,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The defendant's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by the plaintiff constitutes a breach of contract. This is evident as the payment due date has passed and a formal demand letter has been sent, yet the defendant has failed to fulfill its contractual obligations. The Consumer Protection Act, 2019, although primarily dealing with consumer disputes, underscores the importance of contractual obligations and the need for parties to adhere to the terms of their agreements. In this case, the plaintiff's claim falls within the ambit of the Commercial Courts Act, given the threshold of Rs. 3,00,000. The plaintiff submits that the defendant's actions constitute a clear breach of contract, and as such, the plaintiff is entitled to remedy for the same. It is further submitted that the defendant's breach has caused financial loss to the plaintiff, and therefore, the plaintiff is entitled to damages for the same.",
+      "statute_refs": [
+        {
+          "act": "Consumer Protection Act, 2019",
+          "section_no": "47"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "COM-01",
+    "attempt": 2
+  },
+  {
+    "prompt_chars": 3324,
+    "prompt": "Matter: [TEST] COM-01 \u2014 SaaS licensing at Commercial Courts Act threshold\n\nReviewed legal issues:\n- Whether Bluewave Retail Technologies LLP is liable for breach of contract due to non-payment of services rendered by Vertex Software Solutions Pvt. Ltd..\n\nReviewed causes of action:\n- Breach of Contract (Non-Payment of Services): Bluewave Retail Technologies LLP has failed to fulfill its contractual obligation to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by Vertex Software Solutions Pvt. Ltd., despite the payment due date passing and a formal demand letter being sent.\n\nRetrieved statutory context (cite only from this list):\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 39: 39. (1) Where the District Commission is satisfied that the goods complained against\nsuffer from any of the defects specified in the complaint or that any of the allegations\ncontained in the complaint about the services or any unfair trade practices, or claims for\ncompensation under product liability are proved, it shall issue an order to the opposite party\ndirecting him to do one or more of the f\n- Consumer Protection Act, 2019 Section 81: 81. (1) The District Commission or the State Commission or the National Commission,\nas the case may be, shall, within seven days of the receipt of the settlement report, pass\nsuitable order recording such settlement of consumer dispute and dispose of the matter\naccordingly.\n(2) Where the consumer dispute is settled only in part, the District Commission or the\nState Commission or the National Commi\n- Consumer Protection Act, 2019 Section 47: 47. (1) Subject to the other provisions of this Act, the State Commission shall have\njurisdiction\u2014\n(a) to entertain\u2014\n(i) complaints where the value of the goods or services paid as\nconsideration, exceeds rupees one crore, but does not exceed rupees ten crore:\nProvided that where the Central Government deems it necessary so to do,\nit may prescribe such other value, as it deems fit;\n(ii) complaints \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1206,
+    "raw_text": "{\"content\": \"The respondent's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by the applicant constitutes a breach of contract, as the payment due date has passed and a formal demand letter has been sent. This breach is actionable under the principles of contract law, and the applicant is entitled to seek relief for the same. Notably, the value of the services in question exceeds the threshold of rupees one crore as specified in Section 47 of the Consumer Protection Act, 2019, thereby vesting jurisdiction in the appropriate forum to entertain complaints of such nature. However, since the matter at hand does not involve consumer dispute but rather a commercial transaction, the provisions of the Consumer Protection Act, 2019, particularly those related to consumer disputes, do not directly apply. Nonetheless, the principles of contract law and the terms of the agreement between the parties govern the relationship and the obligations thereof. The applicant has fulfilled its obligations under the contract by providing the software development and maintenance services as agreed, and the respondent's failure to make the payment as stipulated constitutes a clear breach of the contractual terms.\", \"statute_refs\": [{\"act\": \"Consumer Protection Act, 2019\", \"section_no\": \"47\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1418,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The respondent's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by the applicant constitutes a breach of contract, as the payment due date has passed and a formal demand letter has been sent. This breach is actionable under the principles of contract law, and the applicant is entitled to seek relief for the same. Notably, the value of the services in question exceeds the threshold of rupees one crore as specified in Section 47 of the Consumer Protection Act, 2019, thereby vesting jurisdiction in the appropriate forum to entertain complaints of such nature. However, since the matter at hand does not involve consumer dispute but rather a commercial transaction, the provisions of the Consumer Protection Act, 2019, particularly those related to consumer disputes, do not directly apply. Nonetheless, the principles of contract law and the terms of the agreement between the parties govern the relationship and the obligations thereof. The applicant has fulfilled its obligations under the contract by providing the software development and maintenance services as agreed, and the respondent's failure to make the payment as stipulated constitutes a clear breach of the contractual terms.",
+      "statute_refs": [
+        {
+          "act": "Consumer Protection Act, 2019",
+          "section_no": "47"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "COM-01",
+    "attempt": 3
+  },
+  {
+    "prompt_chars": 3324,
+    "prompt": "Matter: [TEST] COM-01 \u2014 SaaS licensing at Commercial Courts Act threshold\n\nReviewed legal issues:\n- Whether Bluewave Retail Technologies LLP is liable for breach of contract due to non-payment of services rendered by Vertex Software Solutions Pvt. Ltd..\n\nReviewed causes of action:\n- Breach of Contract (Non-Payment of Services): Bluewave Retail Technologies LLP has failed to fulfill its contractual obligation to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by Vertex Software Solutions Pvt. Ltd., despite the payment due date passing and a formal demand letter being sent.\n\nRetrieved statutory context (cite only from this list):\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 39: 39. (1) Where the District Commission is satisfied that the goods complained against\nsuffer from any of the defects specified in the complaint or that any of the allegations\ncontained in the complaint about the services or any unfair trade practices, or claims for\ncompensation under product liability are proved, it shall issue an order to the opposite party\ndirecting him to do one or more of the f\n- Consumer Protection Act, 2019 Section 81: 81. (1) The District Commission or the State Commission or the National Commission,\nas the case may be, shall, within seven days of the receipt of the settlement report, pass\nsuitable order recording such settlement of consumer dispute and dispose of the matter\naccordingly.\n(2) Where the consumer dispute is settled only in part, the District Commission or the\nState Commission or the National Commi\n- Consumer Protection Act, 2019 Section 47: 47. (1) Subject to the other provisions of this Act, the State Commission shall have\njurisdiction\u2014\n(a) to entertain\u2014\n(i) complaints where the value of the goods or services paid as\nconsideration, exceeds rupees one crore, but does not exceed rupees ten crore:\nProvided that where the Central Government deems it necessary so to do,\nit may prescribe such other value, as it deems fit;\n(ii) complaints \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 806,
+    "raw_text": "{\"content\": \"Vertex Software Solutions Pvt. Ltd. submits that Bluewave Retail Technologies LLP's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services, despite the payment due date passing and a formal demand letter being sent, constitutes a breach of contract. Since the value of the services paid as consideration exceeds rupees one crore but does not exceed rupees ten crore, this Hon'ble Court has jurisdiction to entertain this complaint under Section 47 of the Consumer Protection Act, 2019. Vertex Software Solutions Pvt. Ltd. relies on the provisions of the Consumer Protection Act, 2019, to seek redressal for the breach of contract and non-payment of services. Vertex Software Solutions Pvt. Ltd. prays that this Hon'ble Court direct Bluewave Retail Technologies LLP to pay the outstanding amount and grant such other relief as this Hon'ble Court deems fit.\", \"statute_refs\": [{\"act\": \"Consumer Protection Act, 2019\", \"section_no\": \"47\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1063,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "Vertex Software Solutions Pvt. Ltd. submits that Bluewave Retail Technologies LLP's failure to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services, despite the payment due date passing and a formal demand letter being sent, constitutes a breach of contract. Since the value of the services paid as consideration exceeds rupees one crore but does not exceed rupees ten crore, this Hon'ble Court has jurisdiction to entertain this complaint under Section 47 of the Consumer Protection Act, 2019. Vertex Software Solutions Pvt. Ltd. relies on the provisions of the Consumer Protection Act, 2019, to seek redressal for the breach of contract and non-payment of services. Vertex Software Solutions Pvt. Ltd. prays that this Hon'ble Court direct Bluewave Retail Technologies LLP to pay the outstanding amount and grant such other relief as this Hon'ble Court deems fit.",
+      "statute_refs": [
+        {
+          "act": "Consumer Protection Act, 2019",
+          "section_no": "47"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "COM-01",
+    "attempt": 4
+  },
+  {
+    "prompt_chars": 2707,
+    "prompt": "Matter: [TEST] IA-01 \u2014 Interim injunction pending possession suit, Delhi (hearing-blindness)\n\nReviewed legal issues:\n- Alienation of property pending suit\n\nReviewed causes of action:\n- Injunction to restrain alienation of property pending suit: To restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the possession suit\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 41: 41. Any person aggrieved by an order made by the District Commission may prefer an\nappeal against such order to the State Commission on the grounds of facts or law within a\nperiod of forty-five days from the date of the order, in such form and manner, as may be\nprescribed:\nProvided that the State Commission may entertain an appeal after the expiry of the said\nperiod of forty-five days, if it is sa\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Consumer Protection Act, 2019 Section 51: 51. (1) Any person aggrieved by an order made by the State Commission in exercise of\nits powers conferred by sub-clause (i) or (ii) of clause (a) of sub-section (1) of section 47\nmay prefer an appeal against such order to the National Commission within a period of thirty\ndays from the date of the order in such form and manner as may be prescribed:\nProvided that the National Commission shall not en\n- Consumer Protection Act, 2019 Section 19: 19. (1) The Central Authority may, after receiving any information or complaint or\ndirections from the Central Government or of its own motion, conduct or cause to be conducted\na preliminary inquiry as to whether there exists a prima facie case of violation of consumer\nrights or any unfair trade practice or any false or misleading advertisement, by any person,\nwhich is prejudicial to the public in\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 744,
+    "raw_text": "{\"content\": \"The plaintiff submits that the defendant's alienation of the suit property pending the possession suit would be in contravention of Section 52 of the Transfer of Property Act, 1882, which prohibits the transfer of property pending a suit relating thereto. The plaintiff further submits that an injunction is necessary to restrain the defendant from selling, transferring, or otherwise alienating the suit property, as the Civil Courts have the power to grant relief in such cases, and the plaintiff has a legitimate claim to the property. In the absence of any precedent on record, the plaintiff relies on the statutory provisions to support the cause of action for an injunction to restrain alienation of property pending suit.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"52\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 864,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff submits that the defendant's alienation of the suit property pending the possession suit would be in contravention of Section 52 of the Transfer of Property Act, 1882, which prohibits the transfer of property pending a suit relating thereto. The plaintiff further submits that an injunction is necessary to restrain the defendant from selling, transferring, or otherwise alienating the suit property, as the Civil Courts have the power to grant relief in such cases, and the plaintiff has a legitimate claim to the property. In the absence of any precedent on record, the plaintiff relies on the statutory provisions to support the cause of action for an injunction to restrain alienation of property pending suit.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "52"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "IA-01",
+    "attempt": 1
+  },
+  {
+    "prompt_chars": 2707,
+    "prompt": "Matter: [TEST] IA-01 \u2014 Interim injunction pending possession suit, Delhi (hearing-blindness)\n\nReviewed legal issues:\n- Alienation of property pending suit\n\nReviewed causes of action:\n- Injunction to restrain alienation of property pending suit: To restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the possession suit\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 41: 41. Any person aggrieved by an order made by the District Commission may prefer an\nappeal against such order to the State Commission on the grounds of facts or law within a\nperiod of forty-five days from the date of the order, in such form and manner, as may be\nprescribed:\nProvided that the State Commission may entertain an appeal after the expiry of the said\nperiod of forty-five days, if it is sa\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Consumer Protection Act, 2019 Section 51: 51. (1) Any person aggrieved by an order made by the State Commission in exercise of\nits powers conferred by sub-clause (i) or (ii) of clause (a) of sub-section (1) of section 47\nmay prefer an appeal against such order to the National Commission within a period of thirty\ndays from the date of the order in such form and manner as may be prescribed:\nProvided that the National Commission shall not en\n- Consumer Protection Act, 2019 Section 19: 19. (1) The Central Authority may, after receiving any information or complaint or\ndirections from the Central Government or of its own motion, conduct or cause to be conducted\na preliminary inquiry as to whether there exists a prima facie case of violation of consumer\nrights or any unfair trade practice or any false or misleading advertisement, by any person,\nwhich is prejudicial to the public in\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 778,
+    "raw_text": "{\"content\": \"The plaintiff submits that the defendant's attempt to alienate the suit property pending the possession suit is barred under Section 52 of the Transfer of Property Act, 1882, which provides that a transfer of property pending a suit relating thereto is not valid. The plaintiff seeks an injunction to restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the possession suit, as the plaintiff has a legitimate interest in protecting its rights over the property. The plaintiff contends that the alienation of the property would cause irreparable harm and injustice to the plaintiff, and that the balance of convenience lies in granting the injunction to maintain the status quo pending the outcome of the suit.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"52\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 908,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff submits that the defendant's attempt to alienate the suit property pending the possession suit is barred under Section 52 of the Transfer of Property Act, 1882, which provides that a transfer of property pending a suit relating thereto is not valid. The plaintiff seeks an injunction to restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the possession suit, as the plaintiff has a legitimate interest in protecting its rights over the property. The plaintiff contends that the alienation of the property would cause irreparable harm and injustice to the plaintiff, and that the balance of convenience lies in granting the injunction to maintain the status quo pending the outcome of the suit.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "52"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "IA-01",
+    "attempt": 2
+  },
+  {
+    "prompt_chars": 2707,
+    "prompt": "Matter: [TEST] IA-01 \u2014 Interim injunction pending possession suit, Delhi (hearing-blindness)\n\nReviewed legal issues:\n- Alienation of property pending suit\n\nReviewed causes of action:\n- Injunction to restrain alienation of property pending suit: To restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the possession suit\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 41: 41. Any person aggrieved by an order made by the District Commission may prefer an\nappeal against such order to the State Commission on the grounds of facts or law within a\nperiod of forty-five days from the date of the order, in such form and manner, as may be\nprescribed:\nProvided that the State Commission may entertain an appeal after the expiry of the said\nperiod of forty-five days, if it is sa\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Consumer Protection Act, 2019 Section 51: 51. (1) Any person aggrieved by an order made by the State Commission in exercise of\nits powers conferred by sub-clause (i) or (ii) of clause (a) of sub-section (1) of section 47\nmay prefer an appeal against such order to the National Commission within a period of thirty\ndays from the date of the order in such form and manner as may be prescribed:\nProvided that the National Commission shall not en\n- Consumer Protection Act, 2019 Section 19: 19. (1) The Central Authority may, after receiving any information or complaint or\ndirections from the Central Government or of its own motion, conduct or cause to be conducted\na preliminary inquiry as to whether there exists a prima facie case of violation of consumer\nrights or any unfair trade practice or any false or misleading advertisement, by any person,\nwhich is prejudicial to the public in\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 944,
+    "raw_text": "{\"content\": \"The plaintiff submits that the defendant's attempted alienation of the suit property during the pendency of the possession suit is impermissible under Section 52 of the Transfer of Property Act, 1882, which expressly prohibits the transfer of property pending a suit relating thereto. The plaintiff avers that the suit property is the subject matter of the present possession suit and any alienation thereof would prejudice the plaintiff's rights as a party to the suit. The plaintiff, therefore, seeks an injunction to restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the suit. The plaintiff's cause of action is grounded in the provisions of the Transfer of Property Act, 1882, and the plaintiff is entitled to the relief claimed as the alienation of the suit property would cause irreparable harm to the plaintiff's rights.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"52\"}], \"case_law_refs\": [], \"confidence\": 0.9}",
+    "raw_text_chars": 1029,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff submits that the defendant's attempted alienation of the suit property during the pendency of the possession suit is impermissible under Section 52 of the Transfer of Property Act, 1882, which expressly prohibits the transfer of property pending a suit relating thereto. The plaintiff avers that the suit property is the subject matter of the present possession suit and any alienation thereof would prejudice the plaintiff's rights as a party to the suit. The plaintiff, therefore, seeks an injunction to restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the suit. The plaintiff's cause of action is grounded in the provisions of the Transfer of Property Act, 1882, and the plaintiff is entitled to the relief claimed as the alienation of the suit property would cause irreparable harm to the plaintiff's rights.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "52"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.9
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "IA-01",
+    "attempt": 3
+  },
+  {
+    "prompt_chars": 2707,
+    "prompt": "Matter: [TEST] IA-01 \u2014 Interim injunction pending possession suit, Delhi (hearing-blindness)\n\nReviewed legal issues:\n- Alienation of property pending suit\n\nReviewed causes of action:\n- Injunction to restrain alienation of property pending suit: To restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the possession suit\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 41: 41. Any person aggrieved by an order made by the District Commission may prefer an\nappeal against such order to the State Commission on the grounds of facts or law within a\nperiod of forty-five days from the date of the order, in such form and manner, as may be\nprescribed:\nProvided that the State Commission may entertain an appeal after the expiry of the said\nperiod of forty-five days, if it is sa\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Consumer Protection Act, 2019 Section 51: 51. (1) Any person aggrieved by an order made by the State Commission in exercise of\nits powers conferred by sub-clause (i) or (ii) of clause (a) of sub-section (1) of section 47\nmay prefer an appeal against such order to the National Commission within a period of thirty\ndays from the date of the order in such form and manner as may be prescribed:\nProvided that the National Commission shall not en\n- Consumer Protection Act, 2019 Section 19: 19. (1) The Central Authority may, after receiving any information or complaint or\ndirections from the Central Government or of its own motion, conduct or cause to be conducted\na preliminary inquiry as to whether there exists a prima facie case of violation of consumer\nrights or any unfair trade practice or any false or misleading advertisement, by any person,\nwhich is prejudicial to the public in\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 674,
+    "raw_text": "{\"content\": \"The plaintiff submits that the defendant's alienation of the suit property pending the possession suit is barred by the provisions of Section 52 of the Transfer of Property Act, 1882. The plaintiff further submits that in order to prevent the defendant from defeating the purpose of the suit, it is necessary to restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the suit. The plaintiff relies on the aforesaid statutory provision to support the cause of action for injunction to restrain alienation of property pending suit.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"52\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 726,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff submits that the defendant's alienation of the suit property pending the possession suit is barred by the provisions of Section 52 of the Transfer of Property Act, 1882. The plaintiff further submits that in order to prevent the defendant from defeating the purpose of the suit, it is necessary to restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the suit. The plaintiff relies on the aforesaid statutory provision to support the cause of action for injunction to restrain alienation of property pending suit.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "52"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "IA-01",
+    "attempt": 4
+  },
+  {
+    "prompt_chars": 2904,
+    "prompt": "Matter: [TEST] PROP-03 \u2014 Specific performance of sale deed, Maharashtra\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Specific Performance of Agreement to Sell: To compel the defendant to execute and register the sale deed\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Registration Act, 1908 Section 80B: 80B. Deed Writers to hold licences.\u2014No person other than an advocate or other legal\npractitioner, shall for payment, write deeds unless he holds a licence granted in accordance with rules\nmade under section 69\".\n[Vide Karnataka Act 55 of 1976, s. 16]\nKarnataka\nInsertion of new section 80A.-After section 80 of the Registration Act, 1908 (Central Act 25 of\n1908), the following section shall be and s\n- Indian Contract Act, 1872 Section 238: 238. Effect, on agreement, of misrepresentation or fraud by agent.\nCHAPTER XI\nOF PARTNERSHIP\n239. [Repealed.].\n240. [Repealed.].\n241. [Repealed.].\n242. [Repealed.].\n243. [Repealed.].\n244. [Repealed.].\n245. [Repealed.].\n246. [Repealed.].\n247. [Repealed.].\n248. [Repealed.].\n249. [Repealed.].\n250. [Repealed.].\n251. [Repealed.].\n252. [Repealed.].\n253. [Repealed.].\n254. [Repealed.].\n255. [Repealed.].\n2\n- Registration Act, 1908 Section 83B: 83B. Appeal to Government from orders of the Inspector General of Registration.\u2014Any person\naggrieved by an order of the Inspector General of Registration under section 83A, may prefer an appeal\nbefore the Government within thirty days from the date of receipt of such order, and the Government\nshall pass an order confirming, modifying or cancelling the order of the Inspector General of Registration\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1080,
+    "raw_text": "{\"content\": \"The plaintiff's causes of action against the defendant for breach of the Agreement to Sell are well-founded in law, as the defendant's failure to execute and register the sale deed constitutes a breach of the contractual obligations undertaken by the defendant. The plaintiff is entitled to seek relief under Section 9 of the Transfer of Property Act, 1882, which recognizes the plaintiff's beneficial interest in the immovable property as affording grounds for relief. Furthermore, the plaintiff's claim is supported by the provisions of the Registration Act, 1908, specifically Section 80B, which mandates that the defendant, as a party to the agreement, is obliged to execute and register the sale deed. The defendant's refusal to do so is a clear breach of the contractual terms and the statutory provisions, thereby entitling the plaintiff to seek the relief of specific performance of the agreement. The plaintiff, therefore, seeks an order compelling the defendant to execute and register the sale deed in favour of the plaintiff.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}, {\"act\": \"Registration Act, 1908\", \"section_no\": \"80B\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1228,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff's causes of action against the defendant for breach of the Agreement to Sell are well-founded in law, as the defendant's failure to execute and register the sale deed constitutes a breach of the contractual obligations undertaken by the defendant. The plaintiff is entitled to seek relief under Section 9 of the Transfer of Property Act, 1882, which recognizes the plaintiff's beneficial interest in the immovable property as affording grounds for relief. Furthermore, the plaintiff's claim is supported by the provisions of the Registration Act, 1908, specifically Section 80B, which mandates that the defendant, as a party to the agreement, is obliged to execute and register the sale deed. The defendant's refusal to do so is a clear breach of the contractual terms and the statutory provisions, thereby entitling the plaintiff to seek the relief of specific performance of the agreement. The plaintiff, therefore, seeks an order compelling the defendant to execute and register the sale deed in favour of the plaintiff.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        },
+        {
+          "act": "Registration Act, 1908",
+          "section_no": "80B"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "PROP-03",
+    "attempt": 1
+  },
+  {
+    "prompt_chars": 2904,
+    "prompt": "Matter: [TEST] PROP-03 \u2014 Specific performance of sale deed, Maharashtra\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Specific Performance of Agreement to Sell: To compel the defendant to execute and register the sale deed\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Registration Act, 1908 Section 80B: 80B. Deed Writers to hold licences.\u2014No person other than an advocate or other legal\npractitioner, shall for payment, write deeds unless he holds a licence granted in accordance with rules\nmade under section 69\".\n[Vide Karnataka Act 55 of 1976, s. 16]\nKarnataka\nInsertion of new section 80A.-After section 80 of the Registration Act, 1908 (Central Act 25 of\n1908), the following section shall be and s\n- Indian Contract Act, 1872 Section 238: 238. Effect, on agreement, of misrepresentation or fraud by agent.\nCHAPTER XI\nOF PARTNERSHIP\n239. [Repealed.].\n240. [Repealed.].\n241. [Repealed.].\n242. [Repealed.].\n243. [Repealed.].\n244. [Repealed.].\n245. [Repealed.].\n246. [Repealed.].\n247. [Repealed.].\n248. [Repealed.].\n249. [Repealed.].\n250. [Repealed.].\n251. [Repealed.].\n252. [Repealed.].\n253. [Repealed.].\n254. [Repealed.].\n255. [Repealed.].\n2\n- Registration Act, 1908 Section 83B: 83B. Appeal to Government from orders of the Inspector General of Registration.\u2014Any person\naggrieved by an order of the Inspector General of Registration under section 83A, may prefer an appeal\nbefore the Government within thirty days from the date of receipt of such order, and the Government\nshall pass an order confirming, modifying or cancelling the order of the Inspector General of Registration\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 959,
+    "raw_text": "{\"content\": \"The plaintiff submits that the defendant's refusal to execute and register the sale deed constitutes a breach of the Agreement to Sell, thereby entitling the plaintiff to seek specific performance of the agreement. The plaintiff relies on the provisions of the Transfer of Property Act, 1882, and the Indian Contract Act, 1872, which recognize the right to specific performance of a contract. The plaintiff further submits that the defendant's failure to comply with the terms of the agreement is a clear violation of the contractual obligations, and the plaintiff is entitled to seek relief under the law. The plaintiff also relies on the provisions of the Registration Act, 1908, which mandates the registration of sale deeds, and the defendant's refusal to register the sale deed is a violation of the said provisions.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}, {\"act\": \"Indian Contract Act, 1872\", \"section_no\": \"\"}, {\"act\": \"Registration Act, 1908\", \"section_no\": \"80B\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1068,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff submits that the defendant's refusal to execute and register the sale deed constitutes a breach of the Agreement to Sell, thereby entitling the plaintiff to seek specific performance of the agreement. The plaintiff relies on the provisions of the Transfer of Property Act, 1882, and the Indian Contract Act, 1872, which recognize the right to specific performance of a contract. The plaintiff further submits that the defendant's failure to comply with the terms of the agreement is a clear violation of the contractual obligations, and the plaintiff is entitled to seek relief under the law. The plaintiff also relies on the provisions of the Registration Act, 1908, which mandates the registration of sale deeds, and the defendant's refusal to register the sale deed is a violation of the said provisions.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        },
+        {
+          "act": "Indian Contract Act, 1872",
+          "section_no": ""
+        },
+        {
+          "act": "Registration Act, 1908",
+          "section_no": "80B"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "PROP-03",
+    "attempt": 2
+  },
+  {
+    "prompt_chars": 2904,
+    "prompt": "Matter: [TEST] PROP-03 \u2014 Specific performance of sale deed, Maharashtra\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Specific Performance of Agreement to Sell: To compel the defendant to execute and register the sale deed\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Registration Act, 1908 Section 80B: 80B. Deed Writers to hold licences.\u2014No person other than an advocate or other legal\npractitioner, shall for payment, write deeds unless he holds a licence granted in accordance with rules\nmade under section 69\".\n[Vide Karnataka Act 55 of 1976, s. 16]\nKarnataka\nInsertion of new section 80A.-After section 80 of the Registration Act, 1908 (Central Act 25 of\n1908), the following section shall be and s\n- Indian Contract Act, 1872 Section 238: 238. Effect, on agreement, of misrepresentation or fraud by agent.\nCHAPTER XI\nOF PARTNERSHIP\n239. [Repealed.].\n240. [Repealed.].\n241. [Repealed.].\n242. [Repealed.].\n243. [Repealed.].\n244. [Repealed.].\n245. [Repealed.].\n246. [Repealed.].\n247. [Repealed.].\n248. [Repealed.].\n249. [Repealed.].\n250. [Repealed.].\n251. [Repealed.].\n252. [Repealed.].\n253. [Repealed.].\n254. [Repealed.].\n255. [Repealed.].\n2\n- Registration Act, 1908 Section 83B: 83B. Appeal to Government from orders of the Inspector General of Registration.\u2014Any person\naggrieved by an order of the Inspector General of Registration under section 83A, may prefer an appeal\nbefore the Government within thirty days from the date of receipt of such order, and the Government\nshall pass an order confirming, modifying or cancelling the order of the Inspector General of Registration\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1042,
+    "raw_text": "{\"content\": \"The plaintiff submits that the defendant's failure to execute and register the sale deed constitutes a breach of the Agreement to Sell, and the plaintiff is entitled to seek specific performance of the agreement. In terms of Section 9 of the Transfer of Property Act, 1882, the plaintiff has a beneficial interest in the immovable property, which is existent and not contingent. The defendant's refusal to execute and register the sale deed is a violation of the plaintiff's rights under the agreement, and the plaintiff is entitled to seek relief under the law. The plaintiff relies on the provisions of the Registration Act, 1908, including Section 80B, which requires that all deeds be written by an advocate or other legal practitioner, or by a person holding a license granted in accordance with the rules made under Section 69. The plaintiff submits that the defendant's failure to comply with these provisions has caused prejudice to the plaintiff and has resulted in a breach of the agreement. The plaintiff seeks an order compelling the defendant to execute and register the sale deed, as agreed upon in the Agreement to Sell.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}, {\"act\": \"Registration Act, 1908\", \"section_no\": \"80B\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1326,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff submits that the defendant's failure to execute and register the sale deed constitutes a breach of the Agreement to Sell, and the plaintiff is entitled to seek specific performance of the agreement. In terms of Section 9 of the Transfer of Property Act, 1882, the plaintiff has a beneficial interest in the immovable property, which is existent and not contingent. The defendant's refusal to execute and register the sale deed is a violation of the plaintiff's rights under the agreement, and the plaintiff is entitled to seek relief under the law. The plaintiff relies on the provisions of the Registration Act, 1908, including Section 80B, which requires that all deeds be written by an advocate or other legal practitioner, or by a person holding a license granted in accordance with the rules made under Section 69. The plaintiff submits that the defendant's failure to comply with these provisions has caused prejudice to the plaintiff and has resulted in a breach of the agreement. The plaintiff seeks an order compelling the defendant to execute and register the sale deed, as agreed upon in the Agreement to Sell.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        },
+        {
+          "act": "Registration Act, 1908",
+          "section_no": "80B"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "PROP-03",
+    "attempt": 3
+  },
+  {
+    "prompt_chars": 2904,
+    "prompt": "Matter: [TEST] PROP-03 \u2014 Specific performance of sale deed, Maharashtra\n\nReviewed legal issues:\n- Breach of Contract\n\nReviewed causes of action:\n- Specific Performance of Agreement to Sell: To compel the defendant to execute and register the sale deed\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of Criminal Procedure, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Registration Act, 1908 Section 80B: 80B. Deed Writers to hold licences.\u2014No person other than an advocate or other legal\npractitioner, shall for payment, write deeds unless he holds a licence granted in accordance with rules\nmade under section 69\".\n[Vide Karnataka Act 55 of 1976, s. 16]\nKarnataka\nInsertion of new section 80A.-After section 80 of the Registration Act, 1908 (Central Act 25 of\n1908), the following section shall be and s\n- Indian Contract Act, 1872 Section 238: 238. Effect, on agreement, of misrepresentation or fraud by agent.\nCHAPTER XI\nOF PARTNERSHIP\n239. [Repealed.].\n240. [Repealed.].\n241. [Repealed.].\n242. [Repealed.].\n243. [Repealed.].\n244. [Repealed.].\n245. [Repealed.].\n246. [Repealed.].\n247. [Repealed.].\n248. [Repealed.].\n249. [Repealed.].\n250. [Repealed.].\n251. [Repealed.].\n252. [Repealed.].\n253. [Repealed.].\n254. [Repealed.].\n255. [Repealed.].\n2\n- Registration Act, 1908 Section 83B: 83B. Appeal to Government from orders of the Inspector General of Registration.\u2014Any person\naggrieved by an order of the Inspector General of Registration under section 83A, may prefer an appeal\nbefore the Government within thirty days from the date of receipt of such order, and the Government\nshall pass an order confirming, modifying or cancelling the order of the Inspector General of Registration\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)",
+      "groq:llama-3.3-70b-versatile (1/5)"
+    ],
+    "latency_ms": 2486,
+    "raw_text": "{\"content\":\"The plaintiff submits that under Section 9 of the Transfer of Property Act, 1882 a sale deed effects the transfer of ownership in immovable property and the defendant, as vendor, is bound to execute and register the deed. Further, pursuant to Section 80B of the Registration Act, 1908 only a person duly authorised may prepare a deed, and having complied with the requisite formalities the plaintiff is entitled to registration. Section 83B of the Registration Act, 1908 provides that any person aggrieved by an order refusing registration may appeal to the Government within thirty days, underscoring the plaintiff\u2019s right to seek compulsory registration. Moreover, if the defendant has failed to execute the deed or has misrepresented material facts, Section 238 of the Indian Contract Act, 1872 renders such breach actionable, justifying specific performance. Accordingly, the plaintiff prays for a decree directing the defendant to execute and register the sale deed forthwith.\",\"statute_refs\":[{\"act\":\"Transfer of Property Act, 1882\",\"section_no\":\"Section 9\"},{\"act\":\"Registration Act, 1908\",\"section_no\":\"Section 80B\"},{\"act\":\"Registration Act, 1908\",\"section_no\":\"Section 83B\"},{\"act\":\"Indian Contract Act, 1872\",\"section_no\":\"Section 238\"}],\"case_law_refs\":[],\"confidence\":0.88}",
+    "raw_text_chars": 1298,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The plaintiff submits that under Section 9 of the Transfer of Property Act, 1882 a sale deed effects the transfer of ownership in immovable property and the defendant, as vendor, is bound to execute and register the deed. Further, pursuant to Section 80B of the Registration Act, 1908 only a person duly authorised may prepare a deed, and having complied with the requisite formalities the plaintiff is entitled to registration. Section 83B of the Registration Act, 1908 provides that any person aggrieved by an order refusing registration may appeal to the Government within thirty days, underscoring the plaintiff\u2019s right to seek compulsory registration. Moreover, if the defendant has failed to execute the deed or has misrepresented material facts, Section 238 of the Indian Contract Act, 1872 renders such breach actionable, justifying specific performance. Accordingly, the plaintiff prays for a decree directing the defendant to execute and register the sale deed forthwith.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "Section 9"
+        },
+        {
+          "act": "Registration Act, 1908",
+          "section_no": "Section 80B"
+        },
+        {
+          "act": "Registration Act, 1908",
+          "section_no": "Section 83B"
+        },
+        {
+          "act": "Indian Contract Act, 1872",
+          "section_no": "Section 238"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.88
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 1,
+    "n_causes_in_context": 1,
+    "label": "PROP-03",
+    "attempt": 4
+  },
+  {
+    "prompt_chars": 2930,
+    "prompt": "Matter: [TEST] RERA-01 \u2014 Delayed possession, refund with interest, Delhi\n\nReviewed legal issues:\n- Whether the Defendant has breached the agreement by failing to deliver possession of the property by the committed date and whether the delay constitutes a material breach.\n- Whether the Plaintiff is entitled to a refund of the amount paid with interest due to the Defendant's failure to deliver possession.\n\nReviewed causes of action:\n- Breach of Contract for Delayed Possession and Failure to Deliver: Defendant failed to deliver possession of the property by the committed date of 2024-06-30, despite receiving full consideration from Plaintiff. Construction remains incomplete, and no firm revised possession date has been provided, constituting a material breach of the agreement (Flat Buyer's Agreement). This entitles Plaintiff to seek remedies including a full refund of the amount paid along with interest.\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Transfer of Property Act, 1882 Section 43: 43. Transfer by unauthorised person who subsequently acquires interest in property\ntransferred.\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Carriage by Road Act, 2007 Section 5: 5. Suspension or cancellation of registration.\u2014(1) If the registering authority is satisfied that the\nholder of certificate of registration has failed to comply with any of the provisions of sub-section (7) of\nsection 4, it may give a notice by registered post or through electronic media or by any verifiable means\nto the holder of certificate of registration to rectify within a period of thirty da\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1086,
+    "raw_text": "{\"content\": \"The Plaintiff submits that the Defendant's failure to deliver possession of the property by the committed date of 2024-06-30 constitutes a material breach of the agreement, as the construction remains incomplete and no firm revised possession date has been provided. This breach entitles the Plaintiff to seek remedies, including a full refund of the amount paid along with interest, as the Defendant has failed to perform their obligations under the contract. The Plaintiff relies on the provisions of the Transfer of Property Act, 1882, which recognize the right to seek relief for non-performance of contractual obligations. The Plaintiff's claim for a refund with interest is founded on the principle that a party who fails to perform their contractual obligations is liable to compensate the other party for the loss suffered. In the absence of any verified precedents on record, the Plaintiff submits that the provisions of the Transfer of Property Act, 1882, particularly Section 9, provide a basis for seeking relief in this matter. The Plaintiff prays that this Hon'ble Court may be pleased to grant a decree in favour of the Plaintiff, directing the Defendant to refund the amount paid by the Plaintiff along with interest.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1368,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The Plaintiff submits that the Defendant's failure to deliver possession of the property by the committed date of 2024-06-30 constitutes a material breach of the agreement, as the construction remains incomplete and no firm revised possession date has been provided. This breach entitles the Plaintiff to seek remedies, including a full refund of the amount paid along with interest, as the Defendant has failed to perform their obligations under the contract. The Plaintiff relies on the provisions of the Transfer of Property Act, 1882, which recognize the right to seek relief for non-performance of contractual obligations. The Plaintiff's claim for a refund with interest is founded on the principle that a party who fails to perform their contractual obligations is liable to compensate the other party for the loss suffered. In the absence of any verified precedents on record, the Plaintiff submits that the provisions of the Transfer of Property Act, 1882, particularly Section 9, provide a basis for seeking relief in this matter. The Plaintiff prays that this Hon'ble Court may be pleased to grant a decree in favour of the Plaintiff, directing the Defendant to refund the amount paid by the Plaintiff along with interest.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 2,
+    "n_causes_in_context": 1,
+    "label": "RERA-01",
+    "attempt": 1
+  },
+  {
+    "prompt_chars": 2930,
+    "prompt": "Matter: [TEST] RERA-01 \u2014 Delayed possession, refund with interest, Delhi\n\nReviewed legal issues:\n- Whether the Defendant has breached the agreement by failing to deliver possession of the property by the committed date and whether the delay constitutes a material breach.\n- Whether the Plaintiff is entitled to a refund of the amount paid with interest due to the Defendant's failure to deliver possession.\n\nReviewed causes of action:\n- Breach of Contract for Delayed Possession and Failure to Deliver: Defendant failed to deliver possession of the property by the committed date of 2024-06-30, despite receiving full consideration from Plaintiff. Construction remains incomplete, and no firm revised possession date has been provided, constituting a material breach of the agreement (Flat Buyer's Agreement). This entitles Plaintiff to seek remedies including a full refund of the amount paid along with interest.\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Transfer of Property Act, 1882 Section 43: 43. Transfer by unauthorised person who subsequently acquires interest in property\ntransferred.\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Carriage by Road Act, 2007 Section 5: 5. Suspension or cancellation of registration.\u2014(1) If the registering authority is satisfied that the\nholder of certificate of registration has failed to comply with any of the provisions of sub-section (7) of\nsection 4, it may give a notice by registered post or through electronic media or by any verifiable means\nto the holder of certificate of registration to rectify within a period of thirty da\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)",
+      "groq:llama-3.3-70b-versatile (1/5)"
+    ],
+    "latency_ms": 1809,
+    "raw_text": "{\"content\":\"The Defendant, having accepted full consideration from the Plaintiff, was obligated under the contract for sale to transfer possession of the immovable property to the Plaintiff on or before 30 June 2024. The failure to deliver possession, despite receipt of the entire purchase price and with construction still incomplete, amounts to a breach of the contract. Under Section\u202f9 of the Transfer of Property Act, 1882, a contract for the transfer of immovable property creates a vested right in the purchaser, enforceable by specific performance or restitution where the transfer is not effected. The Defendant\u2019s non\u2011delivery, coupled with the absence of any firm revised possession date, constitutes a material breach, thereby extinguishing the Defendant\u2019s entitlement to retain the consideration. Accordingly, the Plaintiff is entitled to a full refund of the amount paid together with interest, as a remedy for the breach of contract and the resultant loss suffered.\", \"statute_refs\":[{\"act\":\"Transfer of Property Act, 1882\",\"section_no\":\"9\"}], \"case_law_refs\":[], \"confidence\":0.93}",
+    "raw_text_chars": 1096,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The Defendant, having accepted full consideration from the Plaintiff, was obligated under the contract for sale to transfer possession of the immovable property to the Plaintiff on or before 30 June 2024. The failure to deliver possession, despite receipt of the entire purchase price and with construction still incomplete, amounts to a breach of the contract. Under Section\u202f9 of the Transfer of Property Act, 1882, a contract for the transfer of immovable property creates a vested right in the purchaser, enforceable by specific performance or restitution where the transfer is not effected. The Defendant\u2019s non\u2011delivery, coupled with the absence of any firm revised possession date, constitutes a material breach, thereby extinguishing the Defendant\u2019s entitlement to retain the consideration. Accordingly, the Plaintiff is entitled to a full refund of the amount paid together with interest, as a remedy for the breach of contract and the resultant loss suffered.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.93
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 2,
+    "n_causes_in_context": 1,
+    "label": "RERA-01",
+    "attempt": 2
+  },
+  {
+    "prompt_chars": 2930,
+    "prompt": "Matter: [TEST] RERA-01 \u2014 Delayed possession, refund with interest, Delhi\n\nReviewed legal issues:\n- Whether the Defendant has breached the agreement by failing to deliver possession of the property by the committed date and whether the delay constitutes a material breach.\n- Whether the Plaintiff is entitled to a refund of the amount paid with interest due to the Defendant's failure to deliver possession.\n\nReviewed causes of action:\n- Breach of Contract for Delayed Possession and Failure to Deliver: Defendant failed to deliver possession of the property by the committed date of 2024-06-30, despite receiving full consideration from Plaintiff. Construction remains incomplete, and no firm revised possession date has been provided, constituting a material breach of the agreement (Flat Buyer's Agreement). This entitles Plaintiff to seek remedies including a full refund of the amount paid along with interest.\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Transfer of Property Act, 1882 Section 43: 43. Transfer by unauthorised person who subsequently acquires interest in property\ntransferred.\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Carriage by Road Act, 2007 Section 5: 5. Suspension or cancellation of registration.\u2014(1) If the registering authority is satisfied that the\nholder of certificate of registration has failed to comply with any of the provisions of sub-section (7) of\nsection 4, it may give a notice by registered post or through electronic media or by any verifiable means\nto the holder of certificate of registration to rectify within a period of thirty da\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 958,
+    "raw_text": "{\"content\": \"The Defendant's failure to deliver possession of the property by the committed date of 2024-06-30 constitutes a material breach of the agreement, entitling the Plaintiff to seek remedies including a full refund of the amount paid along with interest. This breach is actionable under the principles of contract law, as the Defendant's failure to perform its obligations under the agreement has caused loss to the Plaintiff. The Plaintiff's right to seek a refund with interest is grounded in the contractual terms and the statutory framework, which recognizes the right to claim relief for non-performance of contractual obligations. The Transfer of Property Act, 1882, particularly Section 9, recognizes the right to claim relief for non-performance of contractual obligations, including the right to seek a refund with interest. The Plaintiff's claim for a refund with interest is therefore well-founded in law and supported by the facts of the case.\", \n\"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}], \n\"case_law_refs\": [], \n\"confidence\": 0.8}",
+    "raw_text_chars": 1089,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The Defendant's failure to deliver possession of the property by the committed date of 2024-06-30 constitutes a material breach of the agreement, entitling the Plaintiff to seek remedies including a full refund of the amount paid along with interest. This breach is actionable under the principles of contract law, as the Defendant's failure to perform its obligations under the agreement has caused loss to the Plaintiff. The Plaintiff's right to seek a refund with interest is grounded in the contractual terms and the statutory framework, which recognizes the right to claim relief for non-performance of contractual obligations. The Transfer of Property Act, 1882, particularly Section 9, recognizes the right to claim relief for non-performance of contractual obligations, including the right to seek a refund with interest. The Plaintiff's claim for a refund with interest is therefore well-founded in law and supported by the facts of the case.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 2,
+    "n_causes_in_context": 1,
+    "label": "RERA-01",
+    "attempt": 3
+  },
+  {
+    "prompt_chars": 2930,
+    "prompt": "Matter: [TEST] RERA-01 \u2014 Delayed possession, refund with interest, Delhi\n\nReviewed legal issues:\n- Whether the Defendant has breached the agreement by failing to deliver possession of the property by the committed date and whether the delay constitutes a material breach.\n- Whether the Plaintiff is entitled to a refund of the amount paid with interest due to the Defendant's failure to deliver possession.\n\nReviewed causes of action:\n- Breach of Contract for Delayed Possession and Failure to Deliver: Defendant failed to deliver possession of the property by the committed date of 2024-06-30, despite receiving full consideration from Plaintiff. Construction remains incomplete, and no firm revised possession date has been provided, constituting a material breach of the agreement (Flat Buyer's Agreement). This entitles Plaintiff to seek remedies including a full refund of the amount paid along with interest.\n\nRetrieved statutory context (cite only from this list):\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Transfer of Property Act, 1882 Section 43: 43. Transfer by unauthorised person who subsequently acquires interest in property\ntransferred.\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Carriage by Road Act, 2007 Section 5: 5. Suspension or cancellation of registration.\u2014(1) If the registering authority is satisfied that the\nholder of certificate of registration has failed to comply with any of the provisions of sub-section (7) of\nsection 4, it may give a notice by registered post or through electronic media or by any verifiable means\nto the holder of certificate of registration to rectify within a period of thirty da\n\nVerified precedents on record (cite only from this list, may be empty):\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n\nDraft the LEGAL GROUNDS clause: the legal submissions/grounds supporting the causes of action above, connecting the statutory provisions (and precedents, if any are listed) to the facts already pleaded. Formal legal-argument register.",
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "requested_model": "gemini-2.5-pro",
+    "degraded": true,
+    "fallback_chain": [
+      "gemini:gemini-2.5-pro (1/4)",
+      "gemini:gemini-2.5-flash (2/4)",
+      "gemini:gemini-2.0-flash (3/4)",
+      "gemini:gemini-2.5-flash-lite (4/4)"
+    ],
+    "latency_ms": 1204,
+    "raw_text": "{\"content\": \"The Defendant's failure to deliver possession of the property by the committed date of 2024-06-30, despite receiving full consideration from the Plaintiff, constitutes a material breach of the agreement, thereby entitling the Plaintiff to seek remedies including a full refund of the amount paid along with interest. The Transfer of Property Act, 1882, particularly Section 9, recognizes the debt incurred by the Defendant as a result of this breach, which the Civil Courts can provide relief for. Furthermore, the Plaintiff's right to a refund with interest is grounded in the principles of contract law, which dictate that a party who fails to perform their obligations under a contract is liable to compensate the other party for any losses incurred, including the payment of interest on the amount withheld. In the absence of any revised possession date, the Plaintiff is left with no alternative but to seek a refund, which is a direct consequence of the Defendant's breach of contract. The Plaintiff, therefore, submits that the Defendant's failure to deliver possession of the property as agreed upon, coupled with the lack of any revised timeline for completion, renders the Defendant liable to refund the amount paid by the Plaintiff along with interest, as a measure of restitution for the breach of contract.\", \"statute_refs\": [{\"act\": \"Transfer of Property Act, 1882\", \"section_no\": \"9\"}], \"case_law_refs\": [], \"confidence\": 0.8}",
+    "raw_text_chars": 1454,
+    "parsed_ok": true,
+    "parsed": {
+      "content": "The Defendant's failure to deliver possession of the property by the committed date of 2024-06-30, despite receiving full consideration from the Plaintiff, constitutes a material breach of the agreement, thereby entitling the Plaintiff to seek remedies including a full refund of the amount paid along with interest. The Transfer of Property Act, 1882, particularly Section 9, recognizes the debt incurred by the Defendant as a result of this breach, which the Civil Courts can provide relief for. Furthermore, the Plaintiff's right to a refund with interest is grounded in the principles of contract law, which dictate that a party who fails to perform their obligations under a contract is liable to compensate the other party for any losses incurred, including the payment of interest on the amount withheld. In the absence of any revised possession date, the Plaintiff is left with no alternative but to seek a refund, which is a direct consequence of the Defendant's breach of contract. The Plaintiff, therefore, submits that the Defendant's failure to deliver possession of the property as agreed upon, coupled with the lack of any revised timeline for completion, renders the Defendant liable to refund the amount paid by the Plaintiff along with interest, as a measure of restitution for the breach of contract.",
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "section_no": "9"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.8
+    },
+    "n_statutes_in_context": 5,
+    "n_case_law_in_context": 0,
+    "n_issues_in_context": 2,
+    "n_causes_in_context": 1,
+    "label": "RERA-01",
+    "attempt": 4
+  }
+]

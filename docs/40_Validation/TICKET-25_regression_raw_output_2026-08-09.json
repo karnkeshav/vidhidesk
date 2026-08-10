@@ -1,0 +1,397 @@
+{
+  "legal_grounds": [
+    {
+      "label": "APP-01",
+      "id": "52a030eb-cb44-4a3f-b793-cf8f1fef4674",
+      "matter_id": "d4c4553c-7f3b-4f14-9eb1-a9b0a3132b71",
+      "pleading_outline_id": "c0efc4b7-303a-436d-9eed-0010fdaae3c1",
+      "clause_type": "legal_grounds",
+      "version_no": 3,
+      "content": {
+        "text": "On the issue of Appeal against District Court decree: The appeal is maintainable under Section 58 of the Real Estate Act, 2016 which allows an aggrieved person to file an appeal to the High Court within sixty days, and the procedural requirements of Order XLI Rule 37 and Order XLI Rule 235 of the Code of Civil Procedure, 1908 prescribe the certification and filing of the decree copy and its contents. This ground is supported by Code of Civil Procedure, 1908, Section Order XLI Rule 37; Code of Civil Procedure, 1908, Section Order XLI Rule 235. No verified precedent has been identified in support of this ground.",
+        "grounds": [
+          {
+            "issue": "Appeal against District Court decree",
+            "confidence": 0.783,
+            "statute_refs": [
+              {
+                "act": "Real Estate (Regulation and Development) Act, 2016",
+                "grounded": false,
+                "section_no": "Section 58"
+              },
+              {
+                "act": "Code of Civil Procedure, 1908",
+                "grounded": true,
+                "section_no": "Order XLI Rule 37"
+              },
+              {
+                "act": "Code of Civil Procedure, 1908",
+                "grounded": true,
+                "section_no": "Order XLI Rule 235"
+              }
+            ],
+            "argument_note": "The appeal is maintainable under Section 58 of the Real Estate Act, 2016 which allows an aggrieved person to file an appeal to the High Court within sixty days, and the procedural requirements of Order XLI Rule 37 and Order XLI Rule 235 of the Code of Civil Procedure, 1908 prescribe the certification and filing of the decree copy and its contents.",
+            "case_law_refs": []
+          }
+        ],
+        "bullet_items": null
+      },
+      "statute_refs": [
+        {
+          "act": "Real Estate (Regulation and Development) Act, 2016",
+          "grounded": false,
+          "section_no": "Section 58"
+        },
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "grounded": true,
+          "section_no": "Order XLI Rule 37"
+        },
+        {
+          "act": "Code of Civil Procedure, 1908",
+          "grounded": true,
+          "section_no": "Order XLI Rule 235"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.725,
+      "is_deterministic": false,
+      "model_used": "groq/openai/gpt-oss-120b",
+      "model_routing": {
+        "degraded": true,
+        "actual_model": "openai/gpt-oss-120b",
+        "fallback_chain": [
+          "gemini:gemini-2.5-pro (1/4)",
+          "gemini:gemini-2.5-flash (2/4)",
+          "gemini:gemini-2.0-flash (3/4)",
+          "gemini:gemini-2.5-flash-lite (4/4)",
+          "groq:llama-3.3-70b-versatile (1/5)"
+        ],
+        "actual_provider": "groq",
+        "requested_model": "gemini-2.5-pro"
+      },
+      "prompt_version": "v1",
+      "regenerated": true,
+      "author": "ai",
+      "review_status": "pending",
+      "reviewed_at": null,
+      "masked_prompt": "Matter: [TEST] APP-01 \u2014 First appeal to High Court (off-by-one regression check)\n\n=== SECTION: Reviewed legal issues ===\n- Appeal against District Court decree\n=== PARTY_S: Reviewed legal issues ===\n\n=== SECTION: Reviewed causes of action (background only \u2014 do not copy this section's heading or content into an \"issue\" field below) ===\n- Appeal against District Court decree: PARTY_A is appealing against the District Court decree passed on 2026-06-20\n=== PARTY_S ===\n\n=== SECTION: Retrieved statutory context (cite only from this list) ===\n- Code of PARTY_L, 1908 Section Order XLI Rule 37: 37. Certified copy of decree to be sent to Court whose decree appealed from.\u2014A copy of the\njudgment and of the decree, certified by the Appellate Court or such officer as it appoints in this behalf, shall\nbe sent to the Court which passed the decree appealed from and shall be filed with the original proceedings in\nthe suit, and an entry of the judgment of the Appellate Court shall be made in the r\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of PARTY_E, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- PARTY_M (Regulation and Development) Act, 2016 Section 58: 58. Appeal to High Court.\u2014(1) Any person aggrieved by any decision or order of the Appellate\nTribunal, may, file an appeal to the High Court, within a period of sixty days from the date of\ncommunication of the decision or order of the Appellate Tribunal, to him, on any one or more of the\ngrounds specified in section 100 of the Code of PARTY_L, 1908 (5 of 1908):\nProvided that the High Court\n- PARTY_Ns Act, 2015 Section 8: 8. Bar against revision application or petition against an interlocutory order.\u2014Notwithstanding\nanything contained in any other law for the time being in force, no civil revision application or petition\nshall be entertained against any interlocutory order of a PARTY_N, including an order on the\nissue of jurisdiction, and any such challenge, subject to the provisions of section 13, shall b\n- Code of PARTY_L, 1908 Section Order XLI Rule 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of PARTY_L, 1908 Section 235: 235. Date and contents of decree.\u2014(1) The decree of the Appellate Court shall bear date the day on\nwhich the judgment was pronounced.\n(2) The decree shall contain the number of the appeal, the names and descriptions of the appellant and\nrespondent, and a clear specification of the relief granted or other adjudication made.\n(3) The decree shall also state the amount of costs incurred in the appeal,\n- Code of PARTY_L, 1908 Section Order XLV Rule 2: 2. Application to Court whose decree complained of.\u20142[(1)] Whoever desires to appeal 3[the\nSupreme Court] shall apply by petition to the Court whose decree is complained of.\n4[(2) Every petition under sub-rule (1) shall be heard as expeditiously as possible and endeavour shall\nbe made to conclude the disposal of the petition within sixty days from the date on which the petition is\npresented to the\n- Code of PARTY_L, 1908 PARTY_O 3: 3. Inquiry as to whether applicant is an indigent person.\u2014(1) Where an applicant, referred to in\nrule 1, was allowed to sue or appeal as an indigent person in the Court from whose decree the appeal is\npreferred, no further inquiry in respect of the question whether or not he is an indigent person shall be\nnecessary if the applicant has made an affidavit stating that he has not ceased to be an indi\n=== PARTY_S ===\n\n=== SECTION: Verified precedents already on record for this matter (cite only from this list if it is non-empty) ===\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n=== PARTY_S ===\n\nFor the PARTY_R clause, produce ONE ground per legal issue in the 'Reviewed legal issues' section above, connecting the statutory provisions (and, if genuinely supportive, a precedent) to that issue. For case law specifically: if you are reasonably confident of a real, specific Indian case (or Supreme Court/High Court judgment) that is directly on point for an issue, name it even if it is not in the 'already on record' list above \u2014 it will be independently verified against Indian Kanoon before it is ever shown to the advocate as confirmed, so a good-faith, reasonably-confident guess is safe and useful. Do not name a case you are not reasonably confident actually exists \u2014 omit case_law_refs for that ground instead. Respond with ONLY a JSON object of this exact shape, overriding the general response shape you were told about earlier \u2014 this clause type uses a different, more structured shape: {\"grounds\": [{\"issue\": string, \"statute_refs\": [{\"act\": string, \"section_no\": string}], \"case_law_refs\": [{\"case_name\": string}], \"argument_note\": string, \"confidence\": number}]}. \"issue\" MUST be copied verbatim from exactly ONE bullet point in the 'Reviewed legal issues' section above \u2014 nothing more, nothing less, never a section heading, never text from any other section, never spanning more than one bullet point. \"argument_note\" is a SHORT 1-3 sentence legal submission for this ground only \u2014 not a full paragraph, not the whole clause, and MUST be a single logical line of text (use \\n only if truly necessary, never a literal line break). Only include a statute in statute_refs if it appears in the retrieved statutory context above \u2014 never invent a section number; omit it rather than guess.",
+      "generation_warning": null,
+      "created_at": "2026-08-09T08:27:56.509713+00:00"
+    },
+    {
+      "label": "CIV-01",
+      "id": "708e290f-7007-4f2f-8563-e5314589d291",
+      "matter_id": "e92dfd99-c935-464f-ab97-9e2120f92065",
+      "pleading_outline_id": "51f3fcb3-faa5-4ad6-bba9-6354c3addafa",
+      "clause_type": "legal_grounds",
+      "version_no": 3,
+      "content": {
+        "text": "On the issue of Breach of Contract: The defendant\u2019s failure to repay the personal loan as agreed constitutes a breach of contract actionable under the Indian Contract Act, entitling the plaintiff to recovery of principal with interest. No statutory provision retrieved for this matter directly supports this ground \u2014 verify manually before relying on it. No verified precedent has been identified in support of this ground.",
+        "grounds": [
+          {
+            "issue": "Breach of Contract",
+            "confidence": 0.7,
+            "statute_refs": [],
+            "argument_note": "The defendant\u2019s failure to repay the personal loan as agreed constitutes a breach of contract actionable under the Indian Contract Act, entitling the plaintiff to recovery of principal with interest.",
+            "case_law_refs": []
+          }
+        ],
+        "bullet_items": null
+      },
+      "statute_refs": [],
+      "case_law_refs": [],
+      "confidence": 0.7,
+      "is_deterministic": false,
+      "model_used": "groq/openai/gpt-oss-120b",
+      "model_routing": {
+        "degraded": true,
+        "actual_model": "openai/gpt-oss-120b",
+        "fallback_chain": [
+          "gemini:gemini-2.5-pro (1/4)",
+          "gemini:gemini-2.5-flash (2/4)",
+          "gemini:gemini-2.0-flash (3/4)",
+          "gemini:gemini-2.5-flash-lite (4/4)",
+          "groq:llama-3.3-70b-versatile (1/5)"
+        ],
+        "actual_provider": "groq",
+        "requested_model": "gemini-2.5-pro"
+      },
+      "prompt_version": "v1",
+      "regenerated": true,
+      "author": "ai",
+      "review_status": "pending",
+      "reviewed_at": null,
+      "masked_prompt": "Matter: [TEST] CIV-01 \u2014 Unsecured personal loan (canary)\n\n=== SECTION: Reviewed legal issues ===\n- Breach of Contract\n=== PARTY_R: Reviewed legal issues ===\n\n=== SECTION: Reviewed causes of action (background only \u2014 do not copy this section's heading or content into an \"issue\" field below) ===\n- Recovery of PARTY_N with Interest: PARTY_B's failure to repay the PARTY_N with interest as per the agreement\n=== PARTY_R ===\n\n=== SECTION: Retrieved statutory context (cite only from this list) ===\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n- Indian Contract Act, 1872 Section 141: 141. Surety\u2019s right to benefit of creditor\u2019s securities.\n- Carriage by Road Act, 2007 Section 12: 12. Conditions limiting exonerating the liability of the common carrier.\u2014(1) Every common\ncarrier shall be liable to the consignor for the loss or damage to any consignment in accordance with the\ngoods forwarding note, where such loss or damage has arisen on account of any criminal act of the\ncommon carrier, or any of his servants or agents.\n(2) In any suit brought against the common carrier for t\n=== PARTY_R ===\n\n=== SECTION: Verified precedents already on record for this matter (cite only from this list if it is non-empty) ===\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n=== PARTY_R ===\n\nFor the PARTY_Q clause, produce ONE ground per legal issue in the 'Reviewed legal issues' section above, connecting the statutory provisions (and, if genuinely supportive, a precedent) to that issue. For case law specifically: if you are reasonably confident of a real, specific Indian case (or Supreme Court/High Court judgment) that is directly on point for an issue, name it even if it is not in the 'already on record' list above \u2014 it will be independently verified against Indian Kanoon before it is ever shown to the advocate as confirmed, so a good-faith, reasonably-confident guess is safe and useful. Do not name a case you are not reasonably confident actually exists \u2014 omit case_law_refs for that ground instead. Respond with ONLY a JSON object of this exact shape, overriding the general response shape you were told about earlier \u2014 this clause type uses a different, more structured shape: {\"grounds\": [{\"issue\": string, \"statute_refs\": [{\"act\": string, \"section_no\": string}], \"case_law_refs\": [{\"case_name\": string}], \"argument_note\": string, \"confidence\": number}]}. \"issue\" MUST be copied verbatim from exactly ONE bullet point in the 'Reviewed legal issues' section above \u2014 nothing more, nothing less, never a section heading, never text from any other section, never spanning more than one bullet point. \"argument_note\" is a SHORT 1-3 sentence legal submission for this ground only \u2014 not a full paragraph, not the whole clause, and MUST be a single logical line of text (use \\n only if truly necessary, never a literal line break). Only include a statute in statute_refs if it appears in the retrieved statutory context above \u2014 never invent a section number; omit it rather than guess.",
+      "generation_warning": null,
+      "created_at": "2026-08-09T08:28:39.130354+00:00"
+    },
+    {
+      "label": "COM-01",
+      "id": "66106bf6-40e2-426f-916a-b8f2c2309b59",
+      "matter_id": "539c1147-7a19-4b38-9b5f-f79390cf729f",
+      "pleading_outline_id": "f8d8256f-3eed-4ce5-b8c6-9de13162f7ea",
+      "clause_type": "legal_grounds",
+      "version_no": 3,
+      "content": {
+        "text": "On the issue of Whether Bluewave Retail Technologies LLP is liable for breach of contract due to non-payment of services rendered by Vertex Software Solutions Pvt. Ltd..: Pursuant to Section 39 of the Consumer Protection Act, 2019, the District Commission may direct the opposite party to pay for deficiency in services, establishing liability of Bluewave Retail Technologies LLP for non\u2011payment of the consideration for software services rendered. This ground is supported by Consumer Protection Act, 2019, Section 39. No verified precedent has been identified in support of this ground.",
+        "grounds": [
+          {
+            "issue": "Whether Bluewave Retail Technologies LLP is liable for breach of contract due to non-payment of services rendered by Vertex Software Solutions Pvt. Ltd..",
+            "confidence": 0.95,
+            "statute_refs": [
+              {
+                "act": "Consumer Protection Act, 2019",
+                "grounded": true,
+                "section_no": "39"
+              }
+            ],
+            "argument_note": "Pursuant to Section 39 of the Consumer Protection Act, 2019, the District Commission may direct the opposite party to pay for deficiency in services, establishing liability of Bluewave Retail Technologies LLP for non\u2011payment of the consideration for software services rendered.",
+            "case_law_refs": []
+          }
+        ],
+        "bullet_items": null
+      },
+      "statute_refs": [
+        {
+          "act": "Consumer Protection Act, 2019",
+          "grounded": true,
+          "section_no": "39"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.975,
+      "is_deterministic": false,
+      "model_used": "groq/openai/gpt-oss-120b",
+      "model_routing": {
+        "degraded": true,
+        "actual_model": "openai/gpt-oss-120b",
+        "fallback_chain": [
+          "gemini:gemini-2.5-pro (1/4)",
+          "gemini:gemini-2.5-flash (2/4)",
+          "gemini:gemini-2.0-flash (3/4)",
+          "gemini:gemini-2.5-flash-lite (4/4)",
+          "groq:llama-3.3-70b-versatile (1/5)"
+        ],
+        "actual_provider": "groq",
+        "requested_model": "gemini-2.5-pro"
+      },
+      "prompt_version": "v1",
+      "regenerated": true,
+      "author": "ai",
+      "review_status": "pending",
+      "reviewed_at": null,
+      "masked_prompt": "Matter: [TEST] COM-01 \u2014 SaaS licensing at Commercial Courts Act threshold\n\n=== SECTION: Reviewed legal issues ===\n- Whether PARTY_B is liable for breach of contract due to non-payment of services rendered by PARTY_A.\n=== PARTY_Q: Reviewed legal issues ===\n\n=== SECTION: Reviewed causes of action (background only \u2014 do not copy this section's heading or content into an \"issue\" field below) ===\n- Breach of Contract (Non-Payment of Services): PARTY_B has failed to fulfill its contractual obligation to pay the outstanding invoice of Rs. 3,00,000 for the final milestone of software development and maintenance services provided by PARTY_A, despite the payment due date passing and a formal demand letter being sent.\n=== PARTY_Q ===\n\n=== SECTION: Retrieved statutory context (cite only from this list) ===\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Consumer Protection Act, 2019 Section 39: 39. (1) Where the District Commission is satisfied that the goods complained against\nsuffer from any of the defects specified in the complaint or that any of the allegations\ncontained in the complaint about the services or any unfair trade practices, or claims for\ncompensation under product liability are proved, it shall issue an order to the opposite party\ndirecting him to do one or more of the f\n- Consumer Protection Act, 2019 Section 81: 81. (1) The District Commission or the State Commission or the PARTY_Ession,\nas the case may be, shall, within seven days of the receipt of the settlement report, pass\nsuitable order recording such settlement of consumer dispute and dispose of the matter\naccordingly.\n(2) Where the consumer dispute is settled only in part, the District Commission or the\nState Commission or the PARTY_E\n- Consumer Protection Act, 2019 Section 47: 47. (1) Subject to the other provisions of this Act, the State Commission shall have\njurisdiction\u2014\n(a) to entertain\u2014\n(i) complaints where the value of the goods or services paid as\nconsideration, exceeds rupees one crore, but does not exceed rupees ten crore:\nProvided that where the Central Government deems it necessary so to do,\nit may prescribe such other value, as it deems fit;\n(ii) complaints \n- Consumer Protection Act, 2019 Section 65: 65. (1) All notices, required by this Act to be served, shall be served by delivering or\ntransmitting a copy thereof by registered post acknowledgment due addressed to opposite\nparty against whom complaint is made or to the complainant by speed post or by such\ncourier service, approved by the District Commission, the State Commission or the National\nCommission, as the case may be, or by any other \n=== PARTY_Q ===\n\n=== SECTION: Verified precedents already on record for this matter (cite only from this list if it is non-empty) ===\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n=== PARTY_Q ===\n\nFor the PARTY_N clause, produce ONE ground per legal issue in the 'Reviewed legal issues' section above, connecting the statutory provisions (and, if genuinely supportive, a precedent) to that issue. For case law specifically: if you are reasonably confident of a real, specific Indian case (or Supreme Court/High Court judgment) that is directly on point for an issue, name it even if it is not in the 'already on record' list above \u2014 it will be independently verified against Indian Kanoon before it is ever shown to the advocate as confirmed, so a good-faith, reasonably-confident guess is safe and useful. Do not name a case you are not reasonably confident actually exists \u2014 omit case_law_refs for that ground instead. Respond with ONLY a JSON object of this exact shape, overriding the general response shape you were told about earlier \u2014 this clause type uses a different, more structured shape: {\"grounds\": [{\"issue\": string, \"statute_refs\": [{\"act\": string, \"section_no\": string}], \"case_law_refs\": [{\"case_name\": string}], \"argument_note\": string, \"confidence\": number}]}. \"issue\" MUST be copied verbatim from exactly ONE bullet point in the 'Reviewed legal issues' section above \u2014 nothing more, nothing less, never a section heading, never text from any other section, never spanning more than one bullet point. \"argument_note\" is a SHORT 1-3 sentence legal submission for this ground only \u2014 not a full paragraph, not the whole clause, and MUST be a single logical line of text (use \\n only if truly necessary, never a literal line break). Only include a statute in statute_refs if it appears in the retrieved statutory context above \u2014 never invent a section number; omit it rather than guess.",
+      "generation_warning": null,
+      "created_at": "2026-08-09T08:29:16.854087+00:00"
+    },
+    {
+      "label": "IA-01",
+      "id": "98b15cc2-4a4b-4a4b-8815-d3718957baed",
+      "matter_id": "df6742e9-e6b1-4997-afb7-cfaf39fabdf8",
+      "pleading_outline_id": "57fa963a-1f3b-44aa-a5e8-d5243513d62f",
+      "clause_type": "legal_grounds",
+      "version_no": 3,
+      "content": {
+        "text": "On the issue of Alienation of property pending suit: Section 52 of the Transfer of Property Act expressly prohibits transfer of immovable property by a party against whom a suit is pending, justifying an injunction to restrain alienation of the suit property. This ground is supported by Transfer of Property Act, 1882, Section 52. No verified precedent has been identified in support of this ground.",
+        "grounds": [
+          {
+            "issue": "Alienation of property pending suit",
+            "confidence": 0.975,
+            "statute_refs": [
+              {
+                "act": "Transfer of Property Act, 1882",
+                "grounded": true,
+                "section_no": "52"
+              }
+            ],
+            "argument_note": "Section 52 of the Transfer of Property Act expressly prohibits transfer of immovable property by a party against whom a suit is pending, justifying an injunction to restrain alienation of the suit property.",
+            "case_law_refs": []
+          }
+        ],
+        "bullet_items": null
+      },
+      "statute_refs": [
+        {
+          "act": "Transfer of Property Act, 1882",
+          "grounded": true,
+          "section_no": "52"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.988,
+      "is_deterministic": false,
+      "model_used": "groq/openai/gpt-oss-120b",
+      "model_routing": {
+        "degraded": true,
+        "actual_model": "openai/gpt-oss-120b",
+        "fallback_chain": [
+          "gemini:gemini-2.5-pro (1/4)",
+          "gemini:gemini-2.5-flash (2/4)",
+          "gemini:gemini-2.0-flash (3/4)",
+          "gemini:gemini-2.5-flash-lite (4/4)",
+          "groq:llama-3.3-70b-versatile (1/5)"
+        ],
+        "actual_provider": "groq",
+        "requested_model": "gemini-2.5-pro"
+      },
+      "prompt_version": "v1",
+      "regenerated": true,
+      "author": "ai",
+      "review_status": "pending",
+      "reviewed_at": null,
+      "masked_prompt": "Matter: [TEST] IA-01 \u2014 Interim injunction pending possession suit, ADDR_1 (hearing-blindness)\n\n=== SECTION: Reviewed legal issues ===\n- Alienation of property pending suit\n=== PARTY_O: Reviewed legal issues ===\n\n=== SECTION: Reviewed causes of action (background only \u2014 do not copy this section's heading or content into an \"issue\" field below) ===\n- Injunction to restrain alienation of property pending suit: To restrain the defendant from selling, transferring, or otherwise alienating the suit property during the pendency of the possession suit\n=== PARTY_O ===\n\n=== SECTION: Retrieved statutory context (cite only from this list) ===\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 41: 41. Any person aggrieved by an order made by the District Commission may prefer an\nappeal against such order to the State Commission on the grounds of facts or law within a\nperiod of forty-five days from the date of the order, in such form and manner, as may be\nprescribed:\nProvided that the State Commission may entertain an appeal after the expiry of the said\nperiod of forty-five days, if it is sa\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Consumer Protection Act, 2019 Section 51: 51. (1) Any person aggrieved by an order made by the State Commission in exercise of\nits powers conferred by sub-clause (i) or (ii) of clause (a) of sub-section (1) of section 47\nmay prefer an appeal against such order to the National Commission within a period of thirty\ndays from the date of the order in such form and manner as may be prescribed:\nProvided that the National Commission shall not en\n- Consumer Protection Act, 2019 Section 19: 19. (1) The Central Authority may, after receiving any information or complaint or\ndirections from the Central Government or of its own motion, conduct or cause to be conducted\na preliminary inquiry as to whether there exists a prima facie case of violation of consumer\nrights or any unfair trade practice or any false or misleading advertisement, by any person,\nwhich is prejudicial to the public in\n=== PARTY_O ===\n\n=== SECTION: Verified precedents already on record for this matter (cite only from this list if it is non-empty) ===\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n=== PARTY_O ===\n\nFor the PARTY_N clause, produce ONE ground per legal issue in the 'Reviewed legal issues' section above, connecting the statutory provisions (and, if genuinely supportive, a precedent) to that issue. For case law specifically: if you are reasonably confident of a real, specific Indian case (or Supreme Court/High Court judgment) that is directly on point for an issue, name it even if it is not in the 'already on record' list above \u2014 it will be independently verified against Indian Kanoon before it is ever shown to the advocate as confirmed, so a good-faith, reasonably-confident guess is safe and useful. Do not name a case you are not reasonably confident actually exists \u2014 omit case_law_refs for that ground instead. Respond with ONLY a JSON object of this exact shape, overriding the general response shape you were told about earlier \u2014 this clause type uses a different, more structured shape: {\"grounds\": [{\"issue\": string, \"statute_refs\": [{\"act\": string, \"section_no\": string}], \"case_law_refs\": [{\"case_name\": string}], \"argument_note\": string, \"confidence\": number}]}. \"issue\" MUST be copied verbatim from exactly ONE bullet point in the 'Reviewed legal issues' section above \u2014 nothing more, nothing less, never a section heading, never text from any other section, never spanning more than one bullet point. \"argument_note\" is a SHORT 1-3 sentence legal submission for this ground only \u2014 not a full paragraph, not the whole clause, and MUST be a single logical line of text (use \\n only if truly necessary, never a literal line break). Only include a statute in statute_refs if it appears in the retrieved statutory context above \u2014 never invent a section number; omit it rather than guess.",
+      "generation_warning": null,
+      "created_at": "2026-08-09T08:29:53.69123+00:00"
+    },
+    {
+      "label": "PROP-03",
+      "id": "7ba19ecd-3157-472c-9603-0948e31c8f09",
+      "matter_id": "168c947f-de95-4b34-a118-c0fdf77ee44b",
+      "pleading_outline_id": "0f91caab-7b93-4a56-98b5-d6da07dd72ae",
+      "clause_type": "legal_grounds",
+      "version_no": 3,
+      "content": {
+        "text": "On the issue of Breach of Contract: Failure to execute and register the sale deed constitutes breach, and Section 238 vitiates agreements where misrepresentation or fraud is present. This ground is supported by Indian Contract Act, 1872, Section 238. No verified precedent has been identified in support of this ground.",
+        "grounds": [
+          {
+            "issue": "Breach of Contract",
+            "confidence": 0.85,
+            "statute_refs": [
+              {
+                "act": "Indian Contract Act, 1872",
+                "grounded": true,
+                "section_no": "238"
+              }
+            ],
+            "argument_note": "Failure to execute and register the sale deed constitutes breach, and Section 238 vitiates agreements where misrepresentation or fraud is present.",
+            "case_law_refs": []
+          }
+        ],
+        "bullet_items": null
+      },
+      "statute_refs": [
+        {
+          "act": "Indian Contract Act, 1872",
+          "grounded": true,
+          "section_no": "238"
+        }
+      ],
+      "case_law_refs": [],
+      "confidence": 0.925,
+      "is_deterministic": false,
+      "model_used": "groq/openai/gpt-oss-20b",
+      "model_routing": {
+        "degraded": true,
+        "actual_model": "openai/gpt-oss-20b",
+        "fallback_chain": [
+          "gemini:gemini-2.5-pro (1/4)",
+          "gemini:gemini-2.5-flash (2/4)",
+          "gemini:gemini-2.0-flash (3/4)",
+          "gemini:gemini-2.5-flash-lite (4/4)",
+          "groq:llama-3.3-70b-versatile (1/5)",
+          "groq:openai/gpt-oss-120b (2/5)",
+          "groq:qwen/qwen3.6-27b (3/5)"
+        ],
+        "actual_provider": "groq",
+        "requested_model": "gemini-2.5-pro"
+      },
+      "prompt_version": "v1",
+      "regenerated": true,
+      "author": "ai",
+      "review_status": "pending",
+      "reviewed_at": null,
+      "masked_prompt": "Matter: [TEST] PROP-03 \u2014 PARTY_K of sale deed, ADDR_1\n\n=== SECTION: Reviewed legal issues ===\n- Breach of Contract\n=== PARTY_X: Reviewed legal issues ===\n\n=== SECTION: Reviewed causes of action (background only \u2014 do not copy this section's heading or content into an \"issue\" field below) ===\n- PARTY_K of Agreement to Sell: To compel the defendant to execute and register the sale deed\n=== PARTY_X ===\n\n=== SECTION: Retrieved statutory context (cite only from this list) ===\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Consumer Protection Act, 2019 Section 73: 73. (1) Notwithstanding anything contained in the Code of PARTY_D, 1973,\nwhere an order is passed under sub-section (1) of section 72, an appeal shall lie, both on\nfacts and on law from\u2014\n(a) the order made by the District Commission to the State Commission;\n(b) the order made by the State Commission to the National Commission; and\n(c) the order made by the National Commission to the Sup\n- Registration Act, 1908 Section 80B: 80B. PARTY_E to hold licences.\u2014No person other than an advocate or other legal\npractitioner, shall for payment, write deeds unless he holds a licence granted in accordance with rules\nmade under section 69\".\n[Vide Karnataka Act 55 of 1976, s. 16]\nKarnataka\nInsertion of new section 80A.-After section 80 of the Registration Act, 1908 (Central Act 25 of\n1908), the following section shall be and s\n- Indian Contract Act, 1872 Section 238: 238. Effect, on agreement, of misrepresentation or fraud by agent.\nPARTY_F\n239. [Repealed.].\n240. [Repealed.].\n241. [Repealed.].\n242. [Repealed.].\n243. [Repealed.].\n244. [Repealed.].\n245. [Repealed.].\n246. [Repealed.].\n247. [Repealed.].\n248. [Repealed.].\n249. [Repealed.].\n250. [Repealed.].\n251. [Repealed.].\n252. [Repealed.].\n253. [Repealed.].\n254. [Repealed.].\n255. [Repealed.].\n2\n- Registration Act, 1908 Section 83B: 83B. Appeal to Government from orders of the PARTY_G of Registration.\u2014Any person\naggrieved by an order of the PARTY_G of Registration under section 83A, may prefer an appeal\nbefore the Government within thirty days from the date of receipt of such order, and the Government\nshall pass an order confirming, modifying or cancelling the order of the PARTY_G of Registration\n=== PARTY_X ===\n\n=== SECTION: Verified precedents already on record for this matter (cite only from this list if it is non-empty) ===\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n=== PARTY_X ===\n\nFor the PARTY_W clause, produce ONE ground per legal issue in the 'Reviewed legal issues' section above, connecting the statutory provisions (and, if genuinely supportive, a precedent) to that issue. For case law specifically: if you are reasonably confident of a real, specific Indian case (or Supreme Court/High Court judgment) that is directly on point for an issue, name it even if it is not in the 'already on record' list above \u2014 it will be independently verified against Indian Kanoon before it is ever shown to the advocate as confirmed, so a good-faith, reasonably-confident guess is safe and useful. Do not name a case you are not reasonably confident actually exists \u2014 omit case_law_refs for that ground instead. Respond with ONLY a JSON object of this exact shape, overriding the general response shape you were told about earlier \u2014 this clause type uses a different, more structured shape: {\"grounds\": [{\"issue\": string, \"statute_refs\": [{\"act\": string, \"section_no\": string}], \"case_law_refs\": [{\"case_name\": string}], \"argument_note\": string, \"confidence\": number}]}. \"issue\" MUST be copied verbatim from exactly ONE bullet point in the 'Reviewed legal issues' section above \u2014 nothing more, nothing less, never a section heading, never text from any other section, never spanning more than one bullet point. \"argument_note\" is a SHORT 1-3 sentence legal submission for this ground only \u2014 not a full paragraph, not the whole clause, and MUST be a single logical line of text (use \\n only if truly necessary, never a literal line break). Only include a statute in statute_refs if it appears in the retrieved statutory context above \u2014 never invent a section number; omit it rather than guess.",
+      "generation_warning": null,
+      "created_at": "2026-08-09T08:30:34.809741+00:00"
+    },
+    {
+      "label": "RERA-01",
+      "id": "12faeb9c-2f68-44aa-a0ef-b865019c4231",
+      "matter_id": "aa46b5fe-97b1-4d27-802c-3d76dec34dc5",
+      "pleading_outline_id": "614dd27e-21bb-4a01-98d6-6d03f32bca1a",
+      "clause_type": "legal_grounds",
+      "version_no": 3,
+      "content": {
+        "text": "On the issue of Whether the Defendant has breached the agreement by failing to deliver possession of the property by the committed date and whether the delay constitutes a material breach.: The Defendant\u2019s failure to deliver possession by the committed date constitutes a material breach of the contract, entitling the Plaintiff to damages under Indian contract principles. No statutory provision retrieved for this matter directly supports this ground \u2014 verify manually before relying on it. No verified precedent has been identified in support of this ground.\n\nOn the issue of Whether the Plaintiff is entitled to a refund of the amount paid with interest due to the Defendant's failure to deliver possession.: The Plaintiff is entitled to a refund with interest as a consequence of the Defendant\u2019s material breach, pursuant to general principles of restitution for non-performance of contractual obligations. No statutory provision retrieved for this matter directly supports this ground \u2014 verify manually before relying on it. No verified precedent has been identified in support of this ground.",
+        "grounds": [
+          {
+            "issue": "Whether the Defendant has breached the agreement by failing to deliver possession of the property by the committed date and whether the delay constitutes a material breach.",
+            "confidence": 0.4,
+            "statute_refs": [],
+            "argument_note": "The Defendant\u2019s failure to deliver possession by the committed date constitutes a material breach of the contract, entitling the Plaintiff to damages under Indian contract principles.",
+            "case_law_refs": []
+          },
+          {
+            "issue": "Whether the Plaintiff is entitled to a refund of the amount paid with interest due to the Defendant's failure to deliver possession.",
+            "confidence": 0.4,
+            "statute_refs": [],
+            "argument_note": "The Plaintiff is entitled to a refund with interest as a consequence of the Defendant\u2019s material breach, pursuant to general principles of restitution for non-performance of contractual obligations.",
+            "case_law_refs": []
+          }
+        ],
+        "bullet_items": null
+      },
+      "statute_refs": [],
+      "case_law_refs": [],
+      "confidence": 0.4,
+      "is_deterministic": false,
+      "model_used": "groq/openai/gpt-oss-20b",
+      "model_routing": {
+        "degraded": true,
+        "actual_model": "openai/gpt-oss-20b",
+        "fallback_chain": [
+          "gemini:gemini-2.5-pro (1/4)",
+          "gemini:gemini-2.5-flash (2/4)",
+          "gemini:gemini-2.0-flash (3/4)",
+          "gemini:gemini-2.5-flash-lite (4/4)",
+          "groq:llama-3.3-70b-versatile (1/5)",
+          "groq:openai/gpt-oss-120b (2/5)",
+          "groq:qwen/qwen3.6-27b (3/5)"
+        ],
+        "actual_provider": "groq",
+        "requested_model": "gemini-2.5-pro"
+      },
+      "prompt_version": "v1",
+      "regenerated": true,
+      "author": "ai",
+      "review_status": "pending",
+      "reviewed_at": null,
+      "masked_prompt": "Matter: [TEST] RERA-01 \u2014 PARTY_H, refund with interest, ADDR_1\n\n=== SECTION: Reviewed legal issues ===\n- Whether the Defendant has breached the agreement by failing to deliver possession of the property by the committed date and whether the delay constitutes a material breach.\n- Whether the Plaintiff is entitled to a refund of the amount paid with interest due to the Defendant's failure to deliver possession.\n=== PARTY_Q: Reviewed legal issues ===\n\n=== SECTION: Reviewed causes of action (background only \u2014 do not copy this section's heading or content into an \"issue\" field below) ===\n- Breach of Contract for PARTY_H and Failure to Deliver: Defendant failed to deliver possession of the property by the committed date of 2024-06-30, despite receiving full consideration from Plaintiff. Construction remains incomplete, and no firm revised possession date has been provided, constituting a material breach of the agreement (PARTY_G). This entitles Plaintiff to seek remedies including a full refund of the amount paid along with interest.\n=== PARTY_Q ===\n\n=== SECTION: Retrieved statutory context (cite only from this list) ===\n- Transfer of Property Act, 1882 Section 9: 9. Ins. by Act 2 of 1900, s. 2.\nimmoveable property or by hypothecation or pledge of moveable property, or to any beneficial\ninterest in moveable property not in the possession, either actual or constructive, of the claimant,\nwhich the Civil Courts recognise as affording grounds for relief, whether such debt or beneficial\ninterest be existent, accuring, conditional or contingent:]\n1[\u201ca person is s\n- Transfer of Property Act, 1882 Section 52: 52. Transfer of property pending suit relating thereto.\n- Transfer of Property Act, 1882 Section 43: 43. Transfer by unauthorised person who subsequently acquires interest in property\ntransferred.\n- Consumer Protection Act, 2019 Section 21: 21. (1) Where the Central Authority is satisfied after investigation that any\nadvertisement is false or misleading and is prejudicial to the interest of any consumer or is in\ncontravention of consumer rights, it may, by order, issue directions to the concerned trader\nor manufacturer or endorser or advertiser or publisher, as the case may be, to discontinue\nsuch advertisement or to modify the same \n- Carriage by Road Act, 2007 Section 5: 5. Suspension or cancellation of registration.\u2014(1) If the registering authority is satisfied that the\nholder of certificate of registration has failed to comply with any of the provisions of sub-section (7) of\nsection 4, it may give a notice by registered post or through electronic media or by any verifiable means\nto the holder of certificate of registration to rectify within a period of thirty da\n=== PARTY_Q ===\n\n=== SECTION: Verified precedents already on record for this matter (cite only from this list if it is non-empty) ===\nNo verified precedents are on record for this matter \u2014 do not cite any case.\n=== PARTY_Q ===\n\nFor the PARTY_P clause, produce ONE ground per legal issue in the 'Reviewed legal issues' section above, connecting the statutory provisions (and, if genuinely supportive, a precedent) to that issue. For case law specifically: if you are reasonably confident of a real, specific Indian case (or Supreme Court/High Court judgment) that is directly on point for an issue, name it even if it is not in the 'already on record' list above \u2014 it will be independently verified against Indian Kanoon before it is ever shown to the advocate as confirmed, so a good-faith, reasonably-confident guess is safe and useful. Do not name a case you are not reasonably confident actually exists \u2014 omit case_law_refs for that ground instead. Respond with ONLY a JSON object of this exact shape, overriding the general response shape you were told about earlier \u2014 this clause type uses a different, more structured shape: {\"grounds\": [{\"issue\": string, \"statute_refs\": [{\"act\": string, \"section_no\": string}], \"case_law_refs\": [{\"case_name\": string}], \"argument_note\": string, \"confidence\": number}]}. \"issue\" MUST be copied verbatim from exactly ONE bullet point in the 'Reviewed legal issues' section above \u2014 nothing more, nothing less, never a section heading, never text from any other section, never spanning more than one bullet point. \"argument_note\" is a SHORT 1-3 sentence legal submission for this ground only \u2014 not a full paragraph, not the whole clause, and MUST be a single logical line of text (use \\n only if truly necessary, never a literal line break). Only include a statute in statute_refs if it appears in the retrieved statutory context above \u2014 never invent a section number; omit it rather than guess.",
+      "generation_warning": null,
+      "created_at": "2026-08-09T08:31:17.782972+00:00"
+    }
+  ],
+  "compose": [
+    {
+      "label": "APP-01",
+      "missing_clauses": [],
+      "n_sections": 14
+    },
+    {
+      "label": "CIV-01",
+      "missing_clauses": [],
+      "n_sections": 14
+    },
+    {
+      "label": "COM-01",
+      "missing_clauses": [],
+      "n_sections": 14
+    },
+    {
+      "label": "IA-01",
+      "missing_clauses": [],
+      "n_sections": 14
+    },
+    {
+      "label": "PROP-03",
+      "missing_clauses": [],
+      "n_sections": 14
+    },
+    {
+      "label": "RERA-01",
+      "missing_clauses": [],
+      "n_sections": 14
+    }
+  ]
+}

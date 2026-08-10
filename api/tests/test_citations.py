@@ -83,6 +83,11 @@ class FakeInsert:
                 "case_name_normalized is required (NOT NULL) — the caller must "
                 "compute it via normalize_case_name(), it is not auto-generated"
             )
+        # Real schema: id uuid primary key default gen_random_uuid()
+        # (migration 0001) — mirrored here so a recheck's later
+        # .update(...).eq("id", cached_row["id"]) has something real to
+        # match against, same as it would against production Postgres.
+        row.setdefault("id", f"fake-id-{len(self._table.rows) + 1}")
         self._table.rows.append(row)
         return FakeResponse([row])
 
@@ -90,6 +95,29 @@ class FakeInsert:
 class FakeResponse:
     def __init__(self, data: list[dict]):
         self.data = data
+
+
+class FakeUpdateQuery:
+    """Sprint 3.6 Phase 5 (TICKET-17): supports the
+    .update(record).eq("id", ...).execute() path verify_citation() now
+    takes when rechecking a cached "unverified" row."""
+
+    def __init__(self, table: "FakeTable", record: dict):
+        self._table = table
+        self._record = record
+        self._filters: dict[str, object] = {}
+
+    def eq(self, column: str, value) -> "FakeUpdateQuery":
+        self._filters[column] = value
+        return self
+
+    def execute(self) -> FakeResponse:
+        updated = []
+        for row in self._table.rows:
+            if all(row.get(col) == val for col, val in self._filters.items()):
+                row.update(self._record)
+                updated.append(row)
+        return FakeResponse(updated)
 
 
 class FakeTable:
@@ -101,6 +129,9 @@ class FakeTable:
 
     def insert(self, record: dict) -> FakeInsert:
         return FakeInsert(self, record)
+
+    def update(self, record: dict) -> FakeUpdateQuery:
+        return FakeUpdateQuery(self, record)
 
 
 class FakeSupabase:
@@ -360,3 +391,73 @@ def test_cache_key_distinguishes_by_neutral_citation():
     verify_citation("Ramesh Kumar vs Sunita Sharma", neutral_citation="2020 AIR 5", ik_client=ik, db=db)
 
     assert len(ik.search_calls) == 4  # both were genuine cache misses
+
+
+# --- Sprint 3.6 Phase 5 (TICKET-17/18): reliability improvements ------------
+
+
+def test_match_confidence_is_recorded_on_a_verified_citation():
+    """_best_match()'s own word-overlap score (previously computed and
+    discarded) is now persisted, not just a bare verified/unverified bool."""
+    ik = FakeIndianKanoonClient(
+        search_results=[[{"title": "Ramesh Kumar vs Sunita Sharma", "tid": "1"}]],
+        docs={"1": {"tid": "1", "docsource": "Delhi HC", "publishdate": "2020-01-01"}},
+    )
+    db = FakeSupabase()
+
+    result = verify_citation("Ramesh Kumar vs Sunita Sharma (2020)", ik_client=ik, db=db)
+
+    assert result.status == "verified"
+    assert result.match_confidence is not None
+    assert 0.0 <= result.match_confidence <= 1.0
+
+
+def test_cached_unverified_citation_gets_one_fresh_live_recheck_not_trusted_forever():
+    """Regression test for TICKET-17: a real Supreme Court case
+    (Anathula Sudhakar v. P. Buchi Reddy) came back "unverified" during the
+    Sprint 3.5.6 certification round, then "verified" on an immediate
+    independent retry with the identical case name — live IK search
+    ranking is non-deterministic call-to-call. Before this sprint,
+    verify_citation() cached the first "unverified" result and returned it
+    forever on every subsequent call for the same case name, with no way
+    to ever recover. It must now re-attempt live verification on a cached
+    "unverified" hit rather than trusting a single past negative forever."""
+    ik = FakeIndianKanoonClient(
+        # First call: both passes miss (transient ranking miss).
+        search_results=[[], [], [{"title": "Ramesh Kumar vs Sunita Sharma", "tid": "1"}]],
+        docs={"1": {"tid": "1", "docsource": "Delhi HC", "publishdate": "2020-01-01"}},
+    )
+    db = FakeSupabase()
+
+    first = verify_citation("Ramesh Kumar vs Sunita Sharma", ik_client=ik, db=db)
+    assert first.status == "unverified"
+    assert first.from_cache is False
+    assert len(ik.search_calls) == 2  # first-pass + retry-pass, both missed
+
+    # Second call: cached row is "unverified" — must NOT short-circuit on
+    # the stale cache; must make at least one more live attempt.
+    second = verify_citation("Ramesh Kumar vs Sunita Sharma", ik_client=ik, db=db)
+    assert second.status == "verified"
+    assert second.ik_doc_id == "1"
+    assert second.recheck_count == 1
+    assert len(ik.search_calls) == 3  # one more live attempt was made, not skipped
+
+    # The cache row was updated in place, not duplicated.
+    assert len(db.table("citations").rows) == 1
+
+
+def test_cached_verified_citation_never_rechecked():
+    """The other half of TICKET-17's fix: a "verified" cache hit must
+    still short-circuit exactly as before — only "unverified" hits are
+    untrusted-by-default now, not every cache hit."""
+    ik = FakeIndianKanoonClient(
+        search_results=[[{"title": "Ramesh Kumar vs Sunita Sharma", "tid": "1"}]],
+        docs={"1": {"tid": "1", "docsource": "Delhi HC", "publishdate": "2020-01-01"}},
+    )
+    db = FakeSupabase()
+
+    verify_citation("Ramesh Kumar vs Sunita Sharma", ik_client=ik, db=db)
+    verify_citation("Ramesh Kumar vs Sunita Sharma", ik_client=ik, db=db)
+    verify_citation("Ramesh Kumar vs Sunita Sharma", ik_client=ik, db=db)
+
+    assert len(ik.search_calls) == 1  # unchanged across all 3 calls

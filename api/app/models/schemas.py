@@ -302,7 +302,180 @@ class CaseAnalysisOut(BaseModel):
     recommended_next_steps: list[str]
     possible_precedents: list[PrecedentMentionOut]
     model_used: str | None = None
+    model_routing: ModelRoutingOut | None = None
     generation_warning: str | None = None
     created_at: datetime
     notice: str = "AI-generated draft analysis for advocate review. Not legal advice. Not a pleading."
+
+
+# --- Sprint 3.6 Phase 1/3/4: Pleading Architecture (structured plans only,
+# not drafted pleadings — see ADR-011, migration 0015) -----------------------
+
+class ModelRoutingOut(BaseModel):
+    """Sprint 3.6 Phase 4 (TICKET-20/21): what the LLM Gateway actually
+    did, made explicit rather than silently discoverable only by
+    inspecting model_used after the fact."""
+    requested_model: str  # top of the pool for this task_type, e.g. "gemini-2.5-pro"
+    actual_provider: str
+    actual_model: str
+    degraded: bool  # True if actual_model != requested_model
+    fallback_chain: list[str] = Field(default_factory=list)  # every attempt tried, in order, incl. failures
+
+
+class LegalIssueOut(BaseModel):
+    issue: str
+    related_cause_of_action: str | None = None  # links to a CauseOfActionOut.title, if applicable
+
+
+class ReliefSoughtOut(BaseModel):
+    relief: str
+    basis: str  # which cause of action / statute this relief flows from
+
+
+class EvidenceMappingItemOut(BaseModel):
+    exhibit_number: str | None = None
+    fact_summary: str
+    supports: list[str] = Field(default_factory=list)  # cause-of-action / relief titles this evidence supports
+    has_evidence_file: bool = False
+
+
+class PleadingOutlineSectionOut(BaseModel):
+    """One planned section of the eventual pleading — a content plan, not
+    drafted prose. Enforced in code (pleading_outline.py), not just by
+    convention: see _validate_outline_is_structured()."""
+    section: str  # e.g. "Parties", "Facts", "Cause of Action", "Reliefs Sought"
+    content_plan: str  # what this section will need to cover — a plan, never the pleading text itself
+
+
+class PleadingOutlineGenerateRequest(BaseModel):
+    case_analysis_id: str  # must reference an existing litigation_case_analyses row for this matter
+
+
+class PleadingOutlineOut(BaseModel):
+    id: str
+    matter_id: str
+    case_analysis_id: str
+    version_no: int
+    legal_issues: list[LegalIssueOut]
+    applicable_statutes: list[ApplicableStatuteOut]
+    applicable_case_law: list[PrecedentMentionOut]
+    cause_of_action: list[CauseOfActionOut]
+    reliefs_sought: list[ReliefSoughtOut]
+    jurisdiction_summary: CaseAnalysisForumInput | None = None
+    limitation_summary: CaseAnalysisLimitationInput | None = None
+    evidence_mapping: list[EvidenceMappingItemOut]
+    pleading_outline: list[PleadingOutlineSectionOut]
+    model_used: str | None = None
+    model_routing: ModelRoutingOut | None = None
+    generation_warning: str | None = None
+    created_at: datetime
+    notice: str = (
+        "AI-generated structured pleading PLAN for advocate review. "
+        "Not legal advice. Not a drafted pleading — no prose pleading text "
+        "has been generated from this outline."
+    )
+
+
+# --- Sprint 3.6 Phase 2: Clause-Based Drafting Engine ------------------------
+
+class ClauseGenerateRequest(BaseModel):
+    pleading_outline_id: str
+
+
+class ClauseStatuteRefOut(BaseModel):
+    act: str
+    section_no: str
+    grounded: bool
+
+
+class ClauseCaseLawRefOut(BaseModel):
+    case_name: str
+    status: str  # 'verified' | 'not_in_verified_outline' — never a freshly-proposed, unverified name
+    ik_url: str | None = None
+    court: str | None = None
+
+
+class ClauseGroundOut(BaseModel):
+    """Sprint 3.6 Phase 2A (TICKET-25): one entry per reviewed legal issue,
+    only ever populated for clause_type='legal_grounds'. Deliberately
+    explicit per-field, not folded into free text — WORK ITEM 4's "every
+    generated legal ground must explicitly identify issue/statute/section/
+    precedent/confidence; if unavailable, say so" is satisfied by this
+    shape existing at all, not inferred from prose after the fact."""
+    issue: str
+    statute_refs: list[ClauseStatuteRefOut]
+    case_law_refs: list[ClauseCaseLawRefOut]
+    argument_note: str
+    confidence: float
+
+
+class ClauseContentOut(BaseModel):
+    text: str
+    bullet_items: list[str] | None = None
+    grounds: list[ClauseGroundOut] | None = None
+
+
+class PleadingClauseOut(BaseModel):
+    id: str
+    matter_id: str
+    pleading_outline_id: str
+    clause_type: str
+    version_no: int
+    content: ClauseContentOut
+    statute_refs: list[ClauseStatuteRefOut]
+    case_law_refs: list[ClauseCaseLawRefOut]
+    confidence: float
+    is_deterministic: bool
+    model_used: str | None = None
+    model_routing: ModelRoutingOut | None = None
+    prompt_version: str
+    regenerated: bool
+    author: str
+    review_status: str  # 'pending' | 'approved' | 'rejected'
+    reviewed_at: datetime | None = None
+    generation_warning: str | None = None
+    created_at: datetime
+    notice: str = "AI-generated draft clause for advocate review. Not legal advice."
+
+
+class ClauseReviewRequest(BaseModel):
+    review_status: str = Field(pattern="^(approved|rejected)$")
+
+
+class ComposePleadingRequest(BaseModel):
+    pleading_outline_id: str
+
+
+class ComposedSectionOut(BaseModel):
+    paragraph_no: int
+    clause_type: str
+    heading: str
+    text: str
+    bullet_items: list[str] | None = None
+    statute_refs: list[ClauseStatuteRefOut]
+    case_law_refs: list[ClauseCaseLawRefOut]
+    confidence: float | None = None
+
+
+class ClauseVersionRefOut(BaseModel):
+    clause_type: str
+    clause_id: str
+    version_no: int
+    model_used: str | None = None
+    prompt_version: str | None = None
+
+
+class PleadingDraftOut(BaseModel):
+    id: str
+    matter_id: str
+    pleading_outline_id: str
+    version_no: int
+    clause_versions: list[ClauseVersionRefOut]
+    composed_sections: list[ComposedSectionOut]
+    missing_clauses: list[str]
+    created_at: datetime
+    notice: str = (
+        "AI-assisted DRAFT pleading composed from advocate-approved clauses only. "
+        "Not legal advice. Advocate must review the full document before filing."
+    )
 
