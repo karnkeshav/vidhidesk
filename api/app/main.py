@@ -28,13 +28,35 @@ if not logging.getLogger("vidhidesk").handlers:
 app = FastAPI(title="VidhiDesk API", version="0.1.0")
 
 settings = get_settings()
+
+# Prepare clean CORS origins list, excluding wildcard strings which break credentialed requests
+raw_origins = settings.cors_origins if isinstance(settings.cors_origins, list) else [settings.cors_origins]
+cors_origins = [str(o).strip().rstrip("/") for o in raw_origins if o and str(o).strip() != "*"]
+
+# Ensure default production and local origins are present
+default_origins = ["http://localhost:3000", "https://vidhidesk.vercel.app"]
+for default_origin in default_origins:
+    if default_origin not in cors_origins:
+        cors_origins.append(default_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*vidhidesk.*\.vercel\.app|https://vidhidesk\.vercel\.app|http://localhost:\d+|http://127\.0\.0\.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "VidhiDesk API",
+        "notice": "AI-generated draft for advocate review. Not legal advice.",
+    }
+
 
 app.include_router(health.router)
 app.include_router(matters.router)

@@ -1,6 +1,8 @@
 from functools import lru_cache
+import json
 
 from dotenv import find_dotenv, load_dotenv
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Repo layout: env vars live in the monorepo-root .env, not /api/.env.
@@ -26,10 +28,34 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_key: str = ""
 
-    cors_origins: list[str] = ["http://localhost:3000",
-    "https://vidhidesk.vercel.app"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "https://vidhidesk.vercel.app",
+    ]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: str | list[str] | None) -> list[str]:
+        if v is None:
+            return ["http://localhost:3000", "https://vidhidesk.vercel.app"]
+        if isinstance(v, str):
+            v_str = v.strip()
+            if not v_str:
+                return ["http://localhost:3000", "https://vidhidesk.vercel.app"]
+            if v_str.startswith("[") and v_str.endswith("]"):
+                try:
+                    parsed = json.loads(v_str)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if item]
+                except Exception:
+                    pass
+            if "," in v_str:
+                return [item.strip() for item in v_str.split(",") if item.strip()]
+            return [v_str]
+        return v
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
