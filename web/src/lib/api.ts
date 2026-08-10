@@ -87,15 +87,20 @@ async function authedFetch(path: string, init?: RequestInit) {
       continue;
     }
 
-    // A genuinely rejected session (not a transient upstream hiccup) --
-    // retrying won't fix a dead token. Send the user back to sign in
-    // instead of leaving every page stuck on a raw error forever, the
-    // same way authed-shell.tsx already does when the Supabase SDK itself
-    // detects a null session -- this covers the case that check doesn't
-    // (our own backend rejecting a token the SDK still thinks is live).
-    if (res.status === 401 && typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
+    // Reverted (2026-08-10): this used to also hard-redirect to /login on
+    // any exhausted 401, on the theory that a dead session should bounce
+    // the user back to sign in. That was wrong and caused a real reload
+    // loop in production: /login's own useEffect redirects straight back
+    // to /dashboard whenever a local session is still present (see
+    // app/login/page.tsx), which it is here -- this redirect fires when
+    // Supabase itself is degraded for longer than the retry window, not
+    // when the local session is actually gone, so login would have hit
+    // the exact same failing Supabase call and bounced back immediately.
+    // Two pages full-page-reloading into each other, forever, is worse
+    // than the raw error this was meant to improve on. Session-death
+    // detection stays where it already correctly lives: authed-shell.tsx's
+    // onAuthStateChange/getSession() checks, driven by the Supabase SDK's
+    // own authoritative state, not by one failed backend call.
     throw new ApiError(res.status, `${res.status} ${res.statusText}: ${body}`);
   }
 }

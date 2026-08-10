@@ -20,7 +20,7 @@ function friendlyLoadError(err: unknown): string {
     return "The server is temporarily unavailable. This usually resolves within a few seconds -- try again.";
   }
   if (err instanceof Error && /server error '?5\d\d/i.test(err.message)) {
-    return "A upstream service had a brief connectivity issue. Try again -- this is not something wrong with your account.";
+    return "An upstream service had a brief connectivity issue. Try again -- this is not something wrong with your account.";
   }
   if (err instanceof Error && /Not signed in/i.test(err.message)) {
     return "Your session has ended. Please sign in again.";
