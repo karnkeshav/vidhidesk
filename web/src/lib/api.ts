@@ -13,10 +13,32 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 // wrapped message) is still rejected immediately, not retried.
 const TRANSIENT_RETRY_DELAYS_MS = [600, 1500, 3000];
 
+// 2026-08-10, same day as the retry logic above: a real report of "stuck on
+// 'Loading...' for 3 minutes, then the error" showed the actual gap -- the
+// retry delays above only bound the wait *between* attempts, never the
+// attempt itself. A hung request (connection opens, server/edge never
+// responds at all -- not even an error) has no built-in browser fetch
+// timeout, so it sits until the OS/network stack's own timeout, which can
+// genuinely be minutes. Aborting a stuck attempt after FETCH_TIMEOUT_MS
+// turns that into a fast, retryable failure through the exact same path a
+// network error already takes below, bounding the worst case to roughly
+// (FETCH_TIMEOUT_MS + backoff) x 4 attempts, not an open-ended hang.
+const FETCH_TIMEOUT_MS = 12000;
+
 function isTransientFailure(status: number, bodyText: string): boolean {
   if (status >= 500) return true;
   if (status === 401) return /server error '?5\d\d/i.test(bodyText);
   return false;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export class ApiError extends Error {
@@ -60,7 +82,7 @@ async function authedFetch(path: string, init?: RequestInit) {
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
-      res = await fetch(`${API_URL}${path}`, {
+      res = await fetchWithTimeout(`${API_URL}${path}`, {
         ...init,
         headers: {
           "Content-Type": "application/json",
@@ -70,8 +92,9 @@ async function authedFetch(path: string, init?: RequestInit) {
       });
     } catch (err) {
       // A network-level failure (including a request a CORS-blocked
-      // response shows up as) never gives us a status code at all --
-      // always eligible for the same retry treatment as a 5xx.
+      // response shows up as, and now an aborted-for-hanging-too-long
+      // request too) never gives us a status code at all -- always
+      // eligible for the same retry treatment as a 5xx.
       if (attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
         await new Promise((r) => setTimeout(r, TRANSIENT_RETRY_DELAYS_MS[attempt]));
         continue;

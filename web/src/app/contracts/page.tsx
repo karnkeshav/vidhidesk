@@ -16,6 +16,13 @@ import { Search, Plus, FolderOpen, History, FileText, AlertCircle, RotateCcw } f
 // ever shown, so reaching here means either those retries were exhausted or
 // the failure wasn't retryable in the first place (e.g. offline).
 function friendlyLoadError(err: unknown): string {
+  // AbortError (a request that hung past authedFetch's own timeout, retried,
+  // and still didn't get a response in time) -- checked by `name` rather
+  // than `instanceof Error`, since DOMException (what fetch's AbortController
+  // throws) doesn't reliably satisfy `instanceof Error` in every browser.
+  if (err && typeof err === "object" && "name" in err && (err as { name?: string }).name === "AbortError") {
+    return "The server took too long to respond after several attempts. Please try again in a moment.";
+  }
   if (err instanceof ApiError && err.status >= 500) {
     return "The server is temporarily unavailable. This usually resolves within a few seconds -- try again.";
   }
