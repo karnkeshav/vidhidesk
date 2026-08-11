@@ -2,17 +2,6 @@ import { supabase } from "@/lib/supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
-// TEMP DEBUG (Auth Request Forensics Sprint, 2026-08-11): traces the exact
-// lifecycle of an authedFetch call so a live repro can show where a
-// request dies before FastAPI ever sees it. Deliberately never logs the
-// JWT, the Authorization header value, or any request/response body --
-// only structural facts (url, attempt number, status, abort reason).
-// Remove once the forensic sprint concludes.
-const DEBUG_AUTH_FETCH = true;
-function debugLog(event: string, data?: Record<string, unknown>) {
-  if (DEBUG_AUTH_FETCH) console.debug(`[authedFetch] ${event}`, data ?? "");
-}
-
 // Frontend resilience for transient upstream failures (2026-08-10): a real,
 // live incident showed the backend's own auth check occasionally getting a
 // 520 from Supabase's Cloudflare edge (Render <-> Supabase connectivity, not
@@ -44,19 +33,9 @@ function isTransientFailure(status: number, bodyText: string): boolean {
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
-  let timedOut = false;
-  const timeoutId = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, FETCH_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
-  } catch (err) {
-    debugLog("request cancelled", {
-      url,
-      reason: timedOut ? "internal-timeout" : (err instanceof Error ? err.name : String(err)),
-    });
-    throw err;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -94,18 +73,31 @@ export type Message = {
   created_at: string;
 };
 
+function isLocalVercelRoute(path: string, method: string = "GET"): boolean {
+  if (path === "/api/templates" || path.startsWith("/api/templates/")) {
+    if (path.includes("/clauses")) return false;
+    return method === "GET";
+  }
+  if (path === "/api/matters") return true;
+  if (/^\/api\/matters\/[^\/]+$/.test(path)) {
+    return method === "GET" || method === "PATCH";
+  }
+  return false;
+}
+
 async function authedFetch(path: string, init?: RequestInit) {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  debugLog("request started", { url: `${API_URL}${path}`, authPresent: !!session });
   if (!session) throw new Error("Not signed in");
 
+  const method = (init?.method || "GET").toUpperCase();
+  const baseUrl = isLocalVercelRoute(path, method) ? "" : API_URL;
+
   for (let attempt = 0; ; attempt++) {
-    debugLog("attempt", { url: `${API_URL}${path}`, attempt });
     let res: Response;
     try {
-      res = await fetchWithTimeout(`${API_URL}${path}`, {
+      res = await fetchWithTimeout(`${baseUrl}${path}`, {
         ...init,
         headers: {
           "Content-Type": "application/json",
@@ -119,20 +111,16 @@ async function authedFetch(path: string, init?: RequestInit) {
       // request too) never gives us a status code at all -- always
       // eligible for the same retry treatment as a 5xx.
       if (attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
-        debugLog("retrying after network-level failure", { url: `${API_URL}${path}`, attempt });
         await new Promise((r) => setTimeout(r, TRANSIENT_RETRY_DELAYS_MS[attempt]));
         continue;
       }
-      debugLog("request failed permanently", { url: `${API_URL}${path}`, attempt });
       throw err instanceof Error ? err : new Error(String(err));
     }
 
-    debugLog("request completed", { url: `${API_URL}${path}`, status: res.status, attempt });
     if (res.ok) return res.json();
 
     const body = await res.text();
     if (isTransientFailure(res.status, body) && attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
-      debugLog("retrying after transient status", { url: `${API_URL}${path}`, status: res.status, attempt });
       await new Promise((r) => setTimeout(r, TRANSIENT_RETRY_DELAYS_MS[attempt]));
       continue;
     }
