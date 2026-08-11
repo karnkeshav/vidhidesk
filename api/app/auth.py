@@ -16,7 +16,19 @@ same HTTPException with the exact same status/detail it always did —
 only a WARNING-level, secret-free log line is new. Never logs the
 Authorization header, the JWT, a refresh token, or any user PII (email/id)
 — only a failure category, the request path, the HTTP status, a
-high-level (non-raw-exception) reason string, and a timestamp.
+high-level reason string, and a timestamp.
+
+Raw exception visibility (2026-08-11): the category label alone (e.g.
+"supabase_verification_failed") couldn't tell a Supabase-edge timeout
+(httpx.ReadTimeout/ConnectError — a network problem) apart from a real
+credential rejection (AuthApiError — an auth problem) — two failure
+modes needing completely different fixes. For the one branch that wraps
+an actual SDK exception (the anon_client().auth.get_user() call below),
+_log_auth_failure() now also logs that exception's type and message
+verbatim. Confirmed safe: neither httpx's connection exceptions nor
+gotrue's AuthApiError embed the Authorization header or JWT value in
+their message — the same str(exc) already goes into the HTTPException
+detail returned to the caller.
 """
 
 from __future__ import annotations
@@ -67,12 +79,33 @@ def _classify_supabase_exception(exc: Exception) -> tuple[str, str]:
     return "supabase_verification_failed", "Supabase auth verification failed"
 
 
-def _log_auth_failure(request: Request, category: str, status_code: int, reason: str) -> None:
+def _log_auth_failure(
+    request: Request, category: str, status_code: int, reason: str,
+    exc: Exception | None = None,
+) -> None:
     """Structured, secret-free diagnostic logging for one authentication
-    rejection. See module docstring for what is and is not logged."""
+    rejection. See module docstring for what is and is not logged.
+
+    `exc`, when given, is the actual exception raised by the Supabase SDK
+    call (not a local validation check) -- its raw type and message are
+    logged alongside the mapped category. Added 2026-08-11: the category
+    label alone (e.g. "supabase_verification_failed") was hiding whether
+    a given failure was httpx timing out against Supabase's edge
+    (httpx.ReadTimeout / httpx.ConnectError -- a network/latency problem)
+    or Supabase cleanly rejecting the token (AuthApiError -- a real
+    credential problem) -- two failure modes that need completely
+    different fixes, previously indistinguishable from this log alone.
+    Safe to log: neither httpx's connection exceptions nor gotrue's
+    AuthApiError embed the Authorization header or JWT value in their
+    message -- confirmed by the fact the exact same str(exc) already goes
+    into the HTTPException detail returned to the caller below."""
+    exc_type = f"{type(exc).__module__}.{type(exc).__name__}" if exc is not None else "n/a"
+    exc_message = str(exc) if exc is not None else "n/a"
     logger.warning(
-        "auth.get_current_user auth_failure category=%s endpoint=%s status=%d reason=%s timestamp=%s",
-        category, request.url.path, status_code, reason, datetime.now(timezone.utc).isoformat(),
+        "auth.get_current_user auth_failure category=%s endpoint=%s status=%d reason=%s "
+        "exc_type=%s exc_message=%s timestamp=%s",
+        category, request.url.path, status_code, reason,
+        exc_type, exc_message, datetime.now(timezone.utc).isoformat(),
     )
 
 
@@ -94,7 +127,7 @@ def get_current_user(request: Request, authorization: str = Header(...)) -> Curr
             (time.perf_counter() - _t0) * 1000, request.url.path,
         )
         category, reason = _classify_supabase_exception(exc)
-        _log_auth_failure(request, category, 401, reason)
+        _log_auth_failure(request, category, 401, reason, exc=exc)
         raise HTTPException(status_code=401, detail=f"Invalid session: {exc}") from exc
     _timing_logger.info(
         "timing auth.get_user duration_ms=%.1f outcome=ok endpoint=%s",
