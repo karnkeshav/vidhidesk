@@ -1,10 +1,12 @@
 import logging
+import time
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers import citations, contracts, health, litigation, matters, profile, retrieval
@@ -38,6 +40,63 @@ default_origins = ["http://localhost:3000", "https://vidhidesk.vercel.app"]
 for default_origin in default_origins:
     if default_origin not in cors_origins:
         cors_origins.append(default_origin)
+
+_error_logger = logging.getLogger("vidhidesk.errors")
+
+
+# Auth Request Forensics Sprint (2026-08-11): registered BEFORE
+# add_middleware(CORSMiddleware) below -- Starlette's add_middleware()
+# inserts at the front of the middleware list, so whatever is registered
+# LAST ends up OUTERMOST. Registering this first means it ends up
+# innermost (right next to routing), so CORSMiddleware wraps it and still
+# gets a chance to attach CORS headers to whatever it returns.
+#
+# This matters because an unhandled (non-HTTPException) exception raised
+# inside a route -- e.g. a Supabase client call with no try/except --
+# propagates all the way out to Starlette's ServerErrorMiddleware, which
+# sits OUTSIDE CORSMiddleware and sends its fallback 500 on the raw ASGI
+# `send`, bypassing CORSMiddleware's header injection entirely. The
+# browser then reports that response as "blocked by CORS policy: No
+# Access-Control-Allow-Origin header present" -- CORS is configured
+# correctly, but the error response never passed through it. Verified
+# locally with an isolated TestClient repro (identical CORSMiddleware
+# config): an unhandled RuntimeError produced a 500 with zero CORS
+# headers; the same exception caught here and turned into a JSONResponse
+# came back with the correct headers. A top-level
+# @app.exception_handler(Exception) does NOT fix this -- it's routed
+# through the same outer ServerErrorMiddleware and was verified to still
+# strip CORS headers.
+@app.middleware("http")
+async def catch_unhandled_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        _error_logger.exception("unhandled_exception endpoint=%s", request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
+_timing_logger = logging.getLogger("vidhidesk.timing")
+
+
+# TEMP TIMING INSTRUMENTATION (Auth Request Forensics Sprint, latency
+# follow-up, 2026-08-11): total wall-clock time for every request, to be
+# read alongside the auth.get_user() timing (app/auth.py) and
+# table(...).execute() timing (app/routers/matters.py) -- together they
+# show where a request's time actually goes. Added AFTER
+# catch_unhandled_exceptions above, so (per the ordering note on that
+# middleware) it ends up OUTER relative to it -- this measures the full
+# request including exception-recovery time, not just the happy path.
+# Remove once the sprint's before/after comparison is done.
+@app.middleware("http")
+async def log_request_timing(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    _timing_logger.info(
+        "timing total_request duration_ms=%.1f path=%s method=%s status=%d",
+        (time.perf_counter() - start) * 1000, request.url.path, request.method, response.status_code,
+    )
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,

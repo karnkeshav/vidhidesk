@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import logging
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import CurrentUser, get_current_user
 from app.db import service_client
+
+# TEMP TIMING INSTRUMENTATION (Auth Request Forensics Sprint, latency
+# follow-up, 2026-08-11): see app/auth.py for the matching auth.get_user()
+# timing and app/main.py for total-request timing. Remove once the
+# sprint's before/after comparison is done.
+_timing_logger = logging.getLogger("vidhidesk.timing")
 from app.models.schemas import (
     MatterCreate,
     MatterOut,
@@ -86,11 +95,16 @@ def create_matter(body: MatterCreate, user: CurrentUser = Depends(get_current_us
 
 @router.get("", response_model=list[MatterOut])
 def list_matters(user: CurrentUser = Depends(get_current_user)):
+    _t0 = time.perf_counter()
     resp = (
         user.db.table("matters")
         .select("*")
         .order("created_at", desc=True)
         .execute()
+    )
+    _timing_logger.info(
+        "timing matters.table_execute duration_ms=%.1f rows=%d",
+        (time.perf_counter() - _t0) * 1000, len(resp.data or []),
     )
     return resp.data
 

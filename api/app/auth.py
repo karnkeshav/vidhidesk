@@ -22,6 +22,7 @@ high-level (non-raw-exception) reason string, and a timestamp.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -31,6 +32,14 @@ from supabase import Client
 from app.db import anon_client, user_client
 
 logger = logging.getLogger("vidhidesk.auth")
+
+# TEMP TIMING INSTRUMENTATION (Auth Request Forensics Sprint, latency
+# follow-up, 2026-08-11): measures the auth.get_user() call in isolation
+# so it can be compared against the table(...).execute() timing in
+# app/routers/matters.py and the total-request timing in app/main.py --
+# together they show where a request's time is actually going. Remove
+# once the sprint's before/after comparison is done.
+_timing_logger = logging.getLogger("vidhidesk.timing")
 
 
 @dataclass
@@ -76,12 +85,21 @@ def get_current_user(request: Request, authorization: str = Header(...)) -> Curr
         _log_auth_failure(request, "malformed_header", 401, "empty bearer token")
         raise HTTPException(status_code=401, detail="Missing bearer token")
 
+    _t0 = time.perf_counter()
     try:
         resp = anon_client().auth.get_user(token)
     except Exception as exc:  # noqa: BLE001 — any auth SDK error means "not authenticated"
+        _timing_logger.info(
+            "timing auth.get_user duration_ms=%.1f outcome=error endpoint=%s",
+            (time.perf_counter() - _t0) * 1000, request.url.path,
+        )
         category, reason = _classify_supabase_exception(exc)
         _log_auth_failure(request, category, 401, reason)
         raise HTTPException(status_code=401, detail=f"Invalid session: {exc}") from exc
+    _timing_logger.info(
+        "timing auth.get_user duration_ms=%.1f outcome=ok endpoint=%s",
+        (time.perf_counter() - _t0) * 1000, request.url.path,
+    )
 
     if resp is None or resp.user is None:
         _log_auth_failure(request, "no_user_returned", 401, "Supabase returned no user for this token")

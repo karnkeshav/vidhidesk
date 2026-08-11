@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +14,13 @@ from app.services.llm_gateway import ProviderError
 
 router = APIRouter(prefix="/api", tags=["contracts"])
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+# TEMP TIMING INSTRUMENTATION (Auth Request Forensics Sprint, latency
+# follow-up, 2026-08-11): matches the table_execute timing in
+# app/routers/matters.py so /api/matters and /api/templates produce
+# directly comparable logs. Remove once the sprint's before/after
+# comparison is done.
+_timing_logger = logging.getLogger("vidhidesk.timing")
 
 
 def _get_matter_or_404(user: CurrentUser, matter_id: str) -> dict:
@@ -41,6 +50,7 @@ class TemplateDetailOut(TemplateOut):
 
 @router.get("/templates", response_model=list[TemplateOut])
 def list_templates(user: CurrentUser = Depends(get_current_user)):
+    _t0 = time.perf_counter()
     rows = (
         user.db.table("templates")
         .select("id,name,category,review_status,states_supported,template_key")
@@ -48,6 +58,10 @@ def list_templates(user: CurrentUser = Depends(get_current_user)):
         .execute()
         .data
         or []
+    )
+    _timing_logger.info(
+        "timing templates.table_execute duration_ms=%.1f rows=%d",
+        (time.perf_counter() - _t0) * 1000, len(rows),
     )
     return rows
 

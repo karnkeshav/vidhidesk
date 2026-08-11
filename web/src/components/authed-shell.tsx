@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +22,19 @@ import {
   User,
 } from "lucide-react";
 
+// AuthedShell already needs the full matters list for its "Recent
+// Matters" sidebar on every authed page. DashboardPage used to issue its
+// own, separate listMatters() call for the same data (just unsliced) --
+// two concurrent identical GETs on every dashboard load (Auth Request
+// Forensics Sprint, item 8). Fetching once here and sharing it via
+// context removes the duplicate without losing either the sidebar's
+// top-4 view or the dashboard's own error banner.
+type MattersContextValue = { matters: Matter[]; error: string | null };
+const MattersContext = createContext<MattersContextValue>({ matters: [], error: null });
+export function useMatters() {
+  return useContext(MattersContext);
+}
+
 export function AuthedShell({
   children,
   wide = false,
@@ -33,7 +46,8 @@ export function AuthedShell({
   const router = useRouter();
   const [session, setSession] = useState<Session | null | "loading">("loading");
   const [jurisdiction, setJurisdiction] = useState<string>("Delhi");
-  const [recentMatters, setRecentMatters] = useState<Matter[]>([]);
+  const [matters, setMatters] = useState<Matter[]>([]);
+  const [mattersError, setMattersError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
 
   const loadAdvocateProfile = () => {
@@ -53,14 +67,24 @@ export function AuthedShell({
   };
 
   useEffect(() => {
+    // TEMP DEBUG (Auth Request Forensics Sprint): confirms whether this
+    // effect fires more than once per real mount (React StrictMode
+    // double-invoke in dev) and whether the component unmounts while
+    // listMatters() is still in flight. Remove once the sprint concludes.
+    let unmounted = false;
+    console.debug("[AuthedShell] effect mount");
+
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) {
         router.push("/login");
       } else {
         setSession(data.session);
         listMatters()
-          .then((data) => setRecentMatters(data.slice(0, 4)))
-          .catch(() => {});
+          .then((data) => {
+            if (unmounted) console.debug("[AuthedShell] listMatters resolved after unmount");
+            setMatters(data);
+          })
+          .catch((err) => setMattersError(err instanceof Error ? err.message : String(err)));
       }
     });
 
@@ -84,6 +108,8 @@ export function AuthedShell({
       if (!s) router.push("/login");
     });
     return () => {
+      unmounted = true;
+      console.debug("[AuthedShell] effect cleanup (unmount)");
       sub.subscription.unsubscribe();
       window.removeEventListener("advocate_profile_updated", handleProfileUpdate);
     };
@@ -237,10 +263,10 @@ export function AuthedShell({
               Recent Matters
             </p>
             <div className="space-y-1">
-              {recentMatters.length === 0 ? (
+              {matters.length === 0 ? (
                 <p className="px-2 font-serif text-xs text-[#76777F]">No recent matters</p>
               ) : (
-                recentMatters.map((m) => (
+                matters.slice(0, 4).map((m) => (
                   <a
                     key={m.id}
                     href={m.module === "contracts" ? `/contracts/${m.id}` : `/matters/${m.id}`}
@@ -256,7 +282,9 @@ export function AuthedShell({
 
         {/* Main Workspace Canvas */}
         <main className={cn("w-full min-w-0 p-4 pb-20 md:p-6 md:pb-6", wide ? "max-w-7xl" : "max-w-6xl")}>
-          {children}
+          <MattersContext.Provider value={{ matters, error: mattersError }}>
+            {children}
+          </MattersContext.Provider>
         </main>
       </div>
 

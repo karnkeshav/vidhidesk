@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AuthedShell } from "@/components/authed-shell";
+import { AuthedShell, useMatters } from "@/components/authed-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { listMatters, Matter } from "@/lib/api";
 import {
   FileText,
   Gavel,
@@ -14,14 +12,11 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
-  const [matters, setMatters] = useState<Matter[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listMatters()
-      .then(setMatters)
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
-  }, []);
+  // Auth Request Forensics Sprint, item 8: this used to call listMatters()
+  // itself, duplicating the identical fetch AuthedShell already makes for
+  // its sidebar -- two concurrent GET /api/matters on every dashboard
+  // load. Now shares AuthedShell's single fetch via context.
+  const { matters, error } = useMatters();
 
   const contractsMatters = matters.filter((m) => m.module === "contracts");
   const litigationMatters = matters.filter((m) => m.module === "litigation");
