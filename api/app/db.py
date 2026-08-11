@@ -16,16 +16,23 @@ Auth Request Forensics Sprint, latency follow-up (2026-08-11): measured
 against the real project, an uncached client pays ~1000ms on its first
 Postgrest call vs. ~170ms on a warm/reused one (see the sprint's timing
 investigation) -- yet only service_client() was ever cached. anon_client()
-takes no arguments and is always identical, so it's cached the same way
-now. user_client() is deliberately NOT cached here: it's keyed by a
+takes no arguments and is always identical, so it was briefly cached the
+same way -- REVERTED the same day: production logs showed auth.get_user()
+calls (the one thing sharing that cached client touches) taking 20-64
+seconds under real traffic, clustered in a way consistent with requests
+queuing behind a shared client, immediately after this went live. Not
+conclusively reproduced locally (concurrent-thread repros against the
+real Supabase project stayed fast), so the exact mechanism is unconfirmed
+-- but it's the one variable changed in that path, and going back to a
+fresh client per call is essentially free (~30-500ms) next to the
+alternative. If auth.get_user() is still slow after this revert, that
+points at something external (Render's outbound path to Supabase, or
+Supabase's edge itself) rather than this client's lifecycle.
+user_client() was never cached here in the first place: it's keyed by a
 per-request access token, and naively caching by token would grow
 unbounded over the process lifetime with no eviction for
 expired/revoked tokens -- a real memory/staleness risk, not just an
-optimization left on the table. The shared-httpx-transport approach that
-would let user_client() reuse a warm connection pool too, without
-per-token caching, is intentionally deferred -- it changes transport
-lifecycle and is only worth it if the two changes here don't move the
-needle enough on their own.
+optimization left on the table.
 
 Both PostgREST timeout defaults (2026-08-11 finding): supabase-py's
 ClientOptions defaults postgrest_client_timeout to 120 seconds -- far
@@ -74,12 +81,12 @@ def user_client(access_token: str) -> Client:
     return client
 
 
-@lru_cache
 def anon_client() -> Client:
     """Unauthenticated client — only used to validate a bearer token via
-    auth.get_user(), never to read/write tables. Always identical (no
-    arguments), so — like service_client() — it's cached rather than
-    rebuilt (with a fresh httpx connection pool) on every request."""
+    auth.get_user(), never to read/write tables. NOT cached (see module
+    docstring, "REVERTED the same day") -- was briefly a cached singleton
+    like service_client(), reverted after production showed severe
+    auth.get_user() slowdowns under concurrent traffic once it went live."""
     settings = get_settings()
     return create_client(
         settings.supabase_url,
