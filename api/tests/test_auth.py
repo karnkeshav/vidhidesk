@@ -45,6 +45,9 @@ class _FakeAnonClient:
     def get_user(self, token: str):
         return self._behavior(token)
 
+    def close(self):
+        pass
+
 
 def _make_app(anon_client_factory):
     app = FastAPI()

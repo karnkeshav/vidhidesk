@@ -47,6 +47,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+import httpx
 from supabase import Client, ClientOptions, create_client
 
 from app.config import get_settings
@@ -56,6 +57,11 @@ from app.config import get_settings
 # Supabase call fails fast and observably on the backend instead of
 # silently outliving the client's own timeout.
 SUPABASE_POSTGREST_TIMEOUT_S = 5
+
+# Auth HTTP transport timeout for anon_client(). Dedicated short timeout
+# (connect/read/write/pool) so an upstream Supabase Auth or Cloudflare edge
+# stall fails fast on the backend within ~4s instead of blocking for 20-47s.
+SUPABASE_AUTH_TIMEOUT = httpx.Timeout(connect=3.0, read=4.0, write=3.0, pool=3.0)
 
 
 @lru_cache
@@ -88,8 +94,17 @@ def anon_client() -> Client:
     like service_client(), reverted after production showed severe
     auth.get_user() slowdowns under concurrent traffic once it went live."""
     settings = get_settings()
+    auth_httpx = httpx.Client(
+        timeout=SUPABASE_AUTH_TIMEOUT,
+        follow_redirects=True,
+        http2=True,
+    )
     return create_client(
         settings.supabase_url,
         settings.supabase_anon_key,
-        options=ClientOptions(postgrest_client_timeout=SUPABASE_POSTGREST_TIMEOUT_S),
+        options=ClientOptions(
+            postgrest_client_timeout=SUPABASE_POSTGREST_TIMEOUT_S,
+            httpx_client=auth_httpx,
+        ),
     )
+

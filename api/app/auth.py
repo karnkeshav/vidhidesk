@@ -118,9 +118,10 @@ def get_current_user(request: Request, authorization: str = Header(...)) -> Curr
         _log_auth_failure(request, "malformed_header", 401, "empty bearer token")
         raise HTTPException(status_code=401, detail="Missing bearer token")
 
+    client = anon_client()
     _t0 = time.perf_counter()
     try:
-        resp = anon_client().auth.get_user(token)
+        resp = client.auth.get_user(token)
     except Exception as exc:  # noqa: BLE001 — any auth SDK error means "not authenticated"
         _timing_logger.info(
             "timing auth.get_user duration_ms=%.1f outcome=error endpoint=%s",
@@ -129,6 +130,9 @@ def get_current_user(request: Request, authorization: str = Header(...)) -> Curr
         category, reason = _classify_supabase_exception(exc)
         _log_auth_failure(request, category, 401, reason, exc=exc)
         raise HTTPException(status_code=401, detail=f"Invalid session: {exc}") from exc
+    finally:
+        if hasattr(client.auth, "close"):
+            client.auth.close()
     _timing_logger.info(
         "timing auth.get_user duration_ms=%.1f outcome=ok endpoint=%s",
         (time.perf_counter() - _t0) * 1000, request.url.path,
@@ -140,4 +144,5 @@ def get_current_user(request: Request, authorization: str = Header(...)) -> Curr
 
     meta = getattr(resp.user, "user_metadata", None) or getattr(resp.user, "raw_user_meta_data", None)
     return CurrentUser(id=resp.user.id, email=resp.user.email, db=user_client(token), raw_user_meta_data=meta)
+
 
