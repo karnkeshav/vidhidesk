@@ -48,7 +48,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 import httpx
-from supabase import Client, ClientOptions, create_client
+from supabase import AsyncClient, Client, ClientOptions, create_async_client, create_client
 
 from app.config import get_settings
 
@@ -107,4 +107,25 @@ def anon_client() -> Client:
             httpx_client=auth_httpx,
         ),
     )
+
+
+async def async_anon_client() -> AsyncClient:
+    """Unauthenticated async client factory — creates a dedicated AsyncClient
+    used exclusively by get_current_user() with httpx.AsyncClient transport,
+    allowing asyncio.wait_for() to enforce a true wall-clock deadline (~4s)."""
+    settings = get_settings()
+    auth_httpx = httpx.AsyncClient(
+        timeout=SUPABASE_AUTH_TIMEOUT,
+        follow_redirects=True,
+        http2=True,
+    )
+    return await create_async_client(
+        settings.supabase_url,
+        settings.supabase_anon_key,
+        options=ClientOptions(
+            postgrest_client_timeout=SUPABASE_POSTGREST_TIMEOUT_S,
+            httpx_client=auth_httpx,
+        ),
+    )
+
 

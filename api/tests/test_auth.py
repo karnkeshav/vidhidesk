@@ -32,7 +32,7 @@ class _FakeGetUserResponse:
 
 
 class _FakeAnonClient:
-    """Stands in for app.db.anon_client() — controls exactly what
+    """Stands in for app.db.async_anon_client() — controls exactly what
     .auth.get_user(token) returns/raises, without any real network call."""
 
     def __init__(self, behavior):
@@ -42,10 +42,13 @@ class _FakeAnonClient:
     def auth(self):
         return self
 
-    def get_user(self, token: str):
-        return self._behavior(token)
+    async def get_user(self, token: str):
+        res = self._behavior(token)
+        if hasattr(res, "__await__"):
+            return await res
+        return res
 
-    def close(self):
+    async def close(self):
         pass
 
 
@@ -53,7 +56,7 @@ def _make_app(anon_client_factory):
     app = FastAPI()
 
     @app.get("/whoami")
-    def whoami(user=Depends(get_current_user)):
+    async def whoami(user=Depends(get_current_user)):
         return {"id": user.id}
 
     return app
@@ -62,7 +65,9 @@ def _make_app(anon_client_factory):
 @pytest.fixture
 def client(monkeypatch):
     def _client_for(behavior):
-        monkeypatch.setattr(auth_module, "anon_client", lambda: _FakeAnonClient(behavior))
+        async def _fake_async_anon():
+            return _FakeAnonClient(behavior)
+        monkeypatch.setattr(auth_module, "async_anon_client", _fake_async_anon)
         app = _make_app(None)
         return TestClient(app)
 

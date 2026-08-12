@@ -38,10 +38,13 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import asyncio
 from fastapi import Header, HTTPException, Request
 from supabase import Client
 
-from app.db import anon_client, user_client
+from app.db import async_anon_client, user_client
+
+AUTH_WALL_CLOCK_TIMEOUT_S = 4.0
 
 logger = logging.getLogger("vidhidesk.auth")
 
@@ -71,7 +74,11 @@ def _classify_supabase_exception(exc: Exception) -> tuple[str, str]:
     invalid token produces "...token is malformed: token contains an
     invalid number of segments"; a revoked/expired session produces the
     distinct "Session from session_id claim in JWT does not exist"."""
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+        return "upstream_auth_timeout", "Supabase auth verification timed out after 4s"
     text = str(exc).lower()
+    if "timeout" in text:
+        return "upstream_auth_timeout", "Supabase auth verification timed out after 4s"
     if "malformed" in text or "invalid number of segments" in text or "unable to parse" in text:
         return "invalid_jwt", "token failed structural validation"
     if "session" in text and ("does not exist" in text or "expired" in text or "revoked" in text):
@@ -109,7 +116,7 @@ def _log_auth_failure(
     )
 
 
-def get_current_user(request: Request, authorization: str = Header(...)) -> CurrentUser:
+async def get_current_user(request: Request, authorization: str = Header(...)) -> CurrentUser:
     if not authorization.lower().startswith("bearer "):
         _log_auth_failure(request, "malformed_header", 401, "missing 'Bearer ' prefix")
         raise HTTPException(status_code=401, detail="Missing or malformed Authorization header")
@@ -118,11 +125,14 @@ def get_current_user(request: Request, authorization: str = Header(...)) -> Curr
         _log_auth_failure(request, "malformed_header", 401, "empty bearer token")
         raise HTTPException(status_code=401, detail="Missing bearer token")
 
-    client = anon_client()
+    client = await async_anon_client()
     _t0 = time.perf_counter()
     try:
-        resp = client.auth.get_user(token)
-    except Exception as exc:  # noqa: BLE001 — any auth SDK error means "not authenticated"
+        resp = await asyncio.wait_for(
+            client.auth.get_user(token),
+            timeout=AUTH_WALL_CLOCK_TIMEOUT_S,
+        )
+    except Exception as exc:  # noqa: BLE001 — any auth SDK error or timeout means "not authenticated"
         _timing_logger.info(
             "timing auth.get_user duration_ms=%.1f outcome=error endpoint=%s",
             (time.perf_counter() - _t0) * 1000, request.url.path,
@@ -132,7 +142,7 @@ def get_current_user(request: Request, authorization: str = Header(...)) -> Curr
         raise HTTPException(status_code=401, detail=f"Invalid session: {exc}") from exc
     finally:
         if hasattr(client.auth, "close"):
-            client.auth.close()
+            await client.auth.close()
     _timing_logger.info(
         "timing auth.get_user duration_ms=%.1f outcome=ok endpoint=%s",
         (time.perf_counter() - _t0) * 1000, request.url.path,
