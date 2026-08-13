@@ -48,6 +48,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 import httpx
+import jwt
 from supabase import AsyncClient, Client, ClientOptions, create_async_client, create_client
 
 from app.config import get_settings
@@ -88,11 +89,15 @@ def user_client(access_token: str) -> Client:
 
 
 def anon_client() -> Client:
-    """Unauthenticated client — only used to validate a bearer token via
+    """Unauthenticated client that validates a bearer token via
     auth.get_user(), never to read/write tables. NOT cached (see module
     docstring, "REVERTED the same day") -- was briefly a cached singleton
     like service_client(), reverted after production showed severe
-    auth.get_user() slowdowns under concurrent traffic once it went live."""
+    auth.get_user() slowdowns under concurrent traffic once it went live.
+
+    No longer on get_current_user()'s hot path (Auth Request Forensics
+    Sprint, local JWT verification, 2026-08-13) -- see jwks_client()
+    below and app/auth.py. Kept as a general-purpose factory."""
     settings = get_settings()
     auth_httpx = httpx.Client(
         timeout=SUPABASE_AUTH_TIMEOUT,
@@ -111,8 +116,13 @@ def anon_client() -> Client:
 
 async def async_anon_client() -> AsyncClient:
     """Unauthenticated async client factory — creates a dedicated AsyncClient
-    used exclusively by get_current_user() with httpx.AsyncClient transport,
-    allowing asyncio.wait_for() to enforce a true wall-clock deadline (~4s)."""
+    with httpx.AsyncClient transport, allowing asyncio.wait_for() to enforce
+    a true wall-clock deadline (~4s) on any auth.get_user() call made
+    through it.
+
+    No longer on get_current_user()'s hot path (Auth Request Forensics
+    Sprint, local JWT verification, 2026-08-13) -- see jwks_client() below
+    and app/auth.py. Kept as a general-purpose factory."""
     settings = get_settings()
     auth_httpx = httpx.AsyncClient(
         timeout=SUPABASE_AUTH_TIMEOUT,
@@ -126,6 +136,38 @@ async def async_anon_client() -> AsyncClient:
             postgrest_client_timeout=SUPABASE_POSTGREST_TIMEOUT_S,
             httpx_client=auth_httpx,
         ),
+    )
+
+
+# Auth Request Forensics Sprint, local JWT verification (2026-08-13):
+# get_current_user() previously called Supabase Auth's remote
+# auth.get_user() on every single request via async_anon_client() above --
+# confirmed as the actual bottleneck (production logs showed this call
+# taking 20-64s under load; the frontend's 12s FETCH_TIMEOUT_MS was firing
+# first, so /api/templates and /api/matters appeared to hang/fail even
+# though the database itself (verified directly via service_client(), see
+# the DB forensic diagnostic) was healthy and fast).
+#
+# This project's Supabase Auth signing key is ES256/asymmetric (confirmed
+# against the live JWKS endpoint below), so the JWT can be verified locally
+# -- signature, expiry, issuer, audience -- with zero outbound network call
+# on the normal request path. PyJWKClient handles JWKS caching internally
+# (Tier 1: whole-set cache, 10 min TTL here) and transparently re-fetches
+# on an unrecognised `kid` (key rotation) before failing -- see
+# PyJWKClient.get_signing_key's refresh-and-retry-once behaviour.
+# lru_cache makes this a process-wide singleton so that cache persists
+# across requests instead of resetting on every call.
+JWKS_CACHE_LIFESPAN_S = 600  # 10 minutes; matches gotrue-py's own internal default.
+
+
+@lru_cache
+def jwks_client() -> jwt.PyJWKClient:
+    settings = get_settings()
+    return jwt.PyJWKClient(
+        f"{settings.supabase_url}/auth/v1/.well-known/jwks.json",
+        cache_jwk_set=True,
+        lifespan=JWKS_CACHE_LIFESPAN_S,
+        timeout=4,
     )
 
 
