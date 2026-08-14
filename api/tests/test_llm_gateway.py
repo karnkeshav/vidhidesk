@@ -43,7 +43,7 @@ def test_uses_gemini_first_when_it_succeeds(settings):
     assert result.text == "Gemini says hi"
     # Sprint 3.6 Phase 4 (TICKET-20/21): top-of-pool model succeeding on
     # the first attempt is the one case that must show degraded=False.
-    assert result.model == result.requested_model == "gemini-2.5-pro"
+    assert result.model == result.requested_model == "gemini-2.5-flash"
     assert result.degraded is False
     assert result.fallback_chain == []
 
@@ -90,7 +90,7 @@ def test_success_log_line_reports_final_provider_and_failed_providers(settings, 
     assert len(success_lines) == 1
     assert "provider=sambanova" in success_lines[0]
     assert "failed_attempts" in success_lines[0]
-    assert "gemini:gemini-2.5-pro" in success_lines[0]
+    assert "gemini:gemini-2.5-flash" in success_lines[0]
     assert "groq:llama-3.3-70b-versatile" in success_lines[0]
 
 
@@ -335,17 +335,17 @@ def test_pre_wrapped_user_amendment_is_preserved_without_double_wrapping(setting
 
 @respx.mock
 def test_gemini_model_pool_failover_falls_through_in_pool(settings):
-    """Failure on gemini-2.5-pro falls through to gemini-2.5-flash within Gemini pool."""
+    """Failure on gemini-2.5-flash (pool head) falls through to gemini-2.0-flash within Gemini pool."""
     attempts: list[str] = []
 
     def _gemini_side_effect(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
-        if "gemini-2.5-pro" in url_str:
-            attempts.append("gemini-2.5-pro")
-            return httpx.Response(500, json={"error": "server error"})
+        if "gemini-2.0-flash" in url_str:
+            attempts.append("gemini-2.0-flash")
+            return _gemini_ok("Gemini 2.0 Flash succeeded")
         if "gemini-2.5-flash" in url_str:
             attempts.append("gemini-2.5-flash")
-            return _gemini_ok("Gemini 2.5 Flash succeeded")
+            return httpx.Response(500, json={"error": "server error"})
         return httpx.Response(500)
 
     respx.post(url__startswith="https://generativelanguage.googleapis.com").mock(
@@ -355,19 +355,21 @@ def test_gemini_model_pool_failover_falls_through_in_pool(settings):
     result = generate("hello", settings=settings)
 
     assert result.provider == "gemini"
-    assert result.model == "gemini-2.5-flash"
-    assert result.text == "Gemini 2.5 Flash succeeded"
-    assert attempts == ["gemini-2.5-pro", "gemini-2.5-flash"]
+    assert result.model == "gemini-2.0-flash"
+    assert result.text == "Gemini 2.0 Flash succeeded"
+    assert attempts == ["gemini-2.5-flash", "gemini-2.0-flash"]
 
 
 @respx.mock
 def test_gemini_pool_exhaustion_escalates_to_groq(settings):
-    """Only after all 4 Gemini models fail does the failover chain escalate to Groq."""
+    """Only after all 3 Gemini models fail does the failover chain escalate to Groq."""
     gemini_models_tried: list[str] = []
 
     def _gemini_fail_all(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
-        for m in ["gemini-2.5-pro", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]:
+        # flash-lite checked before flash: "gemini-2.5-flash" is a substring
+        # of "gemini-2.5-flash-lite", so the more specific name must win.
+        for m in ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]:
             if m in url_str:
                 gemini_models_tried.append(m)
                 break
@@ -386,7 +388,6 @@ def test_gemini_pool_exhaustion_escalates_to_groq(settings):
     assert result.model == "llama-3.3-70b-versatile"
     assert result.text == "Groq Llama 3.3 70b succeeded"
     assert gemini_models_tried == [
-        "gemini-2.5-pro",
         "gemini-2.5-flash",
         "gemini-2.0-flash",
         "gemini-2.5-flash-lite",
@@ -395,17 +396,17 @@ def test_gemini_pool_exhaustion_escalates_to_groq(settings):
 
 @respx.mock
 def test_transient_network_error_retries_per_model_before_next_model(settings):
-    """TransportError on gemini-2.5-pro retries once on the same model before moving to gemini-2.5-flash."""
-    call_counts: dict[str, int] = {"gemini-2.5-pro": 0, "gemini-2.5-flash": 0}
+    """TransportError on gemini-2.5-flash (pool head) retries once on the same model before moving to gemini-2.0-flash."""
+    call_counts: dict[str, int] = {"gemini-2.5-flash": 0, "gemini-2.0-flash": 0}
 
     def _flaky_gemini(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
-        if "gemini-2.5-pro" in url_str:
-            call_counts["gemini-2.5-pro"] += 1
-            raise httpx.ConnectTimeout("connection timed out", request=request)
+        if "gemini-2.0-flash" in url_str:
+            call_counts["gemini-2.0-flash"] += 1
+            return _gemini_ok("Gemini 2.0 Flash ok")
         if "gemini-2.5-flash" in url_str:
             call_counts["gemini-2.5-flash"] += 1
-            return _gemini_ok("Gemini 2.5 Flash ok")
+            raise httpx.ConnectTimeout("connection timed out", request=request)
         return httpx.Response(500)
 
     respx.post(url__startswith="https://generativelanguage.googleapis.com").mock(
@@ -415,11 +416,11 @@ def test_transient_network_error_retries_per_model_before_next_model(settings):
     result = generate("hello", settings=settings)
 
     assert result.provider == "gemini"
-    assert result.model == "gemini-2.5-flash"
-    assert result.text == "Gemini 2.5 Flash ok"
-    # Pro was attempted twice (1 initial call + 1 retry on TransportError) before failing over to Flash
-    assert call_counts["gemini-2.5-pro"] == 2
-    assert call_counts["gemini-2.5-flash"] == 1
+    assert result.model == "gemini-2.0-flash"
+    assert result.text == "Gemini 2.0 Flash ok"
+    # Flash was attempted twice (1 initial call + 1 retry on TransportError) before failing over to 2.0 Flash
+    assert call_counts["gemini-2.5-flash"] == 2
+    assert call_counts["gemini-2.0-flash"] == 1
 
 
 @respx.mock
@@ -440,29 +441,28 @@ def test_audit_log_output_reflects_full_cascade(settings, caplog):
 
     # Sprint 3.6 Phase 4 (TICKET-20/21): model-tier degradation is now
     # explicit on the result itself, not just discoverable by reading logs.
-    assert result.requested_model == "gemini-2.5-pro"
+    assert result.requested_model == "gemini-2.5-flash"
     assert result.degraded is True
     assert result.fallback_chain == [
-        "gemini:gemini-2.5-pro (1/4)",
-        "gemini:gemini-2.5-flash (2/4)",
-        "gemini:gemini-2.0-flash (3/4)",
-        "gemini:gemini-2.5-flash-lite (4/4)",
+        "gemini:gemini-2.5-flash (1/3)",
+        "gemini:gemini-2.0-flash (2/3)",
+        "gemini:gemini-2.5-flash-lite (3/3)",
     ]
 
     warning_logs = [r.message for r in caplog.records if r.levelname == "WARNING"]
-    # 4 Gemini attempt failures + 1 explicit "MODEL DEGRADED" summary line —
+    # 3 Gemini attempt failures + 1 explicit "MODEL DEGRADED" summary line —
     # the latter is new in Phase 4, so a real model-tier downgrade is never
     # silent even to someone only watching for WARNING-level log lines.
-    assert len(warning_logs) == 5
-    assert "provider=gemini model=gemini-2.5-pro attempt=1/4" in warning_logs[0]
-    assert "provider=gemini model=gemini-2.5-flash-lite attempt=4/4" in warning_logs[3]
-    assert "MODEL DEGRADED: requested=gemini-2.5-pro actual=groq:llama-3.3-70b-versatile" in warning_logs[4]
+    assert len(warning_logs) == 4
+    assert "provider=gemini model=gemini-2.5-flash attempt=1/3" in warning_logs[0]
+    assert "provider=gemini model=gemini-2.5-flash-lite attempt=3/3" in warning_logs[2]
+    assert "MODEL DEGRADED: requested=gemini-2.5-flash actual=groq:llama-3.3-70b-versatile" in warning_logs[3]
 
     info_logs = [r.message for r in caplog.records if "status=ok" in r.message]
     assert len(info_logs) == 1
     assert "provider=groq model=llama-3.3-70b-versatile attempt=1/5" in info_logs[0]
-    assert "gemini:gemini-2.5-pro (1/4)" in info_logs[0]
-    assert "gemini:gemini-2.5-flash-lite (4/4)" in info_logs[0]
+    assert "gemini:gemini-2.5-flash (1/3)" in info_logs[0]
+    assert "gemini:gemini-2.5-flash-lite (3/3)" in info_logs[0]
 
 
 

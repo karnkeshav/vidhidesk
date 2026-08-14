@@ -279,7 +279,18 @@ def _providers(settings: Settings):
         (
             "gemini",
             [
-                "gemini-2.5-pro",
+                # gemini-2.5-pro removed (2026-08-14): live-verified HTTP 404
+                # "This model ... is no longer available to new users" against
+                # this project's actual Gemini API key — confirmed permanent
+                # (account/key-tier restriction, not transient/rate-limit) via
+                # a direct generateContent call outside this codebase. It had
+                # already never served a single real request in this
+                # project's history before that (TICKET-21, Build_Tracker
+                # E36) under the old 429 rate-limit failure mode; it now
+                # fails closed instead, so there is no scenario where keeping
+                # it in the pool helps. gemini-2.5-flash (live-verified
+                # working, HTTP 200, same key, same endpoint) is the new pool
+                # head.
                 "gemini-2.5-flash",
                 "gemini-2.0-flash",
                 "gemini-2.5-flash-lite",
