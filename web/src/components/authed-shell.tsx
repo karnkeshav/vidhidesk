@@ -269,7 +269,13 @@ export function AuthedShell({
                 matters.slice(0, 4).map((m) => (
                   <a
                     key={m.id}
-                    href={m.module === "contracts" ? `/contracts/${m.id}` : `/matters/${m.id}`}
+                    href={
+                      m.module === "contracts"
+                        ? `/contracts/${m.id}`
+                        : m.module === "litigation"
+                        ? `/litigation/${m.id}`
+                        : `/matters/${m.id}`
+                    }
                     className="block truncate rounded-sm px-2 py-1.5 font-serif text-xs font-medium text-[#081534] transition-colors hover:bg-[#E4E2DD]"
                   >
                     {m.title}

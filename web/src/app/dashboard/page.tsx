@@ -1,8 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { AuthedShell, useMatters } from "@/components/authed-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   FileText,
   Gavel,
@@ -17,6 +25,7 @@ export default function DashboardPage() {
   // its sidebar -- two concurrent GET /api/matters on every dashboard
   // load. Now shares AuthedShell's single fetch via context.
   const { matters, error } = useMatters();
+  const [inProgressModule, setInProgressModule] = useState<"rera" | "consulting" | null>(null);
 
   const contractsMatters = matters.filter((m) => m.module === "contracts");
   const litigationMatters = matters.filter((m) => m.module === "litigation");
@@ -124,7 +133,7 @@ export default function DashboardPage() {
                       litigationMatters.slice(0, 2).map((m) => (
                         <a
                           key={m.id}
-                          href={`/matters/${m.id}`}
+                          href={`/litigation/${m.id}`}
                           className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534] hover:underline"
                         >
                           <ChevronRight className="h-3 w-3 text-[#76777F]" />
@@ -145,7 +154,7 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </div>
-                <a href="/contracts" className="mt-4 block">
+                <a href="/litigation" className="mt-4 block">
                   <Button className="w-full rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white transition-colors hover:bg-[#1E2A4A]">
                     Continue Working
                   </Button>
@@ -195,11 +204,12 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </div>
-                <a href="/contracts" className="mt-4 block">
-                  <Button className="w-full rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white transition-colors hover:bg-[#1E2A4A]">
-                    Continue Working
-                  </Button>
-                </a>
+                <Button
+                  onClick={() => setInProgressModule("rera")}
+                  className="mt-4 w-full rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white transition-colors hover:bg-[#1E2A4A]"
+                >
+                  Continue Working
+                </Button>
               </Card>
 
               {/* 4. Consulting Card */}
@@ -245,11 +255,12 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </div>
-                <a href="/contracts" className="mt-4 block">
-                  <Button className="w-full rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white transition-colors hover:bg-[#1E2A4A]">
-                    Continue Working
-                  </Button>
-                </a>
+                <Button
+                  onClick={() => setInProgressModule("consulting")}
+                  className="mt-4 w-full rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white transition-colors hover:bg-[#1E2A4A]"
+                >
+                  Continue Working
+                </Button>
               </Card>
             </div>
           </div>
@@ -301,6 +312,19 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={inProgressModule !== null} onOpenChange={(open) => !open && setInProgressModule(null)}>
+        <DialogContent className="rounded-sm border-[#E4E2DD] bg-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-sans text-base text-[#081534]">
+              {inProgressModule === "rera" ? "RERA" : "Consulting"} module is in progress.
+            </DialogTitle>
+            <DialogDescription className="font-serif text-xs text-[#45464E]">
+              This workspace is currently under development.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </AuthedShell>
   );
 }
