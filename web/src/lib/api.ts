@@ -94,7 +94,24 @@ export type Message = {
   created_at: string;
 };
 
-async function authedFetch(path: string, init?: RequestInit) {
+// Retry eligibility (Auth Request Forensics Sprint follow-up, 2026-08-14):
+// TRANSIENT_RETRY_DELAYS_MS above assumes replaying the exact same request
+// is harmless -- true for a GET, and true in practice for our PATCH/DELETE
+// endpoints (they converge on the same end state no matter how many times
+// they're applied). It is NOT true for a persistent POST that creates a new
+// row per call (new matter, new draft_version, new message, new audit
+// entry, ...): a request that actually reached the server and succeeded,
+// but whose response was lost to a timeout/network blip, would silently
+// create a duplicate on "retry". That's exactly how one Generate Draft
+// click produced three draft_versions in a prior E2E run. `retry: false`
+// opts a call out of the retry loop below -- it still gets exactly one
+// attempt (still subject to FETCH_TIMEOUT_MS), it just never replays.
+// Defaults to true so every pre-existing call site keeps its current
+// behavior unchanged; any *new* persistent/non-idempotent write should be
+// added with `{ retry: false }` explicitly rather than relying on the
+// default.
+async function authedFetch(path: string, init?: RequestInit, options?: { retry?: boolean }) {
+  const retryEligible = options?.retry ?? true;
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -117,8 +134,9 @@ async function authedFetch(path: string, init?: RequestInit) {
       // A network-level failure (including a request a CORS-blocked
       // response shows up as, and now an aborted-for-hanging-too-long
       // request too) never gives us a status code at all -- always
-      // eligible for the same retry treatment as a 5xx.
-      if (attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
+      // eligible for the same retry treatment as a 5xx, unless this call
+      // opted out via `retry: false` (see note above authedFetch).
+      if (retryEligible && attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
         debugLog("retrying after network-level failure", { url: `${API_URL}${path}`, attempt });
         await new Promise((r) => setTimeout(r, TRANSIENT_RETRY_DELAYS_MS[attempt]));
         continue;
@@ -131,7 +149,7 @@ async function authedFetch(path: string, init?: RequestInit) {
     if (res.ok) return res.json();
 
     const body = await res.text();
-    if (isTransientFailure(res.status, body) && attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
+    if (retryEligible && isTransientFailure(res.status, body) && attempt < TRANSIENT_RETRY_DELAYS_MS.length) {
       debugLog("retrying after transient status", { url: `${API_URL}${path}`, status: res.status, attempt });
       await new Promise((r) => setTimeout(r, TRANSIENT_RETRY_DELAYS_MS[attempt]));
       continue;
@@ -173,10 +191,14 @@ export function createMatter(input: {
   cnr_number?: string;
   case_number_formatted?: string;
 }): Promise<Matter> {
-  return authedFetch("/api/matters", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return authedFetch(
+    "/api/matters",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
 }
 
 export function listParties(matterId: string) {
@@ -184,10 +206,14 @@ export function listParties(matterId: string) {
 }
 
 export function addParty(matterId: string, partyData: Record<string, unknown>) {
-  return authedFetch(`/api/matters/${matterId}/parties`, {
-    method: "POST",
-    body: JSON.stringify(partyData),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/parties`,
+    {
+      method: "POST",
+      body: JSON.stringify(partyData),
+    },
+    { retry: false }
+  );
 }
 
 export function deleteParty(matterId: string, partyId: string) {
@@ -201,10 +227,14 @@ export function listEvidence(matterId: string) {
 }
 
 export function addEvidence(matterId: string, factData: Record<string, unknown>) {
-  return authedFetch(`/api/matters/${matterId}/evidence`, {
-    method: "POST",
-    body: JSON.stringify(factData),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/evidence`,
+    {
+      method: "POST",
+      body: JSON.stringify(factData),
+    },
+    { retry: false }
+  );
 }
 
 export function deleteEvidence(matterId: string, evidenceId: string) {
@@ -251,10 +281,14 @@ export function listHearings(matterId: string) {
 }
 
 export function addHearing(matterId: string, hearingData: Record<string, unknown>) {
-  return authedFetch(`/api/matters/${matterId}/hearings`, {
-    method: "POST",
-    body: JSON.stringify(hearingData),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/hearings`,
+    {
+      method: "POST",
+      body: JSON.stringify(hearingData),
+    },
+    { retry: false }
+  );
 }
 
 export function calculateLimitation(payload: {
@@ -350,10 +384,14 @@ export function generateCaseAnalysis(
     forum?: { recommended_forum: ForumResultOption; is_unambiguous: boolean };
   }
 ): Promise<CaseAnalysis> {
-  return authedFetch(`/api/matters/${matterId}/case-analysis`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/case-analysis`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function listCaseAnalyses(matterId: string): Promise<CaseAnalysis[]> {
@@ -391,10 +429,14 @@ export function sendMessage(
   matterId: string,
   content: string
 ): Promise<[Message, Message]> {
-  return authedFetch(`/api/matters/${matterId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ content }),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    },
+    { retry: false }
+  );
 }
 
 // --- Contracts (Sprint 2) ----------------------------------------------------
@@ -493,10 +535,14 @@ export function generateDraft(
   matterId: string,
   input: { template_id: string; form_data: Record<string, unknown>; amendment_note?: string }
 ): Promise<Draft> {
-  return authedFetch(`/api/matters/${matterId}/drafts`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/drafts`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
 }
 
 export function listDrafts(matterId: string): Promise<DraftVersion[]> {
@@ -570,17 +616,25 @@ export function reviewClause(
   clauseId: string,
   input: { decision: "keep" | "redraft" | "delete"; redraft_text?: string; reviewer_notes?: string }
 ): Promise<TemplateClause> {
-  return authedFetch(`/api/templates/${templateId}/clauses/${clauseId}/review`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return authedFetch(
+    `/api/templates/${templateId}/clauses/${clauseId}/review`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
 }
 
 /** Keeps every currently-unreviewed fixed_boilerplate clause on a
  * template in one action — never touches llm_fillable clauses or a
  * clause that's already been reviewed. Returns the updated rows. */
 export function bulkKeepBoilerplate(templateId: string): Promise<TemplateClause[]> {
-  return authedFetch(`/api/templates/${templateId}/clauses/bulk-keep-boilerplate`, {
-    method: "POST",
-  });
+  return authedFetch(
+    `/api/templates/${templateId}/clauses/bulk-keep-boilerplate`,
+    {
+      method: "POST",
+    },
+    { retry: false }
+  );
 }
