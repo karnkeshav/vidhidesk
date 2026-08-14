@@ -89,6 +89,7 @@ class FakeQuery:
             for rec in records:
                 row = dict(rec)
                 row.setdefault("id", f"{self._table.name}-{next(_id_counter)}")
+                row.setdefault("created_at", "2026-01-01T00:00:00+00:00")
                 self._table.rows.append(row)
                 inserted.append(row)
             return FakeResponse(inserted)
@@ -150,6 +151,20 @@ class FakeDB:
 
     def table(self, name):
         return self._tables.setdefault(name, FakeTable(name))
+
+
+def _poisoned_service_client():
+    """monkeypatch target for app.db.service_client in tests that must stay
+    fully DB-isolated (see test_matter_centric_loading_model_stores_and_returns_template_id
+    and test_template_lookup_supports_both_uuid_and_slug_keys below). Both tests also
+    patch the router module's already-bound `service_client` name to a FakeDB directly,
+    which is what actually makes the app use a fake — this poison pill is a tripwire
+    for any other/future code path that re-imports app.db.service_client fresh, so a
+    regression fails loudly instead of silently writing to the real Supabase project."""
+    raise AssertionError(
+        "app.db.service_client() was called for real from a test that must stay "
+        "fully DB-isolated (no writes to the production Supabase project)."
+    )
 
 
 # --- Fixtures ----------------------------------------------------------------
@@ -2055,22 +2070,51 @@ def test_frontend_category_filter_mapping_covers_all_10_templates():
 def test_matter_centric_loading_model_stores_and_returns_template_id(monkeypatch):
     """Regression test for Matter-centric loading model:
     Creating a matter with template_id (UUID or slug) persists template_id on the matter record,
-    and GET /api/matters/{id} returns template_id."""
+    and GET /api/matters/{id} returns template_id.
+
+    DB-isolated (forensic finding, 2026-08-14): this test used to inject
+    db=service_client() -- the real, production, service-role Supabase client --
+    into CurrentUser, so every local `pytest` run permanently wrote two real rows
+    ("Matter Centric Test (Slug)"/"(UUID)") into the one Supabase project this repo
+    is configured against, with no teardown. It now uses the same FakeDB/FakeTable
+    pattern as the rest of this file (and as test_case_analysis.py, test_litigation.py,
+    etc. use their own equivalents), and app.db.service_client is monkeypatched to
+    raise if anything still tries to reach the real client."""
+    import uuid
+
     from fastapi.testclient import TestClient
     from app.main import app
     from app.auth import get_current_user, CurrentUser
-    from app.db import service_client
+
+    monkeypatch.setattr("app.db.service_client", _poisoned_service_client)
+
+    fake_db = FakeDB()
+    sa_uuid = str(uuid.uuid4())
+    fake_db.table("templates").rows.append({
+        "id": sa_uuid,
+        "name": "Service Agreement",
+        "category": "contracts",
+        "template_key": "service-agreement",
+        "review_status": "beta",
+        "states_supported": [],
+        "schema_json": {},
+    })
+    # create_matter() resolves a template_key slug via app.routers.matters'
+    # module-level `service_client` name (bound at import time) -- patching
+    # app.db.service_client above doesn't reach that already-bound reference,
+    # so it has to be patched here too for the fake to actually take effect.
+    monkeypatch.setattr("app.routers.matters.service_client", lambda: fake_db)
 
     client = TestClient(app)
 
     def mock_user():
-        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=service_client())
+        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=fake_db)
 
     app.dependency_overrides[get_current_user] = mock_user
 
-    # Fetch Service Agreement template UUID
-    tpl_row = service_client().table("templates").select("id").eq("template_key", "service-agreement").execute().data[0]
-    sa_uuid = tpl_row["id"]
+    # Fetch Service Agreement template UUID (from the fake DB, not Supabase)
+    tpl_row = fake_db.table("templates").select("id").eq("template_key", "service-agreement").execute().data[0]
+    assert tpl_row["id"] == sa_uuid
 
     # 1. Create matter passing template_key slug
     res1 = client.post("/api/matters", json={
@@ -2101,16 +2145,40 @@ def test_matter_centric_loading_model_stores_and_returns_template_id(monkeypatch
 
 def test_template_lookup_supports_both_uuid_and_slug_keys(monkeypatch):
     """Regression test: GET /api/templates/{template_id} works identically whether called
-    with a UUID or with a template_key slug (e.g. 'service-agreement')."""
+    with a UUID or with a template_key slug (e.g. 'service-agreement').
+
+    DB-isolated (forensic finding, 2026-08-14): the route under test
+    (api/app/routers/contracts.py:get_template) only ever reads via `user.db`, so this
+    test was genuinely read-only against Supabase -- but it still depended on a real,
+    live "service-agreement" template row existing in production, via
+    db=service_client() injected into CurrentUser, on every local `pytest` run. Switched
+    to the same FakeDB pattern as the rest of this file so it no longer needs (or can
+    reach) the real project at all; app.db.service_client is monkeypatched to raise if
+    anything still tries to reach the real client."""
+    import uuid
+
     from fastapi.testclient import TestClient
     from app.main import app
     from app.auth import get_current_user, CurrentUser
-    from app.db import service_client
+
+    monkeypatch.setattr("app.db.service_client", _poisoned_service_client)
+
+    fake_db = FakeDB()
+    sa_uuid = str(uuid.uuid4())
+    fake_db.table("templates").rows.append({
+        "id": sa_uuid,
+        "name": "Service Agreement",
+        "category": "contracts",
+        "template_key": "service-agreement",
+        "review_status": "beta",
+        "states_supported": [],
+        "schema_json": {},
+    })
 
     client = TestClient(app)
 
     def mock_user():
-        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=service_client())
+        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=fake_db)
 
     app.dependency_overrides[get_current_user] = mock_user
 
