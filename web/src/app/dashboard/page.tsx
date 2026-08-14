@@ -41,9 +41,6 @@ export default function DashboardPage() {
             <h1 className="font-sans text-xl font-semibold tracking-tight text-[#081534] md:text-2xl">
               Good morning, Nitesh.
             </h1>
-            <p className="font-serif text-sm leading-relaxed text-[#45464E]">
-              3 drafts require review. 2 matters have not been updated for over a week.
-            </p>
           </div>
         </section>
 
@@ -68,9 +65,6 @@ export default function DashboardPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#FBF9F4] text-[#081534]">
                       <FileText className="h-6 w-6" strokeWidth={1.5} />
                     </div>
-                    <span className="rounded-sm bg-[#1E2A4A] px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wider text-white">
-                      3 PENDING ITEMS
-                    </span>
                   </div>
                   <div>
                     <h3 className="font-sans text-lg font-semibold text-[#081534]">Contracts</h3>
@@ -91,16 +85,7 @@ export default function DashboardPage() {
                         </a>
                       ))
                     ) : (
-                      <>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>NDA - Acme Corp</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>Service Agreement - Tata</span>
-                        </div>
-                      </>
+                      <p className="font-serif text-xs text-[#76777F]">No active contract matters.</p>
                     )}
                   </div>
                 </div>
@@ -118,9 +103,6 @@ export default function DashboardPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#FBF9F4] text-[#081534]">
                       <Gavel className="h-6 w-6" strokeWidth={1.5} />
                     </div>
-                    <span className="rounded-sm bg-[#1E2A4A] px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wider text-white">
-                      2 PENDING ITEMS
-                    </span>
                   </div>
                   <div>
                     <h3 className="font-sans text-lg font-semibold text-[#081534]">Litigation</h3>
@@ -141,16 +123,7 @@ export default function DashboardPage() {
                         </a>
                       ))
                     ) : (
-                      <>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>High Court - Civil Suit 12</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>Writ Petition - Estate Co.</span>
-                        </div>
-                      </>
+                      <p className="font-serif text-xs text-[#76777F]">No active litigation matters.</p>
                     )}
                   </div>
                 </div>
@@ -168,9 +141,6 @@ export default function DashboardPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#FBF9F4] text-[#081534]">
                       <Building2 className="h-6 w-6" strokeWidth={1.5} />
                     </div>
-                    <span className="rounded-sm bg-[#1E2A4A] px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wider text-white">
-                      5 PENDING ITEMS
-                    </span>
                   </div>
                   <div>
                     <h3 className="font-sans text-lg font-semibold text-[#081534]">RERA</h3>
@@ -191,16 +161,7 @@ export default function DashboardPage() {
                         </a>
                       ))
                     ) : (
-                      <>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>Project Reg - Heights Phase II</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>Quarterly Filing - Urban Dev</span>
-                        </div>
-                      </>
+                      <p className="font-serif text-xs text-[#76777F]">No active RERA matters.</p>
                     )}
                   </div>
                 </div>
@@ -219,9 +180,6 @@ export default function DashboardPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#FBF9F4] text-[#081534]">
                       <UserSearch className="h-6 w-6" strokeWidth={1.5} />
                     </div>
-                    <span className="rounded-sm bg-[#1E2A4A] px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wider text-white">
-                      1 PENDING ITEM
-                    </span>
                   </div>
                   <div>
                     <h3 className="font-sans text-lg font-semibold text-[#081534]">Consulting</h3>
@@ -242,16 +200,7 @@ export default function DashboardPage() {
                         </a>
                       ))
                     ) : (
-                      <>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>Audit - FinTech Compliance</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-serif text-xs italic text-[#081534]">
-                          <ChevronRight className="h-3 w-3 text-[#76777F]" />
-                          <span>Opinion - FDI Regulation</span>
-                        </div>
-                      </>
+                      <p className="font-serif text-xs text-[#76777F]">No active consulting matters.</p>
                     )}
                   </div>
                 </div>
@@ -277,36 +226,7 @@ export default function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="relative space-y-6 pl-4 before:absolute before:left-1.5 before:top-2 before:bottom-0 before:w-px before:bg-[#E4E2DD]">
-                  <div className="relative pl-4">
-                    <div className="absolute -left-[5px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#081534]"></div>
-                    <p className="font-sans text-[11px] font-semibold text-[#76777F]">2 hours ago</p>
-                    <p className="font-serif text-xs text-[#1A1A1A]">
-                      Created <span className="font-semibold italic">Service Agreement</span> for ABC Industries
-                    </p>
-                  </div>
-                  <div className="relative pl-4">
-                    <div className="absolute -left-[5px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#E4E2DD]"></div>
-                    <p className="font-sans text-[11px] font-semibold text-[#76777F]">5 hours ago</p>
-                    <p className="font-serif text-xs text-[#1A1A1A]">
-                      Reviewed <span className="font-semibold italic">NDA Clause 12</span> for internal audit
-                    </p>
-                  </div>
-                  <div className="relative pl-4">
-                    <div className="absolute -left-[5px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#E4E2DD]"></div>
-                    <p className="font-sans text-[11px] font-semibold text-[#76777F]">Yesterday</p>
-                    <p className="font-serif text-xs text-[#1A1A1A]">
-                      Generated <span className="font-semibold italic">Draft v2</span> of Commercial Lease
-                    </p>
-                  </div>
-                  <div className="relative pl-4">
-                    <div className="absolute -left-[5px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#E4E2DD]"></div>
-                    <p className="font-sans text-[11px] font-semibold text-[#76777F]">2 days ago</p>
-                    <p className="font-serif text-xs text-[#1A1A1A]">
-                      Matter #890 <span className="font-semibold text-[#7A2A2A]">Flagged for Review</span>
-                    </p>
-                  </div>
-                </div>
+                <p className="font-serif text-xs text-[#76777F]">No recent activity.</p>
               </CardContent>
             </Card>
           </div>

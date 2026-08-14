@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { createMatter, listTemplates, listMatters, Matter, Template, ApiError } from "@/lib/api";
-import { Search, Plus, FolderOpen, History, FileText, AlertCircle, RotateCcw } from "lucide-react";
+import { Search, Plus, FolderOpen, FileText, AlertCircle, RotateCcw } from "lucide-react";
 
 // Friendlier copy for the common failure shapes -- authedFetch (lib/api.ts)
 // already retries a transient upstream hiccup automatically before this is
@@ -175,22 +175,9 @@ export default function ContractsPage() {
               <p className="px-1 font-sans text-[10px] font-bold uppercase tracking-wider text-[#45464E]">
                 Recent Drafts
               </p>
-              <div className="mt-1.5 space-y-1">
-                <a
-                  href="/contracts"
-                  className="flex items-center gap-2 rounded-sm px-2 py-1 font-sans text-xs text-[#45464E] hover:bg-[#E4E2DD]"
-                >
-                  <History className="h-3.5 w-3.5" />
-                  <span>NDAs - Q4 Batch</span>
-                </a>
-                <a
-                  href="/contracts"
-                  className="flex items-center gap-2 rounded-sm px-2 py-1 font-sans text-xs text-[#45464E] hover:bg-[#E4E2DD]"
-                >
-                  <History className="h-3.5 w-3.5" />
-                  <span>Vendor Onboarding</span>
-                </a>
-              </div>
+              <p className="mt-1.5 px-1 font-serif text-xs text-[#76777F]">
+                No recent drafts yet. Drafts generated for your matters will appear here.
+              </p>
             </div>
 
             <div className="border-t border-[#E4E2DD] pt-3">
