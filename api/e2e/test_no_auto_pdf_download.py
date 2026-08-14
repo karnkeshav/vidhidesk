@@ -43,6 +43,19 @@ process rule on this) so a later audit sweep of `matters`/
 `draft_versions`/`clause_reviews` can filter test-created rows out of
 Nitesh's real review history by title alone, without needing to join
 through the throwaway auth user.
+
+Cleanup (forensic design, 2026-08-14): this test writes to the same
+Supabase project the real application uses (no second project exists
+yet), so every matter it creates is tracked by exact id (captured from
+the URL the instant the real POST /api/matters succeeds -- see
+created_matter_ids below) and removed in fixture teardown, which pytest
+runs even when the test fails partway through. Cleanup never selects by
+title/module/account -- only by the exact id(s) this invocation itself
+created -- and always re-verifies ownership against the dedicated E2E
+account immediately before deleting, failing closed (skipping, never
+deleting) on any mismatch or already-missing row. The dedicated E2E
+auth user itself, and every matter created by *prior* runs, are left
+alone -- this only ever touches what the current invocation created.
 """
 
 from __future__ import annotations
@@ -56,23 +69,61 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.db import service_client  # noqa: E402
+from app.services.contracts import DRAFTS_DIR  # noqa: E402
 
 BASE_URL = os.environ.get("E2E_BASE_URL", "http://localhost:3000")
 TEST_EMAIL = "e2e-test@vidhidesk.local"
 TEST_PASSWORD = "TestPassword123!"
 
 
-def _ensure_test_user() -> None:
+def _ensure_test_user() -> str:
     """Create the throwaway test user if it doesn't already exist —
     makes this test self-sufficient on a fresh environment, not
-    dependent on a user a prior manual session happened to leave behind."""
+    dependent on a user a prior manual session happened to leave behind.
+    Returns its user_id either way, so cleanup can verify ownership
+    against a looked-up id rather than a hardcoded one."""
     db = service_client()
     try:
-        db.auth.admin.create_user(
+        created = db.auth.admin.create_user(
             {"email": TEST_EMAIL, "password": TEST_PASSWORD, "email_confirm": True}
         )
+        return created.user.id
     except Exception:  # noqa: BLE001 — already exists is the expected steady state
-        pass
+        existing = next(u for u in db.auth.admin.list_users() if u.email == TEST_EMAIL)
+        return existing.id
+
+
+def _cleanup_matter(matter_id: str, e2e_user_id: str) -> None:
+    """Remove exactly one matter this test invocation created, plus its
+    generated files, and nothing else. Fails closed: if the matter is
+    already gone, or isn't owned by the dedicated E2E account, it's left
+    alone rather than deleted -- this must never be able to reach a real
+    advocate matter, and never selects by title/module, only by this
+    exact id. draft_versions/draft_clause_fills/messages are removed by
+    the matters row's own ON DELETE CASCADE (api/migrations/0001_schema.sql,
+    0007_contracts_clause_review.sql) -- no separate delete needed for them.
+
+    Generated .docx files are removed by globbing on matter_id rather than
+    by looking up draft_versions.docx_path, so a file written just before a
+    failed draft_versions insert (contracts.py writes the file, then inserts
+    the row -- see app/services/contracts.py) doesn't get left behind even
+    though no DB row ever pointed at it."""
+    db = service_client()
+    rows = db.table("matters").select("id,user_id").eq("id", matter_id).limit(1).execute().data
+    if not rows:
+        print(f"[e2e cleanup] matter {matter_id} already gone — nothing to clean up")
+        return
+    owner_id = rows[0]["user_id"]
+    if owner_id != e2e_user_id:
+        print(
+            f"[e2e cleanup] REFUSING to delete matter {matter_id}: owned by "
+            f"{owner_id}, not the E2E test account ({e2e_user_id}) — failing closed"
+        )
+        return
+
+    db.table("matters").delete().eq("id", matter_id).eq("user_id", e2e_user_id).execute()
+    for f in DRAFTS_DIR.glob(f"{matter_id}_v*.docx"):
+        f.unlink(missing_ok=True)
 
 
 def _fetch_nda_schema() -> dict:
@@ -125,11 +176,27 @@ def _fill_schema_driven_form(page, schema: dict) -> None:
 
 
 @pytest.fixture(scope="module", autouse=True)
-def ensure_test_user():
-    _ensure_test_user()
+def ensure_test_user() -> str:
+    return _ensure_test_user()
 
 
-def test_generating_a_draft_never_auto_fetches_pdf():
+@pytest.fixture
+def created_matter_ids(ensure_test_user: str):
+    """Yields a list the test appends its own created matter id(s) to.
+    Teardown (below the yield) runs via pytest's normal fixture-finalizer
+    semantics -- i.e. even if the test raises an assertion error or any
+    other exception after appending an id -- and removes exactly those
+    matters (see _cleanup_matter's ownership check) and nothing else.
+    Does not run on a hard interruption (SIGKILL/crash) that skips Python's
+    own unwind entirely; that's a known, accepted gap, not something a
+    fixture can close."""
+    ids: list[str] = []
+    yield ids
+    for matter_id in ids:
+        _cleanup_matter(matter_id, ensure_test_user)
+
+
+def test_generating_a_draft_never_auto_fetches_pdf(created_matter_ids: list[str]):
     from playwright.sync_api import sync_playwright
 
     schema = _fetch_nda_schema()
@@ -153,11 +220,15 @@ def test_generating_a_draft_never_auto_fetches_pdf():
 
         page.goto(f"{BASE_URL}/contracts")
         page.wait_for_selector("text=Non-Disclosure Agreement", timeout=15000)
-        page.click("text=Non-Disclosure Agreement")
-        page.wait_for_selector("#title", timeout=5000)
-        page.fill("#title", "[TEST] no-auto-pdf regression check")
-        page.click("text=Continue to intake form")
-        page.wait_for_url("**/contracts/*", timeout=15000)
+        page.get_by_role("heading", name="Non-Disclosure Agreement", exact=True).click()
+        page.get_by_role("button", name="Continue to Intake Form").click()
+        page.wait_for_url("**/contracts/*", timeout=30000)
+        # The real POST /api/matters has now succeeded (web/src/app/contracts/page.tsx
+        # pushes to /contracts/{matter.id} only after it returns) -- capture the id
+        # immediately, before anything below has a chance to fail, so teardown can
+        # still find and clean up this exact matter either way.
+        matter_id = page.url.split("/contracts/")[-1].split("?")[0].rstrip("/")
+        created_matter_ids.append(matter_id)
         page.wait_for_selector(f"text={schema['fields'][0]['label']}", timeout=15000)
         page.wait_for_timeout(500)  # let dev-mode hydration settle — see docs/lessons_learned.md
 
