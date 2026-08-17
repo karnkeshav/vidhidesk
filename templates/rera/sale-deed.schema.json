@@ -1,0 +1,36 @@
+{
+  "template_key": "sale-deed",
+  "title": "Sale Deed",
+  "fields": [
+    {"key": "vendor_name", "label": "Vendor — Full Legal Name", "type": "text", "required": true},
+    {"key": "vendor_address", "label": "Vendor — Address", "type": "textarea", "required": true},
+    {"key": "purchaser_name", "label": "Purchaser — Full Legal Name", "type": "text", "required": true},
+    {"key": "purchaser_address", "label": "Purchaser — Address", "type": "textarea", "required": true},
+    {
+      "key": "property_state", "label": "State Where Property Is Situated", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"],
+      "required": true
+    },
+    {
+      "key": "property_description", "label": "Schedule of Property (full description, boundaries, survey/khasra no., area)",
+      "type": "textarea", "required": true,
+      "help": "This is copied verbatim into the Schedule of Property clause — describe it exactly as it should appear in the deed."
+    },
+    {"key": "sale_consideration_amount", "label": "Sale Consideration (e.g. 'Rs. 50,00,000/- (Rupees Fifty Lakhs Only)')", "type": "text", "required": true},
+    {
+      "key": "consideration_paid_details", "label": "How Consideration Was Paid (mode, dates, references)",
+      "type": "textarea", "required": true
+    },
+    {"key": "possession_date", "label": "Date of Delivery of Possession", "type": "date", "required": true},
+    {
+      "key": "title_background", "label": "How the Vendor Acquired Title (brief — prior deed/inheritance/allotment, date)",
+      "type": "textarea", "required": true,
+      "help": "Used to draft the recitals. Do not invent — state only what you actually know."
+    },
+    {
+      "key": "special_conditions", "label": "Special Conditions (optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {"key": "execution_date", "label": "Date of Execution", "type": "date", "required": true}
+  ]
+}

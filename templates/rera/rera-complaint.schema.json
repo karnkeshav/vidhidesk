@@ -1,0 +1,35 @@
+{
+  "template_key": "rera-complaint",
+  "title": "RERA Complaint — Delay in Possession",
+  "fields": [
+    {"key": "complainant_name", "label": "Complainant (Allottee) — Full Legal Name", "type": "text", "required": true},
+    {"key": "complainant_address", "label": "Complainant — Address", "type": "textarea", "required": true},
+    {"key": "respondent_name", "label": "Respondent (Promoter/Developer) — Full Legal Name", "type": "text", "required": true},
+    {"key": "respondent_address", "label": "Respondent — Registered Office Address", "type": "textarea", "required": true},
+    {"key": "project_name", "label": "Real Estate Project Name", "type": "text", "required": true},
+    {"key": "project_rera_registration_no", "label": "Project RERA Registration Number", "type": "text", "required": true},
+    {"key": "unit_number", "label": "Unit / Flat Number Booked", "type": "text", "required": true},
+    {
+      "key": "jurisdiction_state", "label": "State (RERA Authority)", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (verify state RERA authority)"],
+      "required": true
+    },
+    {"key": "agreement_date", "label": "Date of Agreement for Sale / Allotment", "type": "date", "required": true},
+    {"key": "consideration_amount", "label": "Total Sale Consideration", "type": "text", "required": true},
+    {"key": "amount_paid", "label": "Amount Actually Paid by Complainant To Date", "type": "text", "required": true},
+    {"key": "promised_possession_date", "label": "Promised Date of Possession (as per agreement)", "type": "date", "required": true},
+    {
+      "key": "actual_possession_date", "label": "Actual Date of Possession (leave blank if not yet given)",
+      "type": "date", "required": false, "default": ""
+    },
+    {
+      "key": "facts_narrative", "label": "Facts (chronology of booking, payments, correspondence, delay)",
+      "type": "textarea", "required": true,
+      "help": "State only what actually happened, in order. This is used verbatim as the basis for the Facts clause."
+    },
+    {
+      "key": "relief_sought", "label": "Relief Sought (e.g. possession with delay compensation, or refund with interest)",
+      "type": "textarea", "required": true
+    }
+  ]
+}

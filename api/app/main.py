@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routers import citations, contracts, health, litigation, matters, profile, retrieval
+from app.routers import citations, contracts, health, litigation, matters, profile, rera, retrieval
 
 # Sprint 3.6 Phase 4 (TICKET-22): with no handler configured, Python's
 # logging module falls back to its "handler of last resort," which only
@@ -124,6 +124,7 @@ app.include_router(citations.router)
 app.include_router(retrieval.router)
 app.include_router(contracts.router)
 app.include_router(profile.router)
+app.include_router(rera.router)
 
 _auth_logger = logging.getLogger("vidhidesk.auth")
 

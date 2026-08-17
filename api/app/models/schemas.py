@@ -479,3 +479,82 @@ class PleadingDraftOut(BaseModel):
         "Not legal advice. Advocate must review the full document before filing."
     )
 
+
+
+# --- RERA & Real Estate (Phase 1 backend) ------------------------------------
+# Property deeds and RERA complaints deliberately have NO dedicated models
+# here beyond what's needed for state/walkthrough data — they reuse the
+# existing GenerateDraftRequest/DraftOut (contracts router) and
+# MatterCreate/MatterOut wholesale, exactly like any Contracts template.
+# See docs/30_Implementation/RERA_BACKEND_INTEGRATION_CONTRACT.md for the
+# full reuse rationale. Only the two capabilities with no existing
+# equivalent — state/procedure/step content and walkthrough progress —
+# get new models.
+
+# ADR-010: Phase 1 supports Delhi, Maharashtra, Uttar Pradesh only. Any
+# other state falls back to "unsupported — verify manually" rather than
+# a guess, consistent with every other state-scoped feature in this
+# project (jurisdiction selectors, state_rules lookups).
+RERA_PHASE1_STATES = ("Delhi", "Maharashtra", "Uttar Pradesh")
+
+
+class RERAStateRuleOut(BaseModel):
+    """Mirrors contracts.py router's inline StateRuleOut shape (kept as a
+    separate model rather than importing that router's private class —
+    routers should not import from other routers) with the addition of
+    verification_status (migration 0019)."""
+
+    state: str
+    instrument: str
+    stamp_duty: str | None
+    registration_req: str | None
+    notes: str | None
+    source_url: str | None
+    last_verified: str | None
+    verification_status: str = "unverified"
+
+
+class RERAWalkthroughStepOut(BaseModel):
+    id: str
+    state: str
+    procedure: str
+    step_no: int
+    heading: str | None = None
+    instruction: str
+    required_documents: list[str] = Field(default_factory=list)
+    portal_url: str | None = None
+    warnings: str | None = None
+    source_url: str | None = None
+    last_verified: str | None = None
+    verification_status: str = "unverified"
+
+
+class RERAWalkthroughProcedureOut(BaseModel):
+    state: str
+    procedure: str
+    step_count: int
+
+
+class RERAWalkthroughProgressOut(BaseModel):
+    id: str
+    user_id: str
+    matter_id: str | None = None
+    state: str
+    procedure: str
+    current_step_no: int
+    completed_step_ids: list[str] = Field(default_factory=list)
+    is_complete: bool
+    started_at: datetime
+    updated_at: datetime
+
+
+class RERAWalkthroughProgressUpdate(BaseModel):
+    """Advance/rewind or mark a step complete. `matter_id`, when given,
+    associates this progress with a specific RERA matter — validated by
+    the router to belong to the caller and to have module='rera' before
+    any write happens (never trusted from the request body alone)."""
+
+    matter_id: str | None = None
+    current_step_no: int | None = Field(default=None, ge=1)
+    mark_step_complete_id: str | None = None
+    mark_step_incomplete_id: str | None = None
