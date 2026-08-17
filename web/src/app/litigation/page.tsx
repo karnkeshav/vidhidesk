@@ -182,7 +182,7 @@ export default function LitigationPage() {
                 <X className="h-4 w-4" />
               </button>
             </header>
-            
+
             <form onSubmit={handleCreateMatter} className="p-4 flex-1 space-y-4">
               <div>
                 <label className="block font-sans text-xs font-semibold text-[#081534] mb-1">Matter Title *</label>

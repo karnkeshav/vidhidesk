@@ -56,7 +56,7 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
   const [isComposing, setIsComposing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
-  
+
   // Export states
   const [isExporting, setIsExporting] = useState<"docx" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -154,11 +154,11 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
   async function handleExport(format: "docx" | "pdf") {
     if (drafts.length === 0 || isExporting) return;
     const currentDraft = drafts[0];
-    
+
     setIsExporting(format);
     setExportError(null);
     setExportSuccess(null);
-    
+
     try {
       if (format === "docx") {
         await downloadPleadingDocx(matterId, currentDraft.id, `Pleading_${matterId}.docx`);
@@ -257,9 +257,9 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
                     </span>
                   )
                 )}
-                <Button 
-                  onClick={() => handleExport("docx")} 
-                  disabled={!latestDraft || isExporting !== null} 
+                <Button
+                  onClick={() => handleExport("docx")}
+                  disabled={!latestDraft || isExporting !== null}
                   className="h-8 bg-[#081534] text-white text-xs font-semibold font-sans hover:bg-[#1E2A4A]"
                 >
                   <Download className="h-3.5 w-3.5 mr-1.5" />
@@ -273,7 +273,7 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
               {CLAUSE_TYPES.map(type => {
                 const clause = clauses.find(c => c.clause_type === type);
                 const isGenerating = isGeneratingClause === type;
-                
+
                 return (
                   <div key={type} className="rounded-sm border border-[#E4E2DD] bg-white overflow-hidden">
                     <div className="bg-[#FBF9F4] border-b border-[#E4E2DD] p-3 flex items-center justify-between">
@@ -324,7 +324,7 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
               })}
             </div>
           </div>
-          
+
           <div className="md:col-span-4 space-y-4">
             <div className="rounded-sm border border-[#E4E2DD] bg-white p-4">
               <h4 className="font-sans text-xs font-semibold uppercase text-[#081534] tracking-wide mb-3 flex items-center gap-1.5 border-b border-[#E4E2DD] pb-2">
@@ -334,7 +334,7 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
               <p className="font-serif text-xs text-[#45464E] leading-relaxed mb-4">
                 The Advocate remains the final authority. All generated clauses must be reviewed and approved before document composition.
               </p>
-              
+
               <div className="space-y-2 font-sans text-xs">
                 <div className="flex justify-between items-center py-1">
                   <span className="text-[#45464E]">Total Sections</span>
@@ -372,16 +372,16 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
                   <CheckCircle className="h-3.5 w-3.5"/> Ready for Export
                 </span>
               )}
-              <Button 
-                onClick={() => handleExport("docx")} 
+              <Button
+                onClick={() => handleExport("docx")}
                 disabled={isExporting !== null}
                 className="h-8 bg-[#081534] text-white text-xs font-semibold font-sans hover:bg-[#1E2A4A]"
               >
                 <Download className="h-3.5 w-3.5 mr-1.5" />
                 {isExporting === "docx" ? "Exporting..." : "Export DOCX"}
               </Button>
-              <Button 
-                onClick={() => handleExport("pdf")} 
+              <Button
+                onClick={() => handleExport("pdf")}
                 disabled={isExporting !== null}
                 className="h-8 bg-[#081534] text-white text-xs font-semibold font-sans hover:bg-[#1E2A4A]"
               >
