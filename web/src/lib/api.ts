@@ -581,6 +581,14 @@ export function downloadDraftPdf(draftVersionId: string, filename: string) {
   return downloadFile(`/api/drafts/${draftVersionId}/download.pdf`, filename);
 }
 
+export function downloadPleadingDocx(matterId: string, draftId: string, filename: string) {
+  return downloadFile(`/api/matters/${matterId}/pleading-draft/${draftId}/download`, filename);
+}
+
+export function downloadPleadingPdf(matterId: string, draftId: string, filename: string) {
+  return downloadFile(`/api/matters/${matterId}/pleading-draft/${draftId}/download.pdf`, filename);
+}
+
 export type StateRule = {
   state: string;
   instrument: string;
@@ -637,4 +645,81 @@ export function bulkKeepBoilerplate(templateId: string): Promise<TemplateClause[
     },
     { retry: false }
   );
+}
+
+// --- Litigation Pleading Workbench (Sprint 4) ---
+
+export type PleadingOutline = {
+  id: string;
+  version_no: number;
+  sections: Array<{
+    title: string;
+    section_type: string;
+    required_clauses: string[];
+    suggested_arguments: string[];
+  }>;
+  status: string;
+  created_at: string;
+};
+
+export type PleadingClause = {
+  id: string;
+  clause_type: string;
+  version_no: number;
+  content: string;
+  review_status: "Needs Review" | "Approved" | "Rejected";
+  citations: unknown[];
+  created_at: string;
+};
+
+export type PleadingDraft = {
+  id: string;
+  version_no: number;
+  composed_sections: Array<{
+    paragraph_no: number;
+    clause_type: string;
+    heading: string;
+    text: string;
+  }>;
+  created_at: string;
+};
+
+export function generatePleadingOutline(matterId: string, payload: { case_analysis_id: string }): Promise<PleadingOutline> {
+  return authedFetch(`/api/matters/${matterId}/pleading-outline`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listPleadingOutlines(matterId: string): Promise<PleadingOutline[]> {
+  return authedFetch(`/api/matters/${matterId}/pleading-outline`);
+}
+
+export function generateClause(matterId: string, clauseType: string, payload: { pleading_outline_id: string }): Promise<PleadingClause> {
+  return authedFetch(`/api/matters/${matterId}/clauses/${clauseType}/generate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listClauses(matterId: string, pleadingOutlineId: string): Promise<PleadingClause[]> {
+  return authedFetch(`/api/matters/${matterId}/clauses?pleading_outline_id=${pleadingOutlineId}`);
+}
+
+export function reviewPleadingClause(matterId: string, clauseId: string, status: "Approved" | "Rejected"): Promise<PleadingClause> {
+  return authedFetch(`/api/matters/${matterId}/clauses/${clauseId}/review`, {
+    method: "POST",
+    body: JSON.stringify({ review_status: status }),
+  });
+}
+
+export function composePleading(matterId: string, payload: { pleading_outline_id: string }): Promise<PleadingDraft> {
+  return authedFetch(`/api/matters/${matterId}/pleading-draft/compose`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listPleadingDrafts(matterId: string, pleadingOutlineId: string): Promise<PleadingDraft[]> {
+  return authedFetch(`/api/matters/${matterId}/pleading-draft?pleading_outline_id=${pleadingOutlineId}`);
 }

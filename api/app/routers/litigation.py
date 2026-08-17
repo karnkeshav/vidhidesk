@@ -4,6 +4,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
 from app.auth import CurrentUser, get_current_user
 from app.db import service_client
@@ -30,7 +31,7 @@ from app.models.schemas import (
     PleadingOutlineGenerateRequest,
     PleadingOutlineOut,
 )
-from app.services import case_analysis, clause_generator, document_composer, forum, limitation, litigation, pleading_outline
+from app.services import case_analysis, clause_generator, contracts, document_composer, forum, limitation, litigation, pleading_outline
 from app.services.llm_gateway import ProviderError
 
 router = APIRouter(prefix="/api", tags=["litigation"])
@@ -413,3 +414,63 @@ def list_pleading_drafts_endpoint(
     """List all composed pleading draft versions for a given outline, most recent first."""
     _get_matter_or_404(user, matter_id)
     return document_composer.list_drafts(matter_id, pleading_outline_id, user.db)
+
+
+def _get_pleading_draft_or_404(user: CurrentUser, matter_id: str, draft_id: str) -> dict:
+    """Ownership chain for a single composed pleading draft, mirroring
+    contracts.py's _get_draft_or_404: authenticated user -> matter
+    ownership (_get_matter_or_404, below) -> the requested draft_id
+    actually belongs to THIS matter_id (document_composer.get_draft's own
+    double eq() filter) -> RLS (litigation_pleading_drafts_select_owner,
+    migration 0018) makes another user's draft indistinguishable from a
+    missing one, same no-ownership-probing-oracle posture as everywhere
+    else in this codebase. All reads go through user.db — never
+    service_client() — so tenant isolation is never bypassed."""
+    _get_matter_or_404(user, matter_id)
+    draft = document_composer.get_draft(matter_id, draft_id, user.db)
+    if not draft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pleading draft not found")
+    return draft
+
+
+@router.get("/matters/{matter_id}/pleading-draft/{draft_id}/download")
+def download_pleading_draft_docx(
+    matter_id: str,
+    draft_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Export an already-composed pleading draft to .docx. Deliberately
+    NOT the Contracts /drafts/{id}/download pipeline (draft_versions +
+    pre-generated docx_path) — a composed pleading has no draft_versions
+    row and no pre-generated file; the docx is rendered on demand from
+    litigation_pleading_drafts.composed_sections (see
+    document_composer.render_pleading_docx)."""
+    draft = _get_pleading_draft_or_404(user, matter_id, draft_id)
+    docx_path = document_composer.render_pleading_docx(draft)
+    return FileResponse(
+        docx_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=docx_path.name,
+    )
+
+
+@router.get("/matters/{matter_id}/pleading-draft/{draft_id}/download.pdf")
+def download_pleading_draft_pdf(
+    matter_id: str,
+    draft_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Same ownership chain as the .docx export above, then reuses the
+    existing LibreOffice-headless conversion utility
+    (contracts.convert_docx_to_pdf — a generic Path-in/Path-out utility,
+    not Contracts-specific in implementation) on the freshly-rendered
+    pleading docx. No new PDF architecture introduced."""
+    draft = _get_pleading_draft_or_404(user, matter_id, draft_id)
+    docx_path = document_composer.render_pleading_docx(draft)
+    try:
+        pdf_path = contracts.convert_docx_to_pdf(docx_path)
+    except contracts.PdfConversionTimeout as exc:
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
+    except contracts.PdfConversionUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc)) from exc
+    return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)

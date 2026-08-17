@@ -8,8 +8,10 @@ import { getMatter, listEvidence, listHearings, listMessages, listParties, addPa
 import { LitigationPartyModal } from "@/components/litigation-party-modal";
 import { LitigationFactTimeline, FactItem } from "@/components/litigation-fact-timeline";
 import { LitigationCaseAnalysis } from "@/components/litigation-case-analysis";
-import { UserPlus, Calendar, Plus, Trash2, Send, Clock, Gavel, Sparkles } from "lucide-react";
+import { LitigationPleadingWorkbench } from "@/components/litigation-pleading-workbench";
+import { UserPlus, Calendar, Plus, Trash2, Send, Clock, Gavel, Sparkles, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CaseAnalysis, listCaseAnalyses } from "@/lib/api";
 
 interface PartyItem {
   id: string;
@@ -80,11 +82,12 @@ interface ForumResult {
  */
 export function MatterWorkspace({ matterId }: { matterId: string }) {
   const [matter, setMatter] = useState<Matter | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "facts" | "hearings" | "analysis" | "chat">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "facts" | "hearings" | "analysis" | "chat" | "pleading">("overview");
   const [messages, setMessages] = useState<Message[]>([]);
   const [parties, setParties] = useState<PartyItem[]>([]);
   const [facts, setFacts] = useState<FactItem[]>([]);
   const [hearings, setHearings] = useState<HearingItem[]>([]);
+  const [analyses, setAnalyses] = useState<CaseAnalysis[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,14 +114,16 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
       const m = await getMatter(matterId);
       setMatter(m);
       if (m.module === "litigation") {
-        const [pList, fList, hList] = await Promise.all([
+        const [pList, fList, hList, aList] = await Promise.all([
           listParties(matterId).catch(() => []),
           listEvidence(matterId).catch(() => []),
           listHearings(matterId).catch(() => []),
+          listCaseAnalyses(matterId).catch(() => [])
         ]);
         setParties(pList);
         setFacts(fList);
         setHearings(hList);
+        setAnalyses(aList);
       }
       setMessages(await listMessages(matterId).catch(() => []));
     } catch (err) {
@@ -305,6 +310,18 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                 )}
               >
                 AI Research Assistant
+              </button>
+              <button
+                onClick={() => setActiveTab("pleading")}
+                className={cn(
+                  "flex items-center gap-1 px-4 py-2 border-b-2 font-medium transition-colors",
+                  activeTab === "pleading"
+                    ? "border-[#081534] text-[#081534]"
+                    : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"
+                )}
+              >
+                <FileText className="h-3 w-3" />
+                Pleading Workbench
               </button>
             </div>
 
@@ -752,6 +769,13 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                   </Button>
                 </form>
               </div>
+            )}
+            {/* Tab 6: Pleading Workbench */}
+            {activeTab === "pleading" && (
+              <LitigationPleadingWorkbench
+                matterId={matterId}
+                latestCaseAnalysis={analyses.length > 0 ? analyses[0] : null}
+              />
             )}
           </div>
         ) : (
