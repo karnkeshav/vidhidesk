@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 MODULES = ("litigation", "contracts", "rera", "consulting")
 
@@ -210,6 +210,13 @@ class AdvocateProfile(BaseModel):
     updated_at: datetime | None = None
 
 
+# Migration 0011's own column comment states the contract this enforces:
+# "Storage object URL / path (...), NOT Base64". A real Supabase Storage
+# public URL/path is well under a few hundred characters; this ceiling is
+# generous headroom above that, not a tuned-to-the-byte limit.
+MAX_AVATAR_URL_LENGTH = 2048
+
+
 class AdvocateProfileUpdate(BaseModel):
     full_name: str | None = None
     designation: str | None = "Advocate"
@@ -218,6 +225,30 @@ class AdvocateProfileUpdate(BaseModel):
     phone: str | None = Field(default=None, pattern=r"^\+?[1-9]\d{1,14}$")
     office_address: str | None = None
     avatar_url: str | None = None
+
+    @field_validator("avatar_url")
+    @classmethod
+    def _reject_inline_image_data(cls, value: str | None) -> str | None:
+        """Blocks the exact defect that inflated a production JWT to
+        117KB: a client sending a raw base64 data: URI here, which this
+        endpoint used to copy straight into Supabase Auth user_metadata
+        with no size or shape check at all. Real avatar values are always
+        a short Supabase Storage URL/path, produced by POST
+        /api/profile/avatar (see api/app/routers/profile.py::upload_avatar) —
+        never a data: URI, and never anywhere near this length."""
+        if value is None:
+            return value
+        if value.strip().lower().startswith("data:"):
+            raise ValueError(
+                "avatar_url must be a Supabase Storage URL/path, not an "
+                "inline base64 image. Upload photos via POST /api/profile/avatar."
+            )
+        if len(value) > MAX_AVATAR_URL_LENGTH:
+            raise ValueError(
+                f"avatar_url exceeds the maximum length of {MAX_AVATAR_URL_LENGTH} "
+                "characters; expected a short Storage URL/path."
+            )
+        return value
 
 
 # --- AI Case Analysis (Sprint 3.5.3 vertical slice) -------------------------
@@ -480,7 +511,6 @@ class PleadingDraftOut(BaseModel):
     )
 
 
-
 # --- RERA & Real Estate (Phase 1 backend) ------------------------------------
 # Property deeds and RERA complaints deliberately have NO dedicated models
 # here beyond what's needed for state/walkthrough data — they reuse the
@@ -558,3 +588,82 @@ class RERAWalkthroughProgressUpdate(BaseModel):
     current_step_no: int | None = Field(default=None, ge=1)
     mark_step_complete_id: str | None = None
     mark_step_incomplete_id: str | None = None
+
+
+# --- Consulting & Legal Research (Phase 1) ---------------------------------
+# Reuses CaseAnalysisLimitationInput / CaseAnalysisForumInput (already
+# defined above) as the shape for caller-supplied deterministic Limitation
+# Calculator / Forum Advisor output — identical "caller computes via the
+# existing rule-based engine, passes the result through verbatim" pattern
+# already established for Litigation's AI Case Analysis. No duplicate
+# limitation/forum schema is introduced.
+
+
+class ConsultingAnalyzeRequest(BaseModel):
+    """POST /api/consulting/analyze body. `matter_id` omitted starts a new
+    Consulting matter; supplied, it must be an existing module='consulting'
+    matter the caller owns and this becomes a follow-up (new version, same
+    matter — never a new matter per follow-up)."""
+
+    question: str = Field(min_length=15, max_length=4000)
+    matter_id: str | None = None
+    # Optional known-sensitive entities to force-mask in addition to
+    # automatic PAN/Aadhaar/phone/email/name detection — same fields
+    # MessageCreate already exposes for the generic chat endpoint.
+    party_names: list[str] = Field(default_factory=list)
+    addresses: list[str] = Field(default_factory=list)
+    limitation: CaseAnalysisLimitationInput | None = None
+    forum: CaseAnalysisForumInput | None = None
+
+    @field_validator("question")
+    @classmethod
+    def _reject_whitespace_only(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("question must not be empty or whitespace-only")
+        return v.strip()
+
+
+class ApplicableLawRefOut(BaseModel):
+    act: str
+    section_no: str
+    relevance: str
+    grounded: bool  # cross-checked against RAG-retrieved chunks — CLAUDE.md Hard Rule 3
+
+
+class ForumRecommendationOut(BaseModel):
+    forum_name: str
+    reasoning: str | None = None
+    deterministic: bool  # True only when computed via app/services/forum.py::determine_forum
+    source: str  # "forum_advisor" | "llm_advisory"
+
+
+class LimitationPeriodOut(BaseModel):
+    summary: str
+    deterministic: bool  # True only when computed via app/services/limitation.py::calculate_limitation
+    source: str  # "limitation_calculator" | "llm_advisory"
+    expiry_date: str | None = None
+    is_barred: bool | None = None
+    days_remaining: int | None = None
+
+
+class RemedyOut(BaseModel):
+    remedy: str
+    description: str
+
+
+class ConsultingAnalysisOut(BaseModel):
+    id: str
+    matter_id: str
+    version_no: int
+    question: str
+    applicable_law: list[ApplicableLawRefOut]
+    correct_forum: ForumRecommendationOut | None = None
+    remedies_available: list[RemedyOut]
+    limitation_period: LimitationPeriodOut | None = None
+    case_law_references: list[PrecedentMentionOut]  # same verified-citation shape as Litigation
+    missing_information: list[str]
+    model_used: str | None = None
+    generation_warning: str | None = None
+    created_at: datetime
+    notice: str = "AI-generated legal research for advocate review. Not legal advice."
+

@@ -723,3 +723,133 @@ export function composePleading(matterId: string, payload: { pleading_outline_id
 export function listPleadingDrafts(matterId: string, pleadingOutlineId: string): Promise<PleadingDraft[]> {
   return authedFetch(`/api/matters/${matterId}/pleading-draft?pleading_outline_id=${pleadingOutlineId}`);
 }
+
+// ==========================================
+// RERA
+// ==========================================
+
+export type RERAWalkthroughProcedureOut = {
+  state: string;
+  procedure: string;
+  step_count: number;
+};
+
+export type RERAWalkthroughStepOut = {
+  id: string;
+  state: string;
+  procedure: string;
+  step_no: number;
+  heading: string;
+  required_documents: string[];
+  portal_url: string | null;
+  warnings: string[];
+  verification_status: string;
+};
+
+export type RERAWalkthroughProgressOut = {
+  id: string;
+  user_id: string;
+  matter_id: string | null;
+  state: string;
+  procedure: string;
+  current_step_no: number;
+  completed_step_ids: string[];
+  is_complete: boolean;
+  started_at: string;
+  updated_at: string;
+};
+
+export function getReraStates(): Promise<string[]> {
+  return authedFetch("/api/rera/states");
+}
+
+export function getReraProcedures(state: string): Promise<RERAWalkthroughProcedureOut[]> {
+  return authedFetch(`/api/rera/procedures?state=${encodeURIComponent(state)}`);
+}
+
+export function getReraWalkthrough(state: string, procedure: string): Promise<RERAWalkthroughStepOut[]> {
+  return authedFetch(`/api/rera/walkthrough/${encodeURIComponent(state)}/${encodeURIComponent(procedure)}`);
+}
+
+export function getReraProgress(state: string, procedure: string, matterId?: string): Promise<RERAWalkthroughProgressOut | null> {
+  const query = matterId ? `?matter_id=${encodeURIComponent(matterId)}` : "";
+  return authedFetch(`/api/rera/walkthrough/${encodeURIComponent(state)}/${encodeURIComponent(procedure)}/progress${query}`);
+}
+
+export function updateReraProgress(
+  state: string, 
+  procedure: string, 
+  update: { current_step_no?: number, mark_step_complete_id?: string, mark_step_incomplete_id?: string, matter_id?: string }
+): Promise<RERAWalkthroughProgressOut> {
+  return authedFetch(`/api/rera/walkthrough/${encodeURIComponent(state)}/${encodeURIComponent(procedure)}/progress`, {
+    method: "PUT",
+    body: JSON.stringify(update),
+  });
+}
+
+// ==========================================
+// CONSULTING
+// ==========================================
+
+export type ConsultingAnalyzeRequest = {
+  question: string;
+  matter_id?: string | null;
+  party_names?: string[];
+  addresses?: string[];
+  limitation?: unknown;
+  forum?: unknown;
+};
+
+export type ConsultingAnalysisOut = {
+  id: string;
+  matter_id: string;
+  version_no: number;
+  question: string;
+  applicable_law: Array<{
+    act: string;
+    section_no: string;
+    relevance: string;
+    grounded: boolean;
+  }>;
+  correct_forum: {
+    forum_name: string;
+    reasoning: string;
+    deterministic: boolean;
+    source: string;
+  } | null;
+  remedies_available: Array<{
+    remedy: string;
+    description: string;
+  }>;
+  limitation_period: {
+    summary: string;
+    deterministic: boolean;
+    source: string;
+    expiry_date: string | null;
+    is_barred: boolean | null;
+    days_remaining: number | null;
+  } | null;
+  case_law_references: Array<{
+    case_name: string;
+    note: string;
+    status: "verified" | "unverified" | "pending";
+    ik_url: string | null;
+    court: string | null;
+  }>;
+  missing_information: string[];
+  model_used: string;
+  generation_warning: string | null;
+  created_at: string;
+  notice: string;
+};
+
+export function createConsultingAnalysis(payload: ConsultingAnalyzeRequest): Promise<ConsultingAnalysisOut> {
+  return authedFetch("/api/consulting/analyze", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }, { retry: false });
+}
+
+export function listConsultingAnalyses(matterId: string): Promise<ConsultingAnalysisOut[]> {
+  return authedFetch(`/api/consulting/matters/${matterId}/analyses`);
+}

@@ -53,9 +53,36 @@ SYSTEM_PROMPTS: dict[str, str] = {
         "You are a RERA and real-estate specialist assisting an Indian "
         f"advocate. {_GROUNDING_INSTRUCTION} {_DELIMITER_INSTRUCTION}"
     ),
+    # Consulting & Legal Research Phase 1 backend: extends this task type's
+    # previously prose-only guidance with a structured JSON contract, same
+    # approach as "case_analyst" below — the task_type key itself already
+    # existed (schemas.py MODULE_TASK_TYPE) and is reused unchanged, no new
+    # task type introduced.
     "consulting_analyst": (
-        "You are a general Indian-law consulting analyst identifying "
-        f"applicable statutes, forum, and remedies. {_GROUNDING_INSTRUCTION} {_DELIMITER_INSTRUCTION}"
+        "You are a general Indian-law consulting analyst for an Indian advocate, "
+        "identifying applicable statutes, forum, remedies, limitation period, and "
+        f"case law for a legal question outside the advocate's core expertise. {_GROUNDING_INSTRUCTION} "
+        f"{_DELIMITER_INSTRUCTION} "
+        "Respond with ONLY a single JSON object — no markdown code fences, no prose "
+        "outside the JSON — matching exactly this shape: "
+        '{"applicable_law": [{"act": string, "section_no": string, "relevance": string}], '
+        '"correct_forum": {"forum_name": string, "reasoning": string} | null, '
+        '"remedies_available": [{"remedy": string, "description": string}], '
+        '"limitation_period_note": string, '
+        '"case_law_references": [{"case_name": string, "note": string}], '
+        '"missing_information": [string]}. '
+        "Only include an entry in applicable_law if it appears in the statutory context "
+        "you were given — never invent a section number; omit it rather than guess. "
+        "correct_forum and limitation_period_note are your own advisory assessment only "
+        "(they are not a substitute for the deterministic Forum Advisor / Limitation "
+        "Calculator) — state them cautiously and note when the facts given are "
+        "insufficient to be certain. case_law_references may be an empty list — only name "
+        "a case if you are reasonably confident it exists, since every name you provide "
+        "will be independently verified against Indian Kanoon before an advocate ever "
+        "sees it presented as confirmed, and an unverifiable name you invented will show "
+        "up flagged, not silently trusted. Use missing_information to list any facts you "
+        "would need before giving a more definite answer, mirroring how the advocate "
+        "himself would ask targeted follow-up questions rather than opining prematurely."
     ),
     "chat": (
         "You are VidhiDesk, an AI assistant for an Indian advocate. "
@@ -471,6 +498,7 @@ def generate_json(
     settings: Settings | None = None,
     auto_detect_names: bool = True,
     max_repair_attempts: int = 1,
+    history: list[dict] | None = None,
 ) -> tuple[GenerationResult, dict[str, Any] | None]:
     """generate() + json_mode=True + parse, with up to `max_repair_attempts`
     fresh repair calls if the response still doesn't parse (Sprint 3.6 Phase
@@ -495,7 +523,7 @@ def generate_json(
     never raising for a malformed-but-present response."""
     result = generate(
         prompt, task_type, mask_map=mask_map, entities=entities, settings=settings,
-        auto_detect_names=auto_detect_names, json_mode=True,
+        auto_detect_names=auto_detect_names, json_mode=True, history=history,
     )
     parsed = extract_json(result.text)
     attempts = 0
@@ -508,7 +536,7 @@ def generate_json(
         )
         result = generate(
             prompt + _JSON_REPAIR_SUFFIX, task_type, mask_map=mask_map, entities=entities,
-            settings=settings, auto_detect_names=auto_detect_names, json_mode=True,
+            settings=settings, auto_detect_names=auto_detect_names, json_mode=True, history=history,
         )
         parsed = extract_json(result.text)
     return result, parsed
