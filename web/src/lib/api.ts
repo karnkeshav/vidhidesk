@@ -42,13 +42,13 @@ function isTransientFailure(status: number, bodyText: string): boolean {
   return false;
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   let timedOut = false;
   const timeoutId = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, FETCH_TIMEOUT_MS);
+  }, timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (err) {
@@ -110,8 +110,9 @@ export type Message = {
 // behavior unchanged; any *new* persistent/non-idempotent write should be
 // added with `{ retry: false }` explicitly rather than relying on the
 // default.
-async function authedFetch(path: string, init?: RequestInit, options?: { retry?: boolean }) {
+async function authedFetch(path: string, init?: RequestInit, options?: { retry?: boolean; timeoutMs?: number }) {
   const retryEligible = options?.retry ?? true;
+  const timeoutMs = options?.timeoutMs ?? FETCH_TIMEOUT_MS;
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -122,14 +123,18 @@ async function authedFetch(path: string, init?: RequestInit, options?: { retry?:
     debugLog("attempt", { url: `${API_URL}${path}`, attempt });
     let res: Response;
     try {
-      res = await fetchWithTimeout(`${API_URL}${path}`, {
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          ...(init?.headers ?? {}),
+      res = await fetchWithTimeout(
+        `${API_URL}${path}`,
+        {
+          ...init,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            ...(init?.headers ?? {}),
+          },
         },
-      });
+        timeoutMs
+      );
     } catch (err) {
       // A network-level failure (including a request a CORS-blocked
       // response shows up as, and now an aborted-for-hanging-too-long
@@ -843,11 +848,21 @@ export type ConsultingAnalysisOut = {
   notice: string;
 };
 
+// Well past FETCH_TIMEOUT_MS's default 12s: this endpoint does PII masking
+// + RAG retrieval + an LLM call (with up to 3 Gemini + 5 Groq failover
+// attempts on error/rate-limit, CLAUDE.md Decision 3), then a live Indian
+// Kanoon verification call for every case name the model proposes. A real
+// local run measured 134.5s end to end while the Gemini key was being
+// rejected as leaked (403) on every attempt, forcing the full Groq
+// fallback cascade -- 180s leaves margin above that worst case even before
+// the key is rotated.
+const CONSULTING_ANALYZE_TIMEOUT_MS = 180000;
+
 export function createConsultingAnalysis(payload: ConsultingAnalyzeRequest): Promise<ConsultingAnalysisOut> {
   return authedFetch("/api/consulting/analyze", {
     method: "POST",
     body: JSON.stringify(payload),
-  }, { retry: false });
+  }, { retry: false, timeoutMs: CONSULTING_ANALYZE_TIMEOUT_MS });
 }
 
 export function listConsultingAnalyses(matterId: string): Promise<ConsultingAnalysisOut[]> {
