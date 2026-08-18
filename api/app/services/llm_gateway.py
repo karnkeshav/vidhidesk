@@ -318,8 +318,18 @@ def _providers(settings: Settings):
                 # it in the pool helps. gemini-2.5-flash (live-verified
                 # working, HTTP 200, same key, same endpoint) is the new pool
                 # head.
+                #
+                # gemini-2.0-flash removed (2026-08-18): live-verified HTTP
+                # 404 "This model models/gemini-2.0-flash is no longer
+                # available. Please update your code to use
+                # models/gemini-3.6-flash for the latest features and
+                # improvements." — Google's own deprecation notice, not a
+                # transient failure. Not replaced with gemini-3.6-flash here:
+                # that model has not been live-verified against this
+                # project's key/tier the way gemini-2.5-flash and
+                # gemini-2.5-flash-lite have; adding an unverified model
+                # would repeat the exact mistake this comment is correcting.
                 "gemini-2.5-flash",
-                "gemini-2.0-flash",
                 "gemini-2.5-flash-lite",
             ],
             lambda model, sp, turns, json_mode: _call_gemini(settings, model, sp, turns, json_mode),
@@ -327,7 +337,11 @@ def _providers(settings: Settings):
         (
             "groq",
             [
-                "llama-3.3-70b-versatile",
+                # llama-3.3-70b-versatile removed (2026-08-18): live-verified
+                # HTTP 404 "The model `llama-3.3-70b-versatile` does not
+                # exist or you do not have access to it." — permanent, not
+                # transient/rate-limit. openai/gpt-oss-120b (live-verified
+                # working, HTTP 200, same key) is the new pool head.
                 "openai/gpt-oss-120b",
                 "qwen/qwen3.6-27b",
                 "openai/gpt-oss-20b",

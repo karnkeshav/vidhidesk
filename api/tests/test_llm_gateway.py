@@ -91,7 +91,7 @@ def test_success_log_line_reports_final_provider_and_failed_providers(settings, 
     assert "provider=sambanova" in success_lines[0]
     assert "failed_attempts" in success_lines[0]
     assert "gemini:gemini-2.5-flash" in success_lines[0]
-    assert "groq:llama-3.3-70b-versatile" in success_lines[0]
+    assert "groq:openai/gpt-oss-120b" in success_lines[0]
 
 
 @respx.mock
@@ -335,14 +335,16 @@ def test_pre_wrapped_user_amendment_is_preserved_without_double_wrapping(setting
 
 @respx.mock
 def test_gemini_model_pool_failover_falls_through_in_pool(settings):
-    """Failure on gemini-2.5-flash (pool head) falls through to gemini-2.0-flash within Gemini pool."""
+    """Failure on gemini-2.5-flash (pool head) falls through to gemini-2.5-flash-lite within Gemini pool."""
     attempts: list[str] = []
 
     def _gemini_side_effect(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
-        if "gemini-2.0-flash" in url_str:
-            attempts.append("gemini-2.0-flash")
-            return _gemini_ok("Gemini 2.0 Flash succeeded")
+        # flash-lite checked before flash: "gemini-2.5-flash" is a substring
+        # of "gemini-2.5-flash-lite", so the more specific name must win.
+        if "gemini-2.5-flash-lite" in url_str:
+            attempts.append("gemini-2.5-flash-lite")
+            return _gemini_ok("Gemini 2.5 Flash Lite succeeded")
         if "gemini-2.5-flash" in url_str:
             attempts.append("gemini-2.5-flash")
             return httpx.Response(500, json={"error": "server error"})
@@ -355,21 +357,23 @@ def test_gemini_model_pool_failover_falls_through_in_pool(settings):
     result = generate("hello", settings=settings)
 
     assert result.provider == "gemini"
-    assert result.model == "gemini-2.0-flash"
-    assert result.text == "Gemini 2.0 Flash succeeded"
-    assert attempts == ["gemini-2.5-flash", "gemini-2.0-flash"]
+    assert result.model == "gemini-2.5-flash-lite"
+    assert result.text == "Gemini 2.5 Flash Lite succeeded"
+    assert attempts == ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
 
 
 @respx.mock
 def test_gemini_pool_exhaustion_escalates_to_groq(settings):
-    """Only after all 3 Gemini models fail does the failover chain escalate to Groq."""
+    """Only after both Gemini models fail (rate limit, not an auth failure --
+    the pool must be exhausted normally, not short-circuited) does the
+    failover chain escalate to Groq."""
     gemini_models_tried: list[str] = []
 
     def _gemini_fail_all(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
         # flash-lite checked before flash: "gemini-2.5-flash" is a substring
         # of "gemini-2.5-flash-lite", so the more specific name must win.
-        for m in ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]:
+        for m in ["gemini-2.5-flash-lite", "gemini-2.5-flash"]:
             if m in url_str:
                 gemini_models_tried.append(m)
                 break
@@ -379,31 +383,32 @@ def test_gemini_pool_exhaustion_escalates_to_groq(settings):
         side_effect=_gemini_fail_all
     )
     respx.post("https://api.groq.com/openai/v1/chat/completions").mock(
-        return_value=_openai_ok("Groq Llama 3.3 70b succeeded")
+        return_value=_openai_ok("Groq gpt-oss-120b succeeded")
     )
 
     result = generate("hello", settings=settings)
 
     assert result.provider == "groq"
-    assert result.model == "llama-3.3-70b-versatile"
-    assert result.text == "Groq Llama 3.3 70b succeeded"
+    assert result.model == "openai/gpt-oss-120b"
+    assert result.text == "Groq gpt-oss-120b succeeded"
     assert gemini_models_tried == [
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
         "gemini-2.5-flash-lite",
     ]
 
 
 @respx.mock
 def test_transient_network_error_retries_per_model_before_next_model(settings):
-    """TransportError on gemini-2.5-flash (pool head) retries once on the same model before moving to gemini-2.0-flash."""
-    call_counts: dict[str, int] = {"gemini-2.5-flash": 0, "gemini-2.0-flash": 0}
+    """TransportError on gemini-2.5-flash (pool head) retries once on the same model before moving to gemini-2.5-flash-lite."""
+    call_counts: dict[str, int] = {"gemini-2.5-flash": 0, "gemini-2.5-flash-lite": 0}
 
     def _flaky_gemini(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
-        if "gemini-2.0-flash" in url_str:
-            call_counts["gemini-2.0-flash"] += 1
-            return _gemini_ok("Gemini 2.0 Flash ok")
+        # flash-lite checked before flash: "gemini-2.5-flash" is a substring
+        # of "gemini-2.5-flash-lite", so the more specific name must win.
+        if "gemini-2.5-flash-lite" in url_str:
+            call_counts["gemini-2.5-flash-lite"] += 1
+            return _gemini_ok("Gemini 2.5 Flash Lite ok")
         if "gemini-2.5-flash" in url_str:
             call_counts["gemini-2.5-flash"] += 1
             raise httpx.ConnectTimeout("connection timed out", request=request)
@@ -416,11 +421,11 @@ def test_transient_network_error_retries_per_model_before_next_model(settings):
     result = generate("hello", settings=settings)
 
     assert result.provider == "gemini"
-    assert result.model == "gemini-2.0-flash"
-    assert result.text == "Gemini 2.0 Flash ok"
-    # Flash was attempted twice (1 initial call + 1 retry on TransportError) before failing over to 2.0 Flash
+    assert result.model == "gemini-2.5-flash-lite"
+    assert result.text == "Gemini 2.5 Flash Lite ok"
+    # Flash was attempted twice (1 initial call + 1 retry on TransportError) before failing over to Flash Lite
     assert call_counts["gemini-2.5-flash"] == 2
-    assert call_counts["gemini-2.0-flash"] == 1
+    assert call_counts["gemini-2.5-flash-lite"] == 1
 
 
 @respx.mock
@@ -437,32 +442,31 @@ def test_audit_log_output_reflects_full_cascade(settings, caplog):
         result = generate("hello", settings=settings)
 
     assert result.provider == "groq"
-    assert result.model == "llama-3.3-70b-versatile"
+    assert result.model == "openai/gpt-oss-120b"
 
     # Sprint 3.6 Phase 4 (TICKET-20/21): model-tier degradation is now
     # explicit on the result itself, not just discoverable by reading logs.
     assert result.requested_model == "gemini-2.5-flash"
     assert result.degraded is True
     assert result.fallback_chain == [
-        "gemini:gemini-2.5-flash (1/3)",
-        "gemini:gemini-2.0-flash (2/3)",
-        "gemini:gemini-2.5-flash-lite (3/3)",
+        "gemini:gemini-2.5-flash (1/2)",
+        "gemini:gemini-2.5-flash-lite (2/2)",
     ]
 
     warning_logs = [r.message for r in caplog.records if r.levelname == "WARNING"]
-    # 3 Gemini attempt failures + 1 explicit "MODEL DEGRADED" summary line —
+    # 2 Gemini attempt failures + 1 explicit "MODEL DEGRADED" summary line —
     # the latter is new in Phase 4, so a real model-tier downgrade is never
     # silent even to someone only watching for WARNING-level log lines.
-    assert len(warning_logs) == 4
-    assert "provider=gemini model=gemini-2.5-flash attempt=1/3" in warning_logs[0]
-    assert "provider=gemini model=gemini-2.5-flash-lite attempt=3/3" in warning_logs[2]
-    assert "MODEL DEGRADED: requested=gemini-2.5-flash actual=groq:llama-3.3-70b-versatile" in warning_logs[3]
+    assert len(warning_logs) == 3
+    assert "provider=gemini model=gemini-2.5-flash attempt=1/2" in warning_logs[0]
+    assert "provider=gemini model=gemini-2.5-flash-lite attempt=2/2" in warning_logs[1]
+    assert "MODEL DEGRADED: requested=gemini-2.5-flash actual=groq:openai/gpt-oss-120b" in warning_logs[2]
 
     info_logs = [r.message for r in caplog.records if "status=ok" in r.message]
     assert len(info_logs) == 1
-    assert "provider=groq model=llama-3.3-70b-versatile attempt=1/5" in info_logs[0]
-    assert "gemini:gemini-2.5-flash (1/3)" in info_logs[0]
-    assert "gemini:gemini-2.5-flash-lite (3/3)" in info_logs[0]
+    assert "provider=groq model=openai/gpt-oss-120b attempt=1/4" in info_logs[0]
+    assert "gemini:gemini-2.5-flash (1/2)" in info_logs[0]
+    assert "gemini:gemini-2.5-flash-lite (2/2)" in info_logs[0]
 
 
 
