@@ -10,9 +10,23 @@ persisted per-matter and used to restore the real values in the response.
 from __future__ import annotations
 
 import functools
+import logging
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Protocol
+
+# TEMPORARY LATENCY INSTRUMENTATION (draft-generation latency forensic
+# follow-up, 2026-08-17): measurement only, to determine where the
+# ~91.75s unexplained portion of a ~102.85s draft-generation request goes
+# (database / spaCy cold start / repeated PII detection / application
+# logic / Gemini orchestration / something else). Same "vidhidesk.timing"
+# logger already used by app/routers/matters.py and app/routers/contracts.py
+# for their own request-timing lines, so every draft_timing/pii_timing line
+# for a request ends up under one logger name. Never logs field values,
+# masked/unmasked text, or mask_map contents -- only stage names and
+# elapsed milliseconds. Remove once the latency investigation concludes.
+_timing_logger = logging.getLogger("vidhidesk.timing")
 
 # --- Regex-detected PII (no caller input required) -------------------------
 # Order matters: PHONE must be checked before AADHAAR. A +91-prefixed
@@ -127,9 +141,19 @@ def _get_nlp():
 
     # Only tok2vec + ner are needed for entity spans — disabling the rest
     # cuts load time and per-call latency noticeably.
-    return spacy.load(
+    #
+    # Timed because @lru_cache means this body only ever runs once per
+    # worker process — the logged duration is specifically the one-time
+    # cold-start cost (package import + model load), not per-call
+    # inference time (see _detect_person_names for that).
+    _t0 = time.perf_counter()
+    nlp = spacy.load(
         "en_core_web_sm", disable=["tagger", "parser", "attribute_ruler", "lemmatizer"]
     )
+    _timing_logger.info(
+        "pii_timing stage=spacy_model_load elapsed_ms=%.1f", (time.perf_counter() - _t0) * 1000
+    )
+    return nlp
 
 
 def _merge_spans(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -312,13 +336,19 @@ class SupabaseMaskStore:
         self._db = db
 
     def load(self, matter_id: str) -> MaskMap:
-        rows = (
-            self._db.table("pii_masks")
-            .select("placeholder,real_value,kind")
-            .eq("matter_id", matter_id)
-            .execute()
-            .data
-        )
+        _t0 = time.perf_counter()
+        try:
+            rows = (
+                self._db.table("pii_masks")
+                .select("placeholder,real_value,kind")
+                .eq("matter_id", matter_id)
+                .execute()
+                .data
+            )
+        finally:
+            _timing_logger.info(
+                "draft_timing stage=mask_store_load elapsed_ms=%.1f", (time.perf_counter() - _t0) * 1000
+            )
         mm = MaskMap(matter_id=matter_id)
         for row in rows:
             placeholder, real_value, kind = row["placeholder"], row["real_value"], row["kind"]
@@ -335,26 +365,37 @@ class SupabaseMaskStore:
         return mm
 
     def save(self, mask_map: MaskMap) -> None:
-        existing = {
-            row["placeholder"]
-            for row in self._db.table("pii_masks")
-            .select("placeholder")
-            .eq("matter_id", mask_map.matter_id)
-            .execute()
-            .data
-        }
-        new_rows = [
-            {
-                "matter_id": mask_map.matter_id,
-                "placeholder": placeholder,
-                "real_value": real_value,
-                "kind": placeholder.rsplit("_", 1)[0],
+        # try/finally so the elapsed-time line is still emitted if the
+        # insert below raises (e.g. the pii_masks_matter_id_fkey violation
+        # investigated separately) -- exception semantics are unchanged,
+        # the exception still propagates exactly as before, this only adds
+        # a log line ahead of it.
+        _t0 = time.perf_counter()
+        try:
+            existing = {
+                row["placeholder"]
+                for row in self._db.table("pii_masks")
+                .select("placeholder")
+                .eq("matter_id", mask_map.matter_id)
+                .execute()
+                .data
             }
-            for placeholder, real_value in mask_map.reverse.items()
-            if placeholder not in existing
-        ]
-        if new_rows:
-            self._db.table("pii_masks").insert(new_rows).execute()
+            new_rows = [
+                {
+                    "matter_id": mask_map.matter_id,
+                    "placeholder": placeholder,
+                    "real_value": real_value,
+                    "kind": placeholder.rsplit("_", 1)[0],
+                }
+                for placeholder, real_value in mask_map.reverse.items()
+                if placeholder not in existing
+            ]
+            if new_rows:
+                self._db.table("pii_masks").insert(new_rows).execute()
+        finally:
+            _timing_logger.info(
+                "draft_timing stage=mask_store_save elapsed_ms=%.1f", (time.perf_counter() - _t0) * 1000
+            )
 
 
 _WORD_BOUNDARY_SAFE = re.compile(r"[.*+?^${}()|[\]\\]")

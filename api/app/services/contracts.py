@@ -18,6 +18,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +31,13 @@ from app.services.llm_gateway import GenerationResult, generate
 from app.services.pii_mask import SupabaseMaskStore, mask_text
 
 logger = logging.getLogger("vidhidesk.contracts")
+
+# TEMPORARY LATENCY INSTRUMENTATION (draft-generation latency forensic
+# follow-up, 2026-08-17): measurement only -- see the matching note in
+# app/services/pii_mask.py. Same "vidhidesk.timing" logger already used by
+# app/routers/matters.py and app/routers/contracts.py's own request-timing
+# lines. Remove once the latency investigation concludes.
+_timing_logger = logging.getLogger("vidhidesk.timing")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DRAFTS_DIR = Path(__file__).resolve().parent.parent.parent / "generated_drafts"
@@ -214,7 +222,11 @@ def _mask_form_data(form_data: dict, schema: dict, mask_map, entities) -> dict:
                 for item in result[key]
             ]
         elif field.get("type") in _FREE_TEXT_FIELD_TYPES and isinstance(result[key], str):
+            _pii_t0 = time.perf_counter()
             result[key] = mask_text(result[key], mask_map, entities)
+            _timing_logger.info(
+                "pii_timing field=%s elapsed_ms=%.1f", key, (time.perf_counter() - _pii_t0) * 1000
+            )
     return result
 
 
@@ -309,207 +321,245 @@ def generate_draft(
     Clause-specific targeting is a reasonable future refinement, not a
     correctness requirement for this deliverable.
     """
+    # TEMPORARY LATENCY INSTRUMENTATION (draft-generation latency forensic
+    # follow-up, 2026-08-17): _req_t0/try-finally wrap the whole function so
+    # stage=request_total is always logged, including on the exception paths
+    # below (e.g. the pii_masks FK violation investigated separately) --
+    # exception semantics are unchanged, this only adds a log line.
+    _req_t0 = time.perf_counter()
     db = db if db is not None else service_client()
-
-    template = db.table("templates").select("*").eq("id", template_id).execute().data
-    if not template:
-        raise ValueError(f"template {template_id} not found")
-    template = template[0]
-    form_data = _with_schema_defaults(form_data, template["schema_json"])
-    form_data = _normalize_free_text(form_data, template["schema_json"])
-
-    matter_rows = db.table("matters").select("*").eq("id", matter_id).execute().data
-    matter = matter_rows[0] if matter_rows else None
-
-    all_clauses = (
-        db.table("template_clauses")
-        .select("*")
-        .eq("template_id", template_id)
-        .order("display_order")
-        .execute()
-        .data
-        or []
-    )
-    clauses = _applicable_clauses(all_clauses, form_data)
-
-    mask_store = SupabaseMaskStore(db)
-    mask_map = mask_store.load(matter_id)
-    entities = _entities_from_form(form_data, matter)
-
-    # TICKET-1 (Sprint 2 postmortem): mask every free-text user-supplied
-    # value individually, with full auto-detection, BEFORE it's
-    # interpolated into a clause prompt template — not the assembled
-    # prompt afterward. That's what lets the outer generate() call below
-    # safely pass auto_detect_names=False: every genuinely user-authored
-    # string has already been through the full PAN/phone/name/company/
-    # address pipeline by the time it reaches the LLM, so the only
-    # unmasked text left is this module's own static instruction wording,
-    # which is exactly what should never be scanned (see
-    # pii_mask.mask_text's docstring for why — "NOW THEREFORE"/
-    # "Governing Law" false-positived as person names when the whole
-    # assembled prompt was scanned as one). Schema-aware (only text/
-    # textarea fields, not select/boolean/date) — see _mask_form_data's
-    # docstring for the Service Agreement bug that made this necessary:
-    # masking a `select` value like "Fixed Fee" broke a fixed_boilerplate
-    # clause's own Jinja `{% if fee_structure == 'Fixed Fee' %}` check.
-    masked_form_data = _mask_form_data(form_data, template["schema_json"], mask_map, entities)
-    masked_amendment_note = mask_text(amendment_note, mask_map, entities) if amendment_note else None
-
-    clause_fills: list[ClauseFillRecord] = []
-    final_clause_texts: list[str] = []
-
-    # Assembly-time numbering (Sprint 2 Deliverable 2, migration 0008): a
-    # clause's number is no longer hardcoded in its own text — it's derived
-    # here, against the actual variant/condition-filtered `clauses` list,
-    # so a conditionally-excluded clause (e.g. Service Agreement's SLA)
-    # correctly shifts every later clause's number instead of leaving a
-    # gap or a wrong hardcoded value. A clause with no `heading` (NDA's
-    # recitals) gets no number and doesn't advance the counter.
-    clause_number = 0
-
-    for clause in clauses:
-        if clause["clause_type"] == "fixed_boilerplate":
-            # Jinja-rendered, not appended verbatim (Sprint 2 Deliverable 2):
-            # a fixed_boilerplate clause never calls the LLM, but it can
-            # still need per-matter substitution — a payment clause's fee
-            # amount, a deliverables list via {% for %}. No LLM call means
-            # no paraphrasing risk on numbers/verbatim list items, which is
-            # exactly the point (see the Service Agreement field-
-            # classification note: numeric/enumerable content is
-            # structured+substituted, never llm_fillable). Safe for NDA's
-            # existing tag-free boilerplate too — a template with no {{ }}
-            # in it just renders back to itself unchanged.
-            rendered = _jinja_env.from_string(clause["current_text"]).render(**masked_form_data)
-        else:
-            prompt = _jinja_env.from_string(clause["current_text"]).render(**masked_form_data)
-            if masked_amendment_note:
-                prompt += (
-                    f"\n\n<user_amendment>\n"
-                    f"Additional amendment instruction from the advocate for this "
-                    f"revision (apply it only if relevant to this clause):\n"
-                    f"{masked_amendment_note}\n"
-                    f"</user_amendment>"
-                )
-            result: GenerationResult = generate(
-                prompt,
-                task_type="contract_drafter",
-                mask_map=mask_map,
-                entities=entities,
-                auto_detect_names=False,
-            )
-            rendered = result.text
-            clause_fills.append(
-                ClauseFillRecord(
-                    template_clause_id=clause["id"],
-                    clause_key=clause["clause_key"],
-                    generated_text=result.text,
-                    prompt=result.masked_prompt,
-                    model_used=result.model,
-                )
-            )
-
-        heading = clause.get("heading")
-        if heading:
-            clause_number += 1
-            rendered = f"{clause_number}. {heading}\n\n{rendered}"
-        final_clause_texts.append(rendered)
-
-    mask_store.save(mask_map)
-
-    # NDA-specific derived context (mutual/one-way role-label swapping) —
-    # gated on the specific "nda_variant" field name, not just "any
-    # variant_field is declared": _variant_role_labels() hardcodes
-    # mutual/one_way/Disclosing-Receiving semantics, so a future template
-    # with a *different* variant concept (not this one) must not run
-    # through it. A template with no variant concept at all (Service
-    # Agreement: always asymmetric Provider/Client) skips this entirely.
-    variant_field = template["schema_json"].get("variant_field")
-    party_a_role_label, party_b_role_label = (
-        _variant_role_labels(form_data.get("nda_variant", ""), form_data.get("party_a_role"))
-        if variant_field == "nda_variant"
-        else ("", "")
-    )
-    disclaimer_banner = DISCLAIMER
-    if template.get("review_status") == "beta":
-        disclaimer_banner = "BETA — PENDING CLAUSE REVIEW. " + disclaimer_banner
-
-    tpl = DocxTemplate(str(REPO_ROOT / template["docx_path"]))
-    # The skeleton's placeholder for this MUST be the docxtpl paragraph tag
-    # {{p clauses_subdoc}}, not {{ clauses_subdoc }} — a Subdocument's raw
-    # multi-paragraph XML silently disappears (no error) under the plain
-    # tag. See docs/lessons_learned.md for the full story; any new template
-    # skeleton reusing this pattern needs the same tag form.
-    clauses_subdoc = tpl.new_subdoc()
-    for text in final_clause_texts:
-        for line in text.split("\n"):
-            clauses_subdoc.add_paragraph(line)
-        clauses_subdoc.add_paragraph("")
-
-    # Base context is generic — every submitted form field is available to
-    # any template's skeleton by its own schema key, not a hand-picked
-    # subset. NDA-specific derived keys (role labels, the variant label)
-    # are additions on top, scoped to templates that actually declare a
-    # variant_field — a template with no variant concept just never gets
-    # them, rather than every future template inheriting NDA's shape.
-    context = {
-        **form_data,
-        "disclaimer_banner": disclaimer_banner,
-        "party_a_role_label": party_a_role_label,
-        "party_b_role_label": party_b_role_label,
-        "clauses_subdoc": clauses_subdoc,
-    }
-    if variant_field == "nda_variant":
-        context["nda_variant_label"] = "Mutual" if form_data.get("nda_variant") == "mutual" else "One-Way"
-    tpl.render(context, jinja_env=_docx_jinja_env)
-
-    version_no = _next_version_no(matter_id, db)
-    DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
-    docx_path = DRAFTS_DIR / f"{matter_id}_v{version_no}.docx"
-    tpl.save(str(docx_path))
-
-    variant_suffix = f" ({form_data[variant_field]})" if variant_field else ""
-    change_summary = (
-        f"Amendment: {amendment_note}"
-        if amendment_note
-        else f"Generated from {template['name']}{variant_suffix}"
-    )
-    draft_row = (
-        db.table("draft_versions")
-        .insert(
-            {
-                "matter_id": matter_id,
-                "template_id": template_id,
-                "version_no": version_no,
-                "docx_path": str(docx_path.relative_to(REPO_ROOT)),
-                "change_summary": change_summary,
-            }
+    try:
+        _t0 = time.perf_counter()
+        template = db.table("templates").select("*").eq("id", template_id).execute().data
+        _timing_logger.info(
+            "draft_timing stage=template_lookup elapsed_ms=%.1f", (time.perf_counter() - _t0) * 1000
         )
-        .execute()
-        .data[0]
-    )
+        if not template:
+            raise ValueError(f"template {template_id} not found")
+        template = template[0]
+        form_data = _with_schema_defaults(form_data, template["schema_json"])
+        form_data = _normalize_free_text(form_data, template["schema_json"])
 
-    if clause_fills:
-        db.table("draft_clause_fills").insert(
-            [
+        _t0 = time.perf_counter()
+        matter_rows = db.table("matters").select("*").eq("id", matter_id).execute().data
+        _timing_logger.info(
+            "draft_timing stage=matter_lookup elapsed_ms=%.1f", (time.perf_counter() - _t0) * 1000
+        )
+        matter = matter_rows[0] if matter_rows else None
+
+        _t0 = time.perf_counter()
+        all_clauses = (
+            db.table("template_clauses")
+            .select("*")
+            .eq("template_id", template_id)
+            .order("display_order")
+            .execute()
+            .data
+            or []
+        )
+        _timing_logger.info(
+            "draft_timing stage=template_clauses elapsed_ms=%.1f", (time.perf_counter() - _t0) * 1000
+        )
+        clauses = _applicable_clauses(all_clauses, form_data)
+
+        mask_store = SupabaseMaskStore(db)
+        mask_map = mask_store.load(matter_id)  # timed inside SupabaseMaskStore.load() (pii_mask.py)
+        entities = _entities_from_form(form_data, matter)
+
+        # TICKET-1 (Sprint 2 postmortem): mask every free-text user-supplied
+        # value individually, with full auto-detection, BEFORE it's
+        # interpolated into a clause prompt template — not the assembled
+        # prompt afterward. That's what lets the outer generate() call below
+        # safely pass auto_detect_names=False: every genuinely user-authored
+        # string has already been through the full PAN/phone/name/company/
+        # address pipeline by the time it reaches the LLM, so the only
+        # unmasked text left is this module's own static instruction wording,
+        # which is exactly what should never be scanned (see
+        # pii_mask.mask_text's docstring for why — "NOW THEREFORE"/
+        # "Governing Law" false-positived as person names when the whole
+        # assembled prompt was scanned as one). Schema-aware (only text/
+        # textarea fields, not select/boolean/date) — see _mask_form_data's
+        # docstring for the Service Agreement bug that made this necessary:
+        # masking a `select` value like "Fixed Fee" broke a fixed_boilerplate
+        # clause's own Jinja `{% if fee_structure == 'Fixed Fee' %}` check.
+        _t0 = time.perf_counter()
+        masked_form_data = _mask_form_data(form_data, template["schema_json"], mask_map, entities)
+        _timing_logger.info(
+            "draft_timing stage=pii_form_masking elapsed_ms=%.1f", (time.perf_counter() - _t0) * 1000
+        )
+        masked_amendment_note = mask_text(amendment_note, mask_map, entities) if amendment_note else None
+
+        clause_fills: list[ClauseFillRecord] = []
+        final_clause_texts: list[str] = []
+
+        # Assembly-time numbering (Sprint 2 Deliverable 2, migration 0008): a
+        # clause's number is no longer hardcoded in its own text — it's derived
+        # here, against the actual variant/condition-filtered `clauses` list,
+        # so a conditionally-excluded clause (e.g. Service Agreement's SLA)
+        # correctly shifts every later clause's number instead of leaving a
+        # gap or a wrong hardcoded value. A clause with no `heading` (NDA's
+        # recitals) gets no number and doesn't advance the counter.
+        clause_number = 0
+
+        for clause in clauses:
+            _clause_t0 = time.perf_counter()
+            if clause["clause_type"] == "fixed_boilerplate":
+                # Jinja-rendered, not appended verbatim (Sprint 2 Deliverable 2):
+                # a fixed_boilerplate clause never calls the LLM, but it can
+                # still need per-matter substitution — a payment clause's fee
+                # amount, a deliverables list via {% for %}. No LLM call means
+                # no paraphrasing risk on numbers/verbatim list items, which is
+                # exactly the point (see the Service Agreement field-
+                # classification note: numeric/enumerable content is
+                # structured+substituted, never llm_fillable). Safe for NDA's
+                # existing tag-free boilerplate too — a template with no {{ }}
+                # in it just renders back to itself unchanged.
+                rendered = _jinja_env.from_string(clause["current_text"]).render(**masked_form_data)
+            else:
+                prompt = _jinja_env.from_string(clause["current_text"]).render(**masked_form_data)
+                if masked_amendment_note:
+                    prompt += (
+                        f"\n\n<user_amendment>\n"
+                        f"Additional amendment instruction from the advocate for this "
+                        f"revision (apply it only if relevant to this clause):\n"
+                        f"{masked_amendment_note}\n"
+                        f"</user_amendment>"
+                    )
+                # NOTE: llm_gateway.generate() already logs its own
+                # provider/model/latency line (logger "vidhidesk.llm_gateway")
+                # for the actual Gemini/provider call — that log remains the
+                # authoritative source for LLM call duration. The
+                # draft_timing line below is an enclosing span (Jinja render
+                # + the generate() call + clause-fill bookkeeping together),
+                # deliberately not a duplicate of the provider log.
+                result: GenerationResult = generate(
+                    prompt,
+                    task_type="contract_drafter",
+                    mask_map=mask_map,
+                    entities=entities,
+                    auto_detect_names=False,
+                )
+                rendered = result.text
+                clause_fills.append(
+                    ClauseFillRecord(
+                        template_clause_id=clause["id"],
+                        clause_key=clause["clause_key"],
+                        generated_text=result.text,
+                        prompt=result.masked_prompt,
+                        model_used=result.model,
+                    )
+                )
+
+            heading = clause.get("heading")
+            if heading:
+                clause_number += 1
+                rendered = f"{clause_number}. {heading}\n\n{rendered}"
+            final_clause_texts.append(rendered)
+            _timing_logger.info(
+                "draft_timing stage=clause_generation clause=%s elapsed_ms=%.1f",
+                clause.get("clause_key", "unknown"), (time.perf_counter() - _clause_t0) * 1000,
+            )
+
+        mask_store.save(mask_map)  # timed inside SupabaseMaskStore.save() (pii_mask.py)
+
+        # NDA-specific derived context (mutual/one-way role-label swapping) —
+        # gated on the specific "nda_variant" field name, not just "any
+        # variant_field is declared": _variant_role_labels() hardcodes
+        # mutual/one_way/Disclosing-Receiving semantics, so a future template
+        # with a *different* variant concept (not this one) must not run
+        # through it. A template with no variant concept at all (Service
+        # Agreement: always asymmetric Provider/Client) skips this entirely.
+        variant_field = template["schema_json"].get("variant_field")
+        party_a_role_label, party_b_role_label = (
+            _variant_role_labels(form_data.get("nda_variant", ""), form_data.get("party_a_role"))
+            if variant_field == "nda_variant"
+            else ("", "")
+        )
+        disclaimer_banner = DISCLAIMER
+        if template.get("review_status") == "beta":
+            disclaimer_banner = "BETA — PENDING CLAUSE REVIEW. " + disclaimer_banner
+
+        tpl = DocxTemplate(str(REPO_ROOT / template["docx_path"]))
+        # The skeleton's placeholder for this MUST be the docxtpl paragraph tag
+        # {{p clauses_subdoc}}, not {{ clauses_subdoc }} — a Subdocument's raw
+        # multi-paragraph XML silently disappears (no error) under the plain
+        # tag. See docs/lessons_learned.md for the full story; any new template
+        # skeleton reusing this pattern needs the same tag form.
+        clauses_subdoc = tpl.new_subdoc()
+        for text in final_clause_texts:
+            for line in text.split("\n"):
+                clauses_subdoc.add_paragraph(line)
+            clauses_subdoc.add_paragraph("")
+
+        # Base context is generic — every submitted form field is available to
+        # any template's skeleton by its own schema key, not a hand-picked
+        # subset. NDA-specific derived keys (role labels, the variant label)
+        # are additions on top, scoped to templates that actually declare a
+        # variant_field — a template with no variant concept just never gets
+        # them, rather than every future template inheriting NDA's shape.
+        context = {
+            **form_data,
+            "disclaimer_banner": disclaimer_banner,
+            "party_a_role_label": party_a_role_label,
+            "party_b_role_label": party_b_role_label,
+            "clauses_subdoc": clauses_subdoc,
+        }
+        if variant_field == "nda_variant":
+            context["nda_variant_label"] = "Mutual" if form_data.get("nda_variant") == "mutual" else "One-Way"
+        tpl.render(context, jinja_env=_docx_jinja_env)
+
+        version_no = _next_version_no(matter_id, db)
+        DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
+        docx_path = DRAFTS_DIR / f"{matter_id}_v{version_no}.docx"
+        tpl.save(str(docx_path))
+
+        variant_suffix = f" ({form_data[variant_field]})" if variant_field else ""
+        change_summary = (
+            f"Amendment: {amendment_note}"
+            if amendment_note
+            else f"Generated from {template['name']}{variant_suffix}"
+        )
+        draft_row = (
+            db.table("draft_versions")
+            .insert(
                 {
-                    "draft_version_id": draft_row["id"],
-                    "template_clause_id": f.template_clause_id,
-                    "generated_text": f.generated_text,
-                    "prompt": f.prompt,
-                    "model_used": f.model_used,
-                    "retrieval_sources_json": None,
+                    "matter_id": matter_id,
+                    "template_id": template_id,
+                    "version_no": version_no,
+                    "docx_path": str(docx_path.relative_to(REPO_ROOT)),
+                    "change_summary": change_summary,
                 }
-                for f in clause_fills
-            ]
-        ).execute()
+            )
+            .execute()
+            .data[0]
+        )
 
-    return DraftResult(
-        draft_version_id=draft_row["id"],
-        version_no=version_no,
-        docx_path=draft_row["docx_path"],
-        clause_fills=clause_fills,
-        full_text="\n\n".join(final_clause_texts),
-    )
+        if clause_fills:
+            db.table("draft_clause_fills").insert(
+                [
+                    {
+                        "draft_version_id": draft_row["id"],
+                        "template_clause_id": f.template_clause_id,
+                        "generated_text": f.generated_text,
+                        "prompt": f.prompt,
+                        "model_used": f.model_used,
+                        "retrieval_sources_json": None,
+                    }
+                    for f in clause_fills
+                ]
+            ).execute()
+
+        return DraftResult(
+            draft_version_id=draft_row["id"],
+            version_no=version_no,
+            docx_path=draft_row["docx_path"],
+            clause_fills=clause_fills,
+            full_text="\n\n".join(final_clause_texts),
+        )
+    finally:
+        _timing_logger.info(
+            "draft_timing stage=request_total elapsed_ms=%.1f", (time.perf_counter() - _req_t0) * 1000
+        )
 
 
 def list_drafts(matter_id: str, db=None) -> list[dict]:
