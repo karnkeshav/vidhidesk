@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthedShell, useMatters } from "@/components/authed-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
 import {
   FileText,
   Gavel,
@@ -12,6 +14,22 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+// Strips honorifics ("Adv.", "Advocate", "Mr.", "Ms.", "Dr.", ...) so the
+// greeting reads "Good morning, Nitesh." rather than "Good morning, Adv.".
+const HONORIFIC_RE = /^(adv\.?|advocate|mr\.?|mrs\.?|ms\.?|miss|dr\.?)$/i;
+function firstNameFrom(fullName: string): string {
+  const tokens = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstReal = tokens.find((t) => !HONORIFIC_RE.test(t));
+  return firstReal || "";
+}
+
+function timeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function DashboardPage() {
   // Auth Request Forensics Sprint, item 8: this used to call listMatters()
   // itself, duplicating the identical fetch AuthedShell already makes for
@@ -19,6 +37,50 @@ export default function DashboardPage() {
   // load. Now shares AuthedShell's single fetch via context.
   const { matters, error } = useMatters();
   const router = useRouter();
+  const [greetingName, setGreetingName] = useState("");
+  const [greetingWord, setGreetingWord] = useState(timeOfDayGreeting());
+
+  useEffect(() => {
+    setGreetingWord(timeOfDayGreeting());
+
+    let cancelled = false;
+    (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const email = authData.user?.email || "";
+      const emailLocalPart = email.split("@")[0] || "";
+
+      // Same fallback chain as /profile: DB profile -> Supabase user
+      // metadata (set on signup/last save) -> logged-in email's local part.
+      let fullName = "";
+      if (token) {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+          const res = await fetch(`${apiUrl}/api/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const apiData = await res.json();
+            fullName = apiData.full_name || "";
+          }
+        } catch {
+          // fall through to metadata/email fallback below
+        }
+      }
+      if (!fullName) {
+        fullName = authData.user?.user_metadata?.full_name || "";
+      }
+
+      if (cancelled) return;
+      const name = firstNameFrom(fullName) || emailLocalPart;
+      setGreetingName(name);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const contractsMatters = matters.filter((m) => m.module === "contracts");
   const litigationMatters = matters.filter((m) => m.module === "litigation");
@@ -32,7 +94,7 @@ export default function DashboardPage() {
         <section className="rounded-sm border border-[#E4E2DD] bg-[#F6F3EE] p-4 md:p-5">
           <div className="space-y-1">
             <h1 className="font-sans text-xl font-semibold tracking-tight text-[#081534] md:text-2xl">
-              Good morning, Nitesh.
+              {greetingWord}{greetingName ? `, ${greetingName}` : ""}.
             </h1>
           </div>
         </section>
