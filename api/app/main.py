@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers import citations, consulting, contracts, health, litigation, matters, profile, rera, retrieval
+from app.services import pii_mask as pii_mask_service
+from app.services import retrieval as retrieval_service
 
 # Sprint 3.6 Phase 4 (TICKET-22): with no handler configured, Python's
 # logging module falls back to its "handler of last resort," which only
@@ -30,6 +32,38 @@ if not logging.getLogger("vidhidesk").handlers:
 app = FastAPI(title="VidhiDesk API", version="0.1.0")
 
 settings = get_settings()
+
+_startup_logger = logging.getLogger("vidhidesk.startup")
+
+
+# Cold-start latency fix (2026-08-18): _get_nlp() (spaCy, ~5-6s) and
+# _get_embedding_model() (sentence-transformers, similarly heavy) are each
+# @functools.lru_cache(maxsize=1) -- normally loaded lazily on whichever
+# request happens to need PII masking or statute retrieval first. On a free-
+# tier instance under concurrent load, that lazy load was landing on a real
+# user request and compounding with everything else competing for a
+# throttled CPU -- live production logs showed a single PII field taking
+# 18-26s and an unrelated 4s auth timeout taking 70-260s to actually fire,
+# consistent with severe CPU starvation, not a code defect in either path.
+# Loading both here, synchronously, during startup means uvicorn only
+# reports "Application startup complete" (and Render only starts routing
+# traffic) once this one-time cost is already paid -- the first real
+# request is fast, not the one holding the bag for a cold model load on top
+# of whatever else the instance is doing. Best-effort: a warm-up failure
+# (e.g. no network for a fresh model download) is logged, not fatal --
+# both loaders are called again lazily on first real use exactly as before,
+# so a warm-up failure degrades back to the pre-existing lazy-load
+# behavior, not a startup crash.
+@app.on_event("startup")
+def _warm_up_ml_models() -> None:
+    for name, loader in (
+        ("spacy_pii_model", pii_mask_service._get_nlp),
+        ("statute_embedding_model", retrieval_service._get_embedding_model),
+    ):
+        try:
+            loader()
+        except Exception:
+            _startup_logger.exception("warm_up_failed model=%s", name)
 
 # Prepare clean CORS origins list, excluding wildcard strings which break credentialed requests
 raw_origins = settings.cors_origins if isinstance(settings.cors_origins, list) else [settings.cors_origins]

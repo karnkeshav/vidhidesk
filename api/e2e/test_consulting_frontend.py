@@ -77,7 +77,7 @@ def test_consulting_end_to_end(auth_page: Page, cleanup_matters: list, test_user
     base_url = os.environ.get("E2E_BASE_URL", "http://localhost:3000")
     
     # 1. Dashboard -> Consulting Hub
-    auth_page.click('h3:has-text("Consulting")')
+    auth_page.click('div.rounded-sm:has(h3:has-text("Consulting")) >> button:has-text("Continue Working")')
     expect(auth_page).to_have_url(f"{base_url}/consulting")
     
     # 2. Intake
