@@ -164,7 +164,17 @@ export default function ProfilePage() {
           primary_court: profile.primary_court,
           phone: profile.phone,
           office_address: profile.office_address,
-          avatar_url: profile.avatar_url,
+          // Omit avatar_url entirely when it's a stale inline base64 value
+          // (e.g. left over in state/localStorage from before photo
+          // uploads went through Supabase Storage) rather than resending
+          // it here. The backend now rejects a data: URI outright, and
+          // that rejection would otherwise fail this whole save -- name,
+          // phone, address included -- for a field this form doesn't even
+          // let the advocate edit directly (photos go through the Camera
+          // button -> POST /api/profile/avatar instead).
+          ...(profile.avatar_url && !profile.avatar_url.startsWith("data:")
+            ? { avatar_url: profile.avatar_url }
+            : {}),
         }),
       });
 

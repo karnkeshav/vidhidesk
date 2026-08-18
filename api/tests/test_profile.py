@@ -15,6 +15,7 @@ import pytest
 
 from app.main import app
 from app.auth import get_current_user, CurrentUser
+from app.routers import profile as profile_router
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MIGRATION_0011_PATH = REPO_ROOT / "api" / "migrations" / "0011_create_advocate_profiles.sql"
@@ -105,6 +106,95 @@ def test_upload_avatar_invalid_format(client):
     res = client.post("/api/profile/avatar", files=files)
     assert res.status_code == 400
     assert "Invalid image format" in res.json()["detail"]
+
+
+# --- Oversized-avatar-JWT regression coverage (2026-08-13) ------------------
+# A production incident traced a 117KB JWT to user_metadata.avatar_url
+# holding a raw base64 data: URI (~87KB) instead of a Supabase Storage
+# URL/path. PUT /api/profile had no validation stopping that value from
+# being written into Supabase Auth metadata in the first place.
+
+
+def test_update_profile_rejects_data_uri_avatar(client):
+    payload = {"avatar_url": "data:image/jpeg;base64," + "A" * 500}
+    res = client.put("/api/profile", json=payload)
+    assert res.status_code == 422
+    assert "base64" in res.text.lower()
+
+
+def test_update_profile_rejects_oversized_avatar_url(client):
+    # Not a data: URI, but still far larger than any real Storage URL/path
+    # ever is -- defense in depth beyond the data: prefix check alone.
+    payload = {"avatar_url": "https://example.com/" + "a" * 3000}
+    res = client.put("/api/profile", json=payload)
+    assert res.status_code == 422
+
+
+def test_update_profile_accepts_normal_storage_url(client):
+    short_url = "https://pgwemjswxdlnshrfoggj.supabase.co/storage/v1/object/public/avatars/user1.jpg"
+    payload = {"avatar_url": short_url}
+    res = client.put("/api/profile", json=payload)
+    assert res.status_code == 200
+    assert res.json()["avatar_url"] == short_url
+
+
+class _FakeAuthAdmin:
+    def __init__(self):
+        self.last_metadata_update: tuple[str, dict] | None = None
+
+    def update_user_by_id(self, user_id, payload):
+        self.last_metadata_update = (user_id, payload)
+        return {"id": user_id}
+
+
+class _FakeAuth:
+    def __init__(self):
+        self.admin = _FakeAuthAdmin()
+
+
+class _FakeAvatarBucket:
+    def upload(self, path, file, file_options=None):
+        return {"path": path}
+
+    def get_public_url(self, path):
+        return f"https://fake-storage.local/{path}"
+
+
+class _FakeAvatarStorage:
+    def __init__(self):
+        self._bucket = _FakeAvatarBucket()
+
+    def from_(self, bucket_name):
+        return self._bucket
+
+
+class _FakeAvatarServiceClient:
+    def __init__(self):
+        self.storage = _FakeAvatarStorage()
+        self.auth = _FakeAuth()
+
+
+def test_upload_avatar_happy_path_stores_short_storage_url(client, monkeypatch):
+    """The real /avatar upload flow -- Storage upload, not base64 -- must
+    keep working, and the value it syncs into Supabase Auth user_metadata
+    must be short (proves the fix doesn't just block bad input, it doesn't
+    disturb the already-correct golden path either)."""
+    fake_svc = _FakeAvatarServiceClient()
+    monkeypatch.setattr(profile_router, "service_client", lambda: fake_svc)
+
+    files = {"file": ("photo.jpg", b"\xff\xd8\xff\xe0fake jpeg bytes", "image/jpeg")}
+    res = client.post("/api/profile/avatar", files=files)
+    assert res.status_code == 200
+
+    data = res.json()
+    assert data["avatar_url"].startswith("https://fake-storage.local/avatars/")
+    assert len(data["avatar_url"]) < 200
+
+    user_id, metadata_payload = fake_svc.auth.admin.last_metadata_update
+    stored_avatar_url = metadata_payload["user_metadata"]["avatar_url"]
+    assert stored_avatar_url == data["avatar_url"]
+    assert len(stored_avatar_url) < 200
+    assert not stored_avatar_url.startswith("data:")
 
 
 MIGRATION_0012_PATH = REPO_ROOT / "api" / "migrations" / "0012_simplify_advocate_profiles.sql"
