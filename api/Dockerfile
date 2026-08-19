@@ -30,6 +30,18 @@ WORKDIR /app
 # `docker build` only re-runs pip install when requirements.txt actually
 # changes, not on every code edit.
 COPY api/requirements.txt /app/api/requirements.txt
+
+# sentence-transformers pulls in an unpinned "torch", which PyPI's default
+# index resolves to the CUDA build — installing 18 nvidia-*/cuda-* packages
+# and triton on this GPU-less Oracle VM for no benefit (Phase 2C.1 measured
+# this at ~2.5GB of unnecessary image weight and roughly 2.6x slower
+# dependency installation). Installing the CPU-only wheel first, before the
+# main requirements pass, satisfies sentence-transformers' unpinned "torch"
+# requirement without ever touching the CUDA index — confirmed experimentally
+# in Phase 2C.1: the subsequent requirements.txt install does not reinstall
+# torch once this version is already present.
+RUN pip install --no-cache-dir torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
+
 RUN pip install --no-cache-dir -r /app/api/requirements.txt
 
 # Application code + the two runtime-relative asset directories it expects
