@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -387,6 +388,7 @@ def generate(
     history: list[dict] | None = None,
     auto_detect_names: bool = True,
     json_mode: bool = False,
+    mask_lock: threading.Lock | None = None,
 ) -> GenerationResult:
     """Mask -> call providers/models in pool failover order -> unmask.
 
@@ -395,15 +397,32 @@ def generate(
     response_format) — guarantees syntactically valid JSON, not that the JSON
     matches the caller's requested shape. Callers whose system prompt (see
     SYSTEM_PROMPTS above) instructs a strict JSON response should pass this;
-    callers expecting free-form prose (contract_drafter, chat, ...) must not."""
+    callers expecting free-form prose (contract_drafter, chat, ...) must not.
+
+    mask_lock (Phase 4.1, bounded concurrent clause generation): optional.
+    MaskMap.get_or_assign() is a non-atomic read-then-write against the
+    caller's shared MaskMap -- safe when generate() is called sequentially
+    (the only pattern that existed before this parameter), not safe if a
+    caller fans out multiple generate() calls sharing one MaskMap across
+    threads (contracts.py's concurrent clause generation does exactly
+    this). Callers that only ever call generate() sequentially, or that
+    don't share a MaskMap across concurrent calls, must not pass this --
+    default None preserves prior behavior exactly. The lock is held only
+    around the mask_text() call below, never across the network request,
+    retry wait, or provider fallback -- those remain fully concurrent."""
     settings = settings or get_settings()
     system_prompt = SYSTEM_PROMPTS.get(task_type, SYSTEM_PROMPTS["chat"])
 
-    masked_prompt = (
-        mask_text(prompt, mask_map, entities, auto_detect_names=auto_detect_names)
-        if mask_map
-        else prompt
-    )
+    def _mask() -> str:
+        return mask_text(prompt, mask_map, entities, auto_detect_names=auto_detect_names)
+
+    if not mask_map:
+        masked_prompt = prompt
+    elif mask_lock is not None:
+        with mask_lock:
+            masked_prompt = _mask()
+    else:
+        masked_prompt = _mask()
     if not ("<user_instruction>" in masked_prompt or "<user_amendment>" in masked_prompt):
         formatted_prompt = f"<user_instruction>\n{masked_prompt}\n</user_instruction>"
     else:

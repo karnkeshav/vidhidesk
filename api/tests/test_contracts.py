@@ -2217,5 +2217,431 @@ def test_profile_metadata_no_hardcoded_advocate_defaults():
     assert "D/1042/2018" not in bar_number
 
 
+# --- Phase 4.1: bounded concurrent clause generation ------------------------
+#
+# Phase 4 audit conclusion (SAFE WITH LIMITS): every llm_fillable clause's
+# prompt is built solely from masked_form_data/masked_amendment_note, never
+# from another clause's output -- StrictUndefined makes cross-clause
+# reference an immediate crash, not a silent bug -- so clauses are safe to
+# generate concurrently. The one shared mutable object is MaskMap; it's
+# protected by a lock scoped to only the non-atomic mask_text() mutation
+# inside llm_gateway.generate(), never held across the network call itself.
+#
+# None of these tests make real Gemini calls -- every fake `generate`
+# replacement below is a deterministic, local stand-in.
+
+import threading
+import time as _time
+
+from app.services.pii_mask import mask_text, unmask_text
+
+THREE_LLM_CLAUSES = [
+    {"clause_key": "clause_one", "display_order": 1, "clause_type": "llm_fillable",
+     "applicable_condition": None, "heading": "Clause One",
+     "source_text": "Draft clause one.", "current_text": "Draft clause one."},
+    {"clause_key": "clause_two", "display_order": 2, "clause_type": "llm_fillable",
+     "applicable_condition": None, "heading": "Clause Two",
+     "source_text": "Draft clause two.", "current_text": "Draft clause two."},
+    {"clause_key": "clause_three", "display_order": 3, "clause_type": "llm_fillable",
+     "applicable_condition": None, "heading": "Clause Three",
+     "source_text": "Draft clause three.", "current_text": "Draft clause three."},
+]
+
+ONE_LLM_CLAUSE = [
+    {"clause_key": "solo_clause", "display_order": 1, "clause_type": "llm_fillable",
+     "applicable_condition": None, "heading": "Solo Clause",
+     "source_text": "Draft the only clause.", "current_text": "Draft the only clause."},
+]
+
+
+def _sleepy_generate_by_prompt(monkeypatch, delays_by_prompt: dict[str, float], record: list):
+    """Fake `contracts.generate` that sleeps a caller-chosen amount per
+    prompt and records (prompt, start, end) so tests can assert on overlap
+    and ordering -- no network call, no real Gemini use."""
+    lock = threading.Lock()
+
+    def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+        start = _time.monotonic()
+        _time.sleep(delays_by_prompt.get(prompt, 0.0))
+        end = _time.monotonic()
+        with lock:
+            record.append((prompt, start, end))
+        return GenerationResult(
+            text=f"GENERATED[{prompt}]", provider="gemini", model="gemini-2.5-flash",
+            latency_ms=int((end - start) * 1000), masked_prompt=prompt,
+        )
+
+    monkeypatch.setattr(contracts, "generate", fake)
+
+
+def test_clauses_execute_concurrently_not_sequentially(monkeypatch):
+    """Item 1: two independent llm_fillable clauses (NDA_CLAUSES has
+    exactly two: recitals, term_and_survival) actually overlap in wall
+    time -- proof this isn't just a sequential loop with extra bookkeeping."""
+    # generate_draft()'s pre-loop _mask_form_data() call triggers spaCy's
+    # one-time model load (~2-6s depending on machine, see Phase 3) the
+    # first time ANY test in this process masks a real name -- if this
+    # test happens to run before spaCy is already warm, that load lands
+    # inside the timed section below and swamps the wall-clock assertion
+    # with a cost that has nothing to do with clause-generation
+    # concurrency. Force it to happen here, outside the timed section, so
+    # this test's timing measures only what it claims to measure.
+    from app.services.pii_mask import MaskMap as _WarmupMaskMap
+    from app.services.pii_mask import mask_text as _warmup_mask_text
+    _warmup_mask_text("Ramesh Kumar warmup", _WarmupMaskMap(matter_id="warmup"))
+
+    db = FakeDB()
+    template_id = _seed_template(db)  # NDA_CLAUSES: recitals + term_and_survival
+    matter_id = _seed_matter(db)
+
+    record: list[tuple[str, float, float]] = []
+    delays = {
+        "Draft recitals for: evaluating a potential software licensing deal": 0.15,
+        "Draft term clause for: 3 years from the Effective Date": 0.15,
+    }
+    _sleepy_generate_by_prompt(monkeypatch, delays, record)
+
+    wall_start = _time.monotonic()
+    contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+    wall_elapsed = _time.monotonic() - wall_start
+
+    assert len(record) == 2
+    # NOTE: deliberately no absolute wall_elapsed < N assertion here --
+    # under real system load (e.g. running alongside the rest of the
+    # suite, competing for CPU with other tests' own threads/imports) an
+    # absolute small-fraction-of-a-second ceiling is flaky: it can fail
+    # even when clause generation genuinely overlapped, simply because
+    # the whole process was scheduled slower that run. The actual proof
+    # of concurrency below (interval overlap) is structural and immune to
+    # that -- it holds regardless of how slow or fast the machine is at
+    # the moment, because both calls' start/end are measured relative to
+    # each other, not against a fixed external budget.
+    (_, a_start, a_end), (_, b_start, b_end) = record[0], record[1]
+    overlap = a_start < b_end and b_start < a_end
+    assert overlap, f"no overlap detected: {record}"
+
+
+def test_maximum_concurrency_is_three(monkeypatch):
+    """Item 2: the five-clause Consultancy template (the largest real
+    template) never has more than MAX_CONCURRENT_CLAUSE_GENERATIONS (3)
+    llm_fillable calls in flight at once."""
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+
+    lock = threading.Lock()
+    in_flight = 0
+    max_in_flight = 0
+
+    def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+        nonlocal in_flight, max_in_flight
+        with lock:
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+        _time.sleep(0.05)
+        with lock:
+            in_flight -= 1
+        return GenerationResult(
+            text="GENERATED", provider="gemini", model="gemini-2.5-flash",
+            latency_ms=50, masked_prompt=prompt,
+        )
+
+    monkeypatch.setattr(contracts, "generate", fake)
+    contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    assert max_in_flight <= contracts.MAX_CONCURRENT_CLAUSE_GENERATIONS, (
+        f"observed {max_in_flight} concurrent calls, cap is "
+        f"{contracts.MAX_CONCURRENT_CLAUSE_GENERATIONS}"
+    )
+    assert max_in_flight > 1, "expected genuine concurrency, not accidental serialization"
+
+
+def test_original_clause_ordering_preserved_despite_different_completion_order(monkeypatch):
+    """Item 3 / the mandated concurrency test: clause 1 sleeps 300ms,
+    clause 2 sleeps 100ms, clause 3 sleeps 200ms -- completion order is
+    2, 3, 1, but final_clause_texts/clause_fills must come back in
+    original clause order (1, 2, 3), and max simultaneous calls <= 3."""
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=THREE_LLM_CLAUSES)
+    matter_id = _seed_matter(db)
+
+    lock = threading.Lock()
+    in_flight = 0
+    max_in_flight = 0
+    completion_order: list[str] = []
+    delays = {
+        "Draft clause one.": 0.30,
+        "Draft clause two.": 0.10,
+        "Draft clause three.": 0.20,
+    }
+
+    def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+        nonlocal in_flight, max_in_flight
+        with lock:
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+        _time.sleep(delays[prompt])
+        with lock:
+            in_flight -= 1
+            completion_order.append(prompt)
+        return GenerationResult(
+            text=f"GENERATED[{prompt}]", provider="gemini", model="gemini-2.5-flash",
+            latency_ms=int(delays[prompt] * 1000), masked_prompt=prompt,
+        )
+
+    monkeypatch.setattr(contracts, "generate", fake)
+    result = contracts.generate_draft(matter_id, template_id, {}, db=db)
+
+    # Completion order proves the test actually exercised out-of-order
+    # completion (otherwise this test would pass trivially).
+    assert completion_order == ["Draft clause two.", "Draft clause three.", "Draft clause one."]
+    assert max_in_flight <= 3
+
+    # Original clause order must be preserved regardless.
+    assert [f.clause_key for f in result.clause_fills] == ["clause_one", "clause_two", "clause_three"]
+    assert "GENERATED[Draft clause one.]" in result.full_text
+    assert result.full_text.index("GENERATED[Draft clause one.]") < result.full_text.index(
+        "GENERATED[Draft clause two.]"
+    ) < result.full_text.index("GENERATED[Draft clause three.]")
+
+
+def test_one_clause_failure_prevents_all_persistence(monkeypatch, tmp_path):
+    """Items 4/5 / the mandated failure test: clause 1 succeeds, clause 2
+    fails, clause 3 succeeds -- generate_draft() must raise, and NOTHING
+    must be persisted: no draft_versions row, no draft_clause_fills rows,
+    no docx file. Also proves the other in-flight clauses are not
+    abandoned mid-flight -- both succeeding clauses' fake calls are
+    recorded as having completed even though the whole call fails."""
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=THREE_LLM_CLAUSES)
+    matter_id = _seed_matter(db)
+
+    monkeypatch.setattr(contracts, "DRAFTS_DIR", tmp_path)
+
+    completed: list[str] = []
+
+    def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+        _time.sleep(0.05)
+        if prompt == "Draft clause two.":
+            completed.append(prompt)
+            raise RuntimeError("simulated: all providers/models exhausted")
+        completed.append(prompt)
+        return GenerationResult(
+            text=f"GENERATED[{prompt}]", provider="gemini", model="gemini-2.5-flash",
+            latency_ms=50, masked_prompt=prompt,
+        )
+
+    monkeypatch.setattr(contracts, "generate", fake)
+
+    with pytest.raises(RuntimeError, match="simulated"):
+        contracts.generate_draft(matter_id, template_id, {}, db=db)
+
+    # All three were allowed to run to completion -- none silently
+    # abandoned mid-flight just because clause_two failed.
+    assert set(completed) == {"Draft clause one.", "Draft clause two.", "Draft clause three."}
+
+    # No persistence anywhere.
+    assert db.table("draft_versions").rows == []
+    assert db.table("draft_clause_fills").rows == []
+    assert list(tmp_path.iterdir()) == [], "docx must not be written on a failed draft"
+
+
+def test_maskmap_correct_under_concurrent_clause_execution(monkeypatch):
+    """Item 6: three llm_fillable clauses each embed a DISTINCT PAN number
+    directly in their static clause text (PAN detection runs regardless of
+    auto_detect_names, per pii_mask.mask_text's docstring) -- this forces
+    three concurrent, previously-unseen MaskMap.get_or_assign() calls
+    against the SAME MaskMap object, the exact race the Phase 4 audit
+    flagged. The fake `generate` below calls the REAL mask_text()/
+    unmask_text() (under the real mask_lock contracts.py passes it),
+    mirroring llm_gateway.generate()'s actual mask -> process -> unmask
+    envelope, with only the network call itself replaced."""
+    clauses = [
+        {"clause_key": "c1", "display_order": 1, "clause_type": "llm_fillable",
+         "applicable_condition": None, "heading": "C1",
+         "source_text": "Ref PAN ABCDE1111F.", "current_text": "Ref PAN ABCDE1111F."},
+        {"clause_key": "c2", "display_order": 2, "clause_type": "llm_fillable",
+         "applicable_condition": None, "heading": "C2",
+         "source_text": "Ref PAN FGHIJ2222K.", "current_text": "Ref PAN FGHIJ2222K."},
+        {"clause_key": "c3", "display_order": 3, "clause_type": "llm_fillable",
+         "applicable_condition": None, "heading": "C3",
+         "source_text": "Ref PAN KLMNO3333P.", "current_text": "Ref PAN KLMNO3333P."},
+    ]
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=clauses)
+    matter_id = _seed_matter(db)
+
+    def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, mask_lock=None, **kwargs):
+        if mask_lock is not None:
+            with mask_lock:
+                masked = mask_text(prompt, mask_map, entities, auto_detect_names=auto_detect_names)
+        else:
+            masked = mask_text(prompt, mask_map, entities, auto_detect_names=auto_detect_names)
+        _time.sleep(0.03)  # widen the race window
+        llm_output = masked  # "model" echoes the masked prompt back verbatim
+        unmasked = unmask_text(llm_output, mask_map) if mask_map else llm_output
+        return GenerationResult(
+            text=unmasked, provider="gemini", model="gemini-2.5-flash",
+            latency_ms=30, masked_prompt=masked,
+        )
+
+    monkeypatch.setattr(contracts, "generate", fake)
+    result = contracts.generate_draft(matter_id, template_id, {}, db=db)
+
+    # Each clause's OWN generated text must contain its OWN PAN back,
+    # correctly unmasked -- not another clause's (which would indicate a
+    # forward/reverse mapping collision under concurrency).
+    fills_by_key = {f.clause_key: f.generated_text for f in result.clause_fills}
+    assert "ABCDE1111F" in fills_by_key["c1"] and "FGHIJ2222K" not in fills_by_key["c1"] and "KLMNO3333P" not in fills_by_key["c1"]
+    assert "FGHIJ2222K" in fills_by_key["c2"] and "ABCDE1111F" not in fills_by_key["c2"] and "KLMNO3333P" not in fills_by_key["c2"]
+    assert "KLMNO3333P" in fills_by_key["c3"] and "ABCDE1111F" not in fills_by_key["c3"] and "FGHIJ2222K" not in fills_by_key["c3"]
+
+    # SupabaseMaskStore.save() persists one pii_masks row per distinct
+    # placeholder (matter_id, placeholder, real_value, kind) -- exactly
+    # three PAN rows must exist, each with the correct, un-collided
+    # real_value. A concurrency-induced collision in MaskMap.get_or_assign()
+    # would show up here as a missing row or a wrong real_value.
+    pii_rows = [r for r in db.table("pii_masks").rows if r["matter_id"] == matter_id]
+    pan_rows = [r for r in pii_rows if r["kind"] == "PAN"]
+    assert len(pan_rows) == 3, f"expected 3 distinct PAN entries, got {pan_rows}"
+    assert {r["real_value"] for r in pan_rows} == {"ABCDE1111F", "FGHIJ2222K", "KLMNO3333P"}
+    assert len({r["placeholder"] for r in pan_rows}) == 3, "placeholder collision under concurrency"
+
+
+def test_single_llm_fillable_clause_template_still_works(monkeypatch):
+    """Item 7: a template with exactly one llm_fillable clause (e.g. the
+    real Agreement to Sell / Lease Deed / Leave & Licence templates) must
+    still work correctly through the ThreadPoolExecutor(max_workers=1)
+    path -- not a special-cased/bypassed code path."""
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=ONE_LLM_CLAUSE)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="SOLO GENERATED TEXT")
+
+    result = contracts.generate_draft(matter_id, template_id, {}, db=db)
+
+    assert len(result.clause_fills) == 1
+    assert result.clause_fills[0].clause_key == "solo_clause"
+    assert "SOLO GENERATED TEXT" in result.full_text
+
+
+def test_five_clause_consultancy_template_works(monkeypatch):
+    """Item 8: the real, five-llm_fillable-clause Consultancy template
+    (the largest of all 10 real templates, per the Phase 4 clause
+    dependency table) completes correctly end to end under the bounded
+    concurrent path, with all five clause_fills present in original
+    template display_order."""
+    db = FakeDB()
+    template_id = _seed_consultancy(db)
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch, canned_text="CONSULTANCY CLAUSE TEXT")
+
+    result = contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    expected_keys = [
+        "recitals", "scope_of_consulting_services", "ip_assignment",
+        "term_and_termination", "governing_law_jurisdiction",
+    ]
+    assert [f.clause_key for f in result.clause_fills] == expected_keys
+    assert len(result.clause_fills) == 5
+
+
+def test_fixed_boilerplate_clauses_unaffected_by_concurrency_change(monkeypatch):
+    """Item 10: fixed_boilerplate clauses (e.g. NDA's "definitions") are
+    still rendered directly via Jinja, never touch the ThreadPoolExecutor
+    or `generate` at all -- pre-existing guarantee, re-asserted here
+    against the restructured clause loop specifically."""
+    db = FakeDB()
+    template_id = _seed_template(db)  # NDA_CLAUSES includes fixed "definitions"
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    result = contracts.generate_draft(matter_id, template_id, BASE_FORM, db=db)
+
+    # Only the two llm_fillable clauses (recitals, term_and_survival)
+    # reached the fake generate() -- fixed_boilerplate clauses never did.
+    assert len(calls) == 2
+    assert "Fixed boilerplate text." in result.full_text
+
+
+def test_provider_fallback_path_unchanged_by_concurrency_wrapper(monkeypatch):
+    """Item 9: contracts.py's concurrency wrapper doesn't alter
+    llm_gateway.generate()'s own provider-fallback contract -- a clause
+    whose `generate()` call raises after exhausting the failover chain
+    (simulated here, real fallback behavior is llm_gateway.py's own
+    unchanged responsibility and is covered by test_llm_gateway.py)
+    still surfaces as a normal exception out of generate_draft(), the
+    same as it did before this change."""
+    db = FakeDB()
+    template_id = _seed_template(db, clauses=ONE_LLM_CLAUSE)
+    matter_id = _seed_matter(db)
+
+    def fake_exhausted(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+        raise RuntimeError("all providers/models exhausted")
+
+    monkeypatch.setattr(contracts, "generate", fake_exhausted)
+
+    with pytest.raises(RuntimeError, match="all providers/models exhausted"):
+        contracts.generate_draft(matter_id, template_id, {}, db=db)
+
+
+def test_concurrent_vs_sequential_mock_performance(monkeypatch):
+    """Performance test (mocked, no real Gemini calls): a deterministic
+    fake provider sleeps 0.1s per call. Compares MAX_CONCURRENT_CLAUSE_
+    GENERATIONS=1 (forces effectively-sequential execution through the
+    SAME code path) against the real default (3), for the three-clause
+    fixture. Concurrent must be meaningfully faster -- proof the
+    ThreadPoolExecutor is actually overlapping work, not just present in
+    the code. Labelled explicitly as a MOCK measurement, not a real-world
+    benchmark (see Phase 3/3.1 for real, measured Gemini latency)."""
+    def make_fake():
+        def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+            _time.sleep(0.1)
+            return GenerationResult(
+                text=f"GENERATED[{prompt}]", provider="gemini", model="gemini-2.5-flash",
+                latency_ms=100, masked_prompt=prompt,
+            )
+        return fake
+
+    # See test_clauses_execute_concurrently_not_sequentially's warm-up note
+    # -- same rationale, applied here too before either timed section.
+    from app.services.pii_mask import MaskMap as _WarmupMaskMap
+    from app.services.pii_mask import mask_text as _warmup_mask_text
+    _warmup_mask_text("Ramesh Kumar warmup", _WarmupMaskMap(matter_id="warmup"))
+
+    # Sequential baseline: same code path, cap forced to 1.
+    db1 = FakeDB()
+    template_id = _seed_template(db1, clauses=THREE_LLM_CLAUSES)
+    matter_id = _seed_matter(db1)
+    monkeypatch.setattr(contracts, "generate", make_fake())
+    monkeypatch.setattr(contracts, "MAX_CONCURRENT_CLAUSE_GENERATIONS", 1)
+    t0 = _time.monotonic()
+    contracts.generate_draft(matter_id, template_id, {}, db=db1)
+    sequential_elapsed = _time.monotonic() - t0
+
+    # Concurrent: default cap (3), all three clauses fit within it.
+    db2 = FakeDB()
+    template_id2 = _seed_template(db2, clauses=THREE_LLM_CLAUSES)
+    matter_id2 = _seed_matter(db2)
+    monkeypatch.setattr(contracts, "generate", make_fake())
+    monkeypatch.setattr(contracts, "MAX_CONCURRENT_CLAUSE_GENERATIONS", 3)
+    t0 = _time.monotonic()
+    contracts.generate_draft(matter_id2, template_id2, {}, db=db2)
+    concurrent_elapsed = _time.monotonic() - t0
+
+    # MOCK measurement, explicitly labeled: 3 x 0.1s sequential (~0.3s) vs
+    # concurrent bounded by the slowest single call (~0.1s + overhead).
+    # NOTE: no absolute upper bound on concurrent_elapsed -- under real
+    # system load a fixed small ceiling is flaky (see the overlap-test's
+    # note above); the relative comparison below is the robust proof,
+    # since both measurements are taken back-to-back under the same
+    # momentary system conditions.
+    assert sequential_elapsed > 0.28, f"sequential baseline too fast: {sequential_elapsed:.3f}s"
+    assert concurrent_elapsed < sequential_elapsed / 1.5, (
+        f"expected concurrent ({concurrent_elapsed:.3f}s) to be substantially faster "
+        f"than sequential ({sequential_elapsed:.3f}s)"
+    )
+
+
 
 

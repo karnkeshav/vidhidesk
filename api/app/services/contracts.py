@@ -14,10 +14,12 @@ as-is from the reviewed template.
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import re
 import shutil
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -41,6 +43,16 @@ _timing_logger = logging.getLogger("vidhidesk.timing")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DRAFTS_DIR = Path(__file__).resolve().parent.parent.parent / "generated_drafts"
+
+# Phase 4 audit (concurrency feasibility): every llm_fillable clause's
+# prompt is built solely from masked_form_data/masked_amendment_note,
+# never from another clause's output -- StrictUndefined below makes a
+# clause referencing another clause's generated text an immediate crash,
+# not a silent bug, so this independence is structurally enforced, not
+# just observed. Bounded rather than unbounded so the largest template
+# (Consultancy, 5 llm_fillable clauses) doesn't fire 5 simultaneous
+# provider calls with no documented rate-limit headroom to justify it.
+MAX_CONCURRENT_CLAUSE_GENERATIONS = 3
 
 _jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 
@@ -401,8 +413,17 @@ def generate_draft(
         # recitals) gets no number and doesn't advance the counter.
         clause_number = 0
 
-        for clause in clauses:
-            _clause_t0 = time.perf_counter()
+        # --- Phase 1: prepare every clause (cheap, local, no network) in
+        # original order. fixed_boilerplate renders immediately (never
+        # calls the LLM, no reason to defer it). llm_fillable clauses only
+        # get their prompt built here -- the actual generate() call is
+        # deferred to Phase 2 so it can run concurrently. `prepared` keeps
+        # one slot per clause, in original clauses-list order, so Phase 3
+        # can reassemble everything by index regardless of which order the
+        # concurrent calls in Phase 2 actually complete in.
+        llm_jobs: list[tuple[int, dict, str]] = []  # (index, clause, prompt)
+        prepared: list[tuple[dict, str | None]] = []  # (clause, rendered) -- rendered=None means "pending Phase 2"
+        for idx, clause in enumerate(clauses):
             if clause["clause_type"] == "fixed_boilerplate":
                 # Jinja-rendered, not appended verbatim (Sprint 2 Deliverable 2):
                 # a fixed_boilerplate clause never calls the LLM, but it can
@@ -414,7 +435,13 @@ def generate_draft(
                 # structured+substituted, never llm_fillable). Safe for NDA's
                 # existing tag-free boilerplate too — a template with no {{ }}
                 # in it just renders back to itself unchanged.
+                _clause_t0 = time.perf_counter()
                 rendered = _jinja_env.from_string(clause["current_text"]).render(**masked_form_data)
+                _timing_logger.info(
+                    "draft_timing stage=clause_generation clause=%s elapsed_ms=%.1f",
+                    clause.get("clause_key", "unknown"), (time.perf_counter() - _clause_t0) * 1000,
+                )
+                prepared.append((clause, rendered))
             else:
                 prompt = _jinja_env.from_string(clause["current_text"]).render(**masked_form_data)
                 if masked_amendment_note:
@@ -425,20 +452,71 @@ def generate_draft(
                         f"{masked_amendment_note}\n"
                         f"</user_amendment>"
                     )
-                # NOTE: llm_gateway.generate() already logs its own
-                # provider/model/latency line (logger "vidhidesk.llm_gateway")
-                # for the actual Gemini/provider call — that log remains the
-                # authoritative source for LLM call duration. The
-                # draft_timing line below is an enclosing span (Jinja render
-                # + the generate() call + clause-fill bookkeeping together),
-                # deliberately not a duplicate of the provider log.
-                result: GenerationResult = generate(
-                    prompt,
-                    task_type="contract_drafter",
-                    mask_map=mask_map,
-                    entities=entities,
-                    auto_detect_names=False,
-                )
+                llm_jobs.append((idx, clause, prompt))
+                prepared.append((clause, None))
+
+        # --- Phase 2: run independent llm_fillable clause generations
+        # concurrently, bounded to MAX_CONCURRENT_CLAUSE_GENERATIONS
+        # workers (Phase 4 audit: SAFE WITH LIMITS -- no clause's prompt
+        # depends on another clause's output; the one shared mutable
+        # object, mask_map, is protected by mask_lock, held only around
+        # the internal mask_text() call inside generate(), never across
+        # the Gemini HTTP request/retry/fallback -- see llm_gateway.py's
+        # mask_lock docstring). All-or-nothing preserved: every submitted
+        # future is awaited (none are abandoned mid-flight just because an
+        # earlier one failed), and NO persistence happens below unless
+        # every clause succeeded -- identical external contract to the
+        # prior sequential implementation.
+        #
+        # NOTE: llm_gateway.generate() already logs its own
+        # provider/model/latency line (logger "vidhidesk.llm_gateway") for
+        # the actual Gemini/provider call — that log remains the
+        # authoritative source for LLM call duration. The draft_timing
+        # line below is an enclosing span (generate() call + clause-fill
+        # bookkeeping), deliberately not a duplicate of the provider log.
+        mask_lock = threading.Lock()
+        llm_results: dict[int, GenerationResult] = {}
+        llm_timings_ms: dict[int, float] = {}
+        llm_errors: list[BaseException] = []
+
+        def _generate_one(idx: int, prompt: str) -> None:
+            _clause_t0 = time.perf_counter()
+            llm_results[idx] = generate(
+                prompt,
+                task_type="contract_drafter",
+                mask_map=mask_map,
+                entities=entities,
+                auto_detect_names=False,
+                mask_lock=mask_lock,
+            )
+            llm_timings_ms[idx] = (time.perf_counter() - _clause_t0) * 1000
+
+        if llm_jobs:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(MAX_CONCURRENT_CLAUSE_GENERATIONS, len(llm_jobs))
+            ) as executor:
+                futures = [executor.submit(_generate_one, idx, prompt) for idx, _clause, prompt in llm_jobs]
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as exc:  # noqa: BLE001 -- collected, not swallowed; see below
+                        llm_errors.append(exc)
+
+        if llm_errors:
+            # Every future has already completed (the loop above only
+            # exits once all are done) -- nothing is left running in the
+            # background. Re-raising the first error preserves the prior
+            # behavior of a single clause failure aborting the whole
+            # generate_draft() call with no persistence, regardless of how
+            # many clauses succeeded alongside it.
+            raise llm_errors[0]
+
+        # --- Phase 3: assemble final_clause_texts / clause_fills in
+        # original clause order (list index, NOT completion order),
+        # applying numbering exactly as before.
+        for idx, (clause, rendered) in enumerate(prepared):
+            if rendered is None:
+                result = llm_results[idx]
                 rendered = result.text
                 clause_fills.append(
                     ClauseFillRecord(
@@ -449,16 +527,16 @@ def generate_draft(
                         model_used=result.model,
                     )
                 )
+                _timing_logger.info(
+                    "draft_timing stage=clause_generation clause=%s elapsed_ms=%.1f",
+                    clause.get("clause_key", "unknown"), llm_timings_ms[idx],
+                )
 
             heading = clause.get("heading")
             if heading:
                 clause_number += 1
                 rendered = f"{clause_number}. {heading}\n\n{rendered}"
             final_clause_texts.append(rendered)
-            _timing_logger.info(
-                "draft_timing stage=clause_generation clause=%s elapsed_ms=%.1f",
-                clause.get("clause_key", "unknown"), (time.perf_counter() - _clause_t0) * 1000,
-            )
 
         mask_store.save(mask_map)  # timed inside SupabaseMaskStore.save() (pii_mask.py)
 
