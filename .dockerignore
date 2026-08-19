@@ -1,0 +1,23 @@
+# Build context is the repository root (docker build -f api/Dockerfile .).
+# Keep templates/, corpus/, api/app, and api/requirements.txt un-excluded —
+# api/Dockerfile depends on all four being present in the build context.
+
+.git
+.github
+.venv
+api/.venv
+__pycache__
+*.pyc
+.env
+.env.*
+api/generated_drafts/*
+tests
+api/.pytest_cache
+
+# Repo-level docs — not needed inside the backend image.
+docs
+
+# Frontend — this Dockerfile only builds the Python API; the Next.js app
+# is deployed separately to Vercel and doesn't belong in this image.
+web/node_modules
+web/.next
