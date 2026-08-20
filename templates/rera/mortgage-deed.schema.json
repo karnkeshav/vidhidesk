@@ -1,0 +1,40 @@
+{
+  "template_key": "mortgage-deed",
+  "title": "Mortgage Deed",
+  "fields": [
+    {"key": "mortgagor_name", "label": "Mortgagor — Full Legal Name", "type": "text", "required": true},
+    {"key": "mortgagor_address", "label": "Mortgagor — Address", "type": "textarea", "required": true},
+    {"key": "mortgagee_name", "label": "Mortgagee — Full Legal Name", "type": "text", "required": true},
+    {"key": "mortgagee_address", "label": "Mortgagee — Address", "type": "textarea", "required": true},
+    {
+      "key": "property_state", "label": "State Where Property Is Situated", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"],
+      "required": true
+    },
+    {
+      "key": "property_description", "label": "Schedule of Property (full description, boundaries, survey/khasra no., area)",
+      "type": "textarea", "required": true,
+      "help": "This is copied verbatim into the Schedule of Property clause — describe it exactly as it should appear in the deed."
+    },
+    {"key": "principal_amount", "label": "Principal Amount Secured (e.g. 'Rs. 20,00,000/- (Rupees Twenty Lakhs Only)')", "type": "text", "required": true},
+    {
+      "key": "loan_purpose", "label": "Purpose of the Loan (brief, optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {"key": "interest_rate", "label": "Rate of Interest (e.g. '12% per annum')", "type": "text", "required": true},
+    {
+      "key": "repayment_terms", "label": "Repayment Terms (schedule, tenure, mode)", "type": "textarea",
+      "required": true
+    },
+    {
+      "key": "title_background", "label": "How the Mortgagor Acquired Title (brief — prior deed/inheritance/allotment, date)",
+      "type": "textarea", "required": true,
+      "help": "Used to draft the recitals. Do not invent — state only what you actually know."
+    },
+    {
+      "key": "special_conditions", "label": "Special Conditions (optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {"key": "execution_date", "label": "Date of Execution", "type": "date", "required": true}
+  ]
+}

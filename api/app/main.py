@@ -1,3 +1,4 @@
+import concurrent.futures
 import logging
 import time
 from datetime import datetime, timezone
@@ -49,21 +50,67 @@ _startup_logger = logging.getLogger("vidhidesk.startup")
 # reports "Application startup complete" (and Render only starts routing
 # traffic) once this one-time cost is already paid -- the first real
 # request is fast, not the one holding the bag for a cold model load on top
-# of whatever else the instance is doing. Best-effort: a warm-up failure
-# (e.g. no network for a fresh model download) is logged, not fatal --
-# both loaders are called again lazily on first real use exactly as before,
-# so a warm-up failure degrades back to the pre-existing lazy-load
-# behavior, not a startup crash.
+# of whatever else the instance is doing.
+#
+# Bounded-wait fix (RERA Phase 2A, 2026-08-20): the two loaders now run
+# concurrently in a thread pool with a combined wait cap of
+# _WARM_UP_TIMEOUT_S, instead of being awaited sequentially with no bound.
+# Root cause this addresses: RERA Phase 1's live investigation of the
+# reported "Loading property templates" / "Complaint template not found"
+# hang traced it to this exact handler -- on a cold local machine,
+# SentenceTransformer's HuggingFace Hub freshness check (a network call
+# huggingface_hub makes even when a valid local cache already exists) took
+# several minutes rather than the ~5-6s documented above, and because this
+# handler blocks FastAPI's ASGI lifespan, uvicorn does not begin serving
+# ANY route -- not just RERA's -- until it returns. That made the failure
+# look like a RERA-specific bug when it was actually a startup-wide one.
+# A slow/hung loader no longer blocks startup past the cap; it keeps
+# running in its thread in the background (Python cannot force-cancel a
+# running thread) and will finish populating the same lru_cache whenever
+# it completes, so a request arriving after the cap still benefits from it
+# the moment it's done -- and if it never finishes, the existing lazy-load
+# fallback (any request that actually needs the model calls the same
+# @lru_cache-decorated loader itself, exactly as before this whole
+# 2026-08-18 fix existed) still applies. This preserves the documented
+# production benefit above unchanged for the normal (fast) case -- the cap
+# only changes behavior when a load is abnormally slow, which is exactly
+# the failure mode being fixed.
+_WARM_UP_TIMEOUT_S = 25.0
+
+
+def _warm_up_one(name: str, loader) -> None:
+    try:
+        loader()
+        _startup_logger.info("warm_up_complete model=%s", name)
+    except Exception:
+        _startup_logger.exception("warm_up_failed model=%s", name)
+
+
 @app.on_event("startup")
 def _warm_up_ml_models() -> None:
-    for name, loader in (
-        ("spacy_pii_model", pii_mask_service._get_nlp),
-        ("statute_embedding_model", retrieval_service._get_embedding_model),
-    ):
-        try:
-            loader()
-        except Exception:
-            _startup_logger.exception("warm_up_failed model=%s", name)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    futures = {
+        executor.submit(_warm_up_one, name, loader): name
+        for name, loader in (
+            ("spacy_pii_model", pii_mask_service._get_nlp),
+            ("statute_embedding_model", retrieval_service._get_embedding_model),
+        )
+    }
+    _done, not_done = concurrent.futures.wait(futures, timeout=_WARM_UP_TIMEOUT_S)
+    for future in not_done:
+        _startup_logger.warning(
+            "warm_up_still_running model=%s after %.0fs -- continuing startup without "
+            "waiting further; this model will finish loading in the background and/or "
+            "lazy-load on first real request that needs it",
+            futures[future], _WARM_UP_TIMEOUT_S,
+        )
+    # Deliberately not calling executor.shutdown() here -- that would block
+    # (by default) until every submitted future finishes, which is exactly
+    # the unbounded wait this fix removes. The executor and its threads are
+    # allowed to be garbage-collected once their work completes; Python
+    # does not require an explicit shutdown for correctness here, only for
+    # prompt resource reclamation, which does not matter for a
+    # once-per-process-lifetime startup call.
 
 # Prepare clean CORS origins list, excluding wildcard strings which break credentialed requests
 raw_origins = settings.cors_origins if isinstance(settings.cors_origins, list) else [settings.cors_origins]
