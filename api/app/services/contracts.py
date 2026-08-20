@@ -30,6 +30,7 @@ from docxtpl import DocxTemplate
 
 from app.db import service_client
 from app.services.llm_gateway import GenerationResult, generate
+from app.services.model_pool import Capability, select_model
 from app.services.pii_mask import SupabaseMaskStore, mask_text
 
 logger = logging.getLogger("vidhidesk.contracts")
@@ -455,6 +456,19 @@ def generate_draft(
                 llm_jobs.append((idx, clause, prompt))
                 prepared.append((clause, None))
 
+        # --- Phase 1.5 (Phase 4.5, model pool draft-session lock): select
+        # exactly ONE (provider, model) for the WHOLE draft, once, before
+        # any clause generation begins -- only if there's actually an
+        # llm_fillable clause to generate (a template with none needs no
+        # model at all). Every clause below receives this same
+        # `selected_model`; none of them call select_model() or discover
+        # the provider list independently (POOL FOR AVAILABILITY,
+        # CONSISTENCY FOR EXECUTION -- see model_pool.py). If selection
+        # itself fails (no eligible model), that's a clean, immediate,
+        # pre-generation failure -- nothing has been generated yet, so
+        # there's nothing to roll back.
+        selected_model = select_model(Capability.LEGAL_DRAFTING) if llm_jobs else None
+
         # --- Phase 2: run independent llm_fillable clause generations
         # concurrently, bounded to MAX_CONCURRENT_CLAUSE_GENERATIONS
         # workers (Phase 4 audit: SAFE WITH LIMITS -- no clause's prompt
@@ -467,6 +481,13 @@ def generate_draft(
         # earlier one failed), and NO persistence happens below unless
         # every clause succeeded -- identical external contract to the
         # prior sequential implementation.
+        #
+        # STAGE 2 (Phase 4.5): every clause passes the SAME `selected_model`
+        # to generate(), which then calls ONLY that provider/model -- no
+        # per-clause failover. If the locked model fails for any one
+        # clause, generate() raises immediately (no silent cross-provider
+        # switch mid-draft) and that exception flows into llm_errors below
+        # exactly like any other clause failure already did.
         #
         # NOTE: llm_gateway.generate() already logs its own
         # provider/model/latency line (logger "vidhidesk.llm_gateway") for
@@ -488,12 +509,22 @@ def generate_draft(
                 entities=entities,
                 auto_detect_names=False,
                 mask_lock=mask_lock,
+                selected_model=selected_model,
             )
             llm_timings_ms[idx] = (time.perf_counter() - _clause_t0) * 1000
 
         if llm_jobs:
+            # Effective worker count is bounded by whichever is smallest:
+            # the application-wide cap, the locked model's own conservative
+            # concurrency_limit (model_pool.py -- not a provider-verified
+            # true limit, see its docstring), and the actual clause count.
+            effective_workers = min(
+                MAX_CONCURRENT_CLAUSE_GENERATIONS,
+                selected_model.concurrency_limit,
+                len(llm_jobs),
+            )
             with concurrent.futures.ThreadPoolExecutor(
-                max_workers=min(MAX_CONCURRENT_CLAUSE_GENERATIONS, len(llm_jobs))
+                max_workers=effective_workers
             ) as executor:
                 futures = [executor.submit(_generate_one, idx, prompt) for idx, _clause, prompt in llm_jobs]
                 for future in concurrent.futures.as_completed(futures):

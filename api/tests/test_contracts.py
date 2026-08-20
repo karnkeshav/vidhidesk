@@ -30,7 +30,19 @@ import pytest
 
 from app.services import contracts
 from app.services.llm_gateway import GenerationResult
+from app.services.model_pool import Capability, ModelSpec
 from app.services.pii_mask import MaskMap
+
+# Phase 4.5: a fixed, environment-independent stand-in for model_pool.
+# select_model()'s real return value -- production selection reads real
+# Settings (real .env API keys) to decide eligibility, which existing
+# tests must NOT depend on (NO LIVE API CALLS; tests must pass in an
+# environment with no real provider keys configured at all). Any test
+# using _fake_generate() below gets this automatically.
+FAKE_SELECTED_MODEL = ModelSpec(
+    provider="gemini", model="gemini-2.5-flash",
+    capability=Capability.LEGAL_DRAFTING, priority=1, enabled=True,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -268,6 +280,7 @@ def _fake_generate(monkeypatch, canned_text="LLM-GENERATED TEXT"):
             {
                 "prompt": prompt, "task_type": task_type, "mask_map": mask_map,
                 "entities": entities, "auto_detect_names": auto_detect_names,
+                "selected_model": kwargs.get("selected_model"),
             }
         )
         return GenerationResult(
@@ -276,6 +289,10 @@ def _fake_generate(monkeypatch, canned_text="LLM-GENERATED TEXT"):
         )
 
     monkeypatch.setattr(contracts, "generate", fake)
+    # Phase 4.5: stub select_model() too, so this fixture stays fully
+    # environment-independent (no real provider API keys needed for any
+    # test using it) -- see FAKE_SELECTED_MODEL above.
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
     return calls
 
 
@@ -2272,6 +2289,7 @@ def _sleepy_generate_by_prompt(monkeypatch, delays_by_prompt: dict[str, float], 
         )
 
     monkeypatch.setattr(contracts, "generate", fake)
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
 
 
 def test_clauses_execute_concurrently_not_sequentially(monkeypatch):
@@ -2347,6 +2365,7 @@ def test_maximum_concurrency_is_three(monkeypatch):
         )
 
     monkeypatch.setattr(contracts, "generate", fake)
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
     contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
 
     assert max_in_flight <= contracts.MAX_CONCURRENT_CLAUSE_GENERATIONS, (
@@ -2390,6 +2409,7 @@ def test_original_clause_ordering_preserved_despite_different_completion_order(m
         )
 
     monkeypatch.setattr(contracts, "generate", fake)
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
     result = contracts.generate_draft(matter_id, template_id, {}, db=db)
 
     # Completion order proves the test actually exercised out-of-order
@@ -2432,6 +2452,7 @@ def test_one_clause_failure_prevents_all_persistence(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(contracts, "generate", fake)
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
 
     with pytest.raises(RuntimeError, match="simulated"):
         contracts.generate_draft(matter_id, template_id, {}, db=db)
@@ -2486,6 +2507,7 @@ def test_maskmap_correct_under_concurrent_clause_execution(monkeypatch):
         )
 
     monkeypatch.setattr(contracts, "generate", fake)
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
     result = contracts.generate_draft(matter_id, template_id, {}, db=db)
 
     # Each clause's OWN generated text must contain its OWN PAN back,
@@ -2580,6 +2602,7 @@ def test_provider_fallback_path_unchanged_by_concurrency_wrapper(monkeypatch):
         raise RuntimeError("all providers/models exhausted")
 
     monkeypatch.setattr(contracts, "generate", fake_exhausted)
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
 
     with pytest.raises(RuntimeError, match="all providers/models exhausted"):
         contracts.generate_draft(matter_id, template_id, {}, db=db)
@@ -2587,16 +2610,28 @@ def test_provider_fallback_path_unchanged_by_concurrency_wrapper(monkeypatch):
 
 def test_concurrent_vs_sequential_mock_performance(monkeypatch):
     """Performance test (mocked, no real Gemini calls): a deterministic
-    fake provider sleeps 0.1s per call. Compares MAX_CONCURRENT_CLAUSE_
+    fake provider sleeps 0.4s per call. Compares MAX_CONCURRENT_CLAUSE_
     GENERATIONS=1 (forces effectively-sequential execution through the
     SAME code path) against the real default (3), for the three-clause
     fixture. Concurrent must be meaningfully faster -- proof the
     ThreadPoolExecutor is actually overlapping work, not just present in
     the code. Labelled explicitly as a MOCK measurement, not a real-world
-    benchmark (see Phase 3/3.1 for real, measured Gemini latency)."""
+    benchmark (see Phase 3/3.1 for real, measured Gemini latency).
+
+    Phase 4.6 (2026-08-20): raised the per-call sleep from 0.1s to 0.4s.
+    At 0.1s, a full-suite run (this test executing alongside ~390 others,
+    real thread/CPU contention on a shared machine) intermittently pushed
+    both measurements up by a roughly fixed ~0.2-0.4s scheduling-overhead
+    tax -- fine in isolation, but at the 0.1s scale that overhead was
+    sometimes comparable to the signal itself, compressing the concurrent/
+    sequential ratio below the 1/1.5 threshold even though the underlying
+    ThreadPoolExecutor behavior was unchanged and correct. A larger fixed
+    per-call cost makes the real signal (3x work either overlapped or
+    not) dominate that same fixed overhead by a wider margin, without
+    changing what the assertions actually verify."""
     def make_fake():
         def fake(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
-            _time.sleep(0.1)
+            _time.sleep(0.4)
             return GenerationResult(
                 text=f"GENERATED[{prompt}]", provider="gemini", model="gemini-2.5-flash",
                 latency_ms=100, masked_prompt=prompt,
@@ -2608,6 +2643,7 @@ def test_concurrent_vs_sequential_mock_performance(monkeypatch):
     from app.services.pii_mask import MaskMap as _WarmupMaskMap
     from app.services.pii_mask import mask_text as _warmup_mask_text
     _warmup_mask_text("Ramesh Kumar warmup", _WarmupMaskMap(matter_id="warmup"))
+    monkeypatch.setattr(contracts, "select_model", lambda capability, settings=None: FAKE_SELECTED_MODEL)
 
     # Sequential baseline: same code path, cap forced to 1.
     db1 = FakeDB()
@@ -2629,19 +2665,377 @@ def test_concurrent_vs_sequential_mock_performance(monkeypatch):
     contracts.generate_draft(matter_id2, template_id2, {}, db=db2)
     concurrent_elapsed = _time.monotonic() - t0
 
-    # MOCK measurement, explicitly labeled: 3 x 0.1s sequential (~0.3s) vs
-    # concurrent bounded by the slowest single call (~0.1s + overhead).
+    # MOCK measurement, explicitly labeled: 3 x 0.4s sequential (~1.2s) vs
+    # concurrent bounded by the slowest single call (~0.4s + overhead).
     # NOTE: no absolute upper bound on concurrent_elapsed -- under real
     # system load a fixed small ceiling is flaky (see the overlap-test's
     # note above); the relative comparison below is the robust proof,
     # since both measurements are taken back-to-back under the same
     # momentary system conditions.
-    assert sequential_elapsed > 0.28, f"sequential baseline too fast: {sequential_elapsed:.3f}s"
+    assert sequential_elapsed > 1.1, f"sequential baseline too fast: {sequential_elapsed:.3f}s"
     assert concurrent_elapsed < sequential_elapsed / 1.5, (
         f"expected concurrent ({concurrent_elapsed:.3f}s) to be substantially faster "
         f"than sequential ({sequential_elapsed:.3f}s)"
     )
 
 
+# --- Phase 4.5: model-pool draft-session lock, integration level -----------
+
+
+def test_all_clauses_in_one_draft_receive_the_identical_selected_model(monkeypatch):
+    """Item 6: every clause in a multi-clause draft gets the SAME
+    (provider, model) -- not independently rediscovered per clause."""
+    db = FakeDB()
+    template_id = _seed_consultancy(db)  # 5 llm_fillable clauses
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch)
+
+    contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    assert len(calls) == 5
+    selected_models = {c["selected_model"] for c in calls}
+    assert len(selected_models) == 1, f"clauses used different selected_model values: {selected_models}"
+    assert next(iter(selected_models)) == FAKE_SELECTED_MODEL
+
+
+def test_select_model_called_exactly_once_per_draft_not_per_clause(monkeypatch):
+    """Items 5/7: pool selection happens once, before the loop -- not
+    once per clause, and concurrent clauses cannot each independently
+    call select_model()."""
+    db = FakeDB()
+    template_id = _seed_consultancy(db)  # 5 llm_fillable clauses
+    matter_id = _seed_matter(db)
+    _fake_generate(monkeypatch)  # also stubs select_model via the shared fixture
+
+    call_count = {"n": 0}
+    real_stub = contracts.select_model
+
+    def counting_select_model(capability, settings=None):
+        call_count["n"] += 1
+        return real_stub(capability, settings=settings)
+
+    monkeypatch.setattr(contracts, "select_model", counting_select_model)
+
+    contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    assert call_count["n"] == 1, f"select_model() was called {call_count['n']} times, expected exactly 1"
+
+
+def test_pre_draft_fallback_selection_stays_locked_for_every_clause(monkeypatch):
+    """THE critical regression test (Phase 4.5 TEST SCENARIO, part 2):
+    Model A is unavailable BEFORE the draft begins -> Model B is
+    selected -> EVERY clause in the draft uses Model B, none silently
+    reach for Model A or any other provider."""
+    from app.services.model_pool import Capability, ModelSpec
+
+    model_a = ModelSpec(provider="gemini", model="model-a-unavailable",
+                         capability=Capability.LEGAL_DRAFTING, priority=1, enabled=False,
+                         reason="simulated unavailable for this test")
+    model_b = ModelSpec(provider="groq", model="model-b-fallback",
+                         capability=Capability.LEGAL_DRAFTING, priority=2, enabled=True)
+
+    def fake_select_model(capability, settings=None):
+        # Mirrors the real select_model()'s own priority-sort-then-filter
+        # logic against this test's fixed two-model pool -- model_a is
+        # disabled, so model_b is what a real call would also return.
+        return model_b
+
+    monkeypatch.setattr(contracts, "select_model", fake_select_model)
+
+    calls = []
+
+    def fake_generate(prompt, task_type=None, mask_map=None, entities=None, auto_detect_names=True, **kwargs):
+        calls.append(kwargs.get("selected_model"))
+        return GenerationResult(
+            text="GENERATED", provider="groq", model="model-b-fallback",
+            latency_ms=10, masked_prompt=prompt,
+        )
+
+    monkeypatch.setattr(contracts, "generate", fake_generate)
+
+    db = FakeDB()
+    template_id = _seed_consultancy(db)  # 5 llm_fillable clauses
+    matter_id = _seed_matter(db)
+    contracts.generate_draft(matter_id, template_id, CONSULTANCY_FORM, db=db)
+
+    assert len(calls) == 5
+    assert all(c == model_b for c in calls), f"not every clause used model_b: {calls}"
+    assert all(c != model_a for c in calls)
+
+
+# --- RERA Phase 2B-1: Gift Deed / Mortgage Deed / Relinquishment Deed ------
+#
+# Same real-schema/real-CLAUSES loading pattern as _load_consultancy_fixtures
+# etc. above -- reads the actual templates/rera/*.schema.json and the actual
+# CLAUSES list from the actual scripts/seed_*_template.py module (never a
+# hand-copied duplicate that could silently drift from what seed_
+# template_pipeline() would really insert). No real Supabase/network access:
+# FakeDB only, same as every other fixture in this file. Sale Deed itself
+# (the pre-existing RERA template these three follow) has no equivalent
+# fixture loader in this file yet -- that is a pre-existing gap, not
+# something this phase introduced or was asked to backfill.
+
+
+def _load_gift_deed_fixtures():
+    schema = json.loads((REPO_ROOT / "templates" / "rera" / "gift-deed.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_gift_deed_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_gift_deed_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _seed_gift_deed(db):
+    schema, clauses = _load_gift_deed_fixtures()
+    template_id = "template-gift-deed"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Gift Deed",
+            "category": "rera",
+            "docx_path": "templates/rera/gift-deed.docx",
+            "review_status": "beta",
+            "template_key": "gift-deed",
+            "states_supported": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+GIFT_DEED_FORM = {
+    "donor_name": "Radhika Iyer",
+    "donor_address": "9 Malabar Hill, Mumbai",
+    "donee_name": "Aditya Iyer",
+    "donee_address": "9 Malabar Hill, Mumbai",
+    "relationship_with_donee": "mother and son",
+    "property_state": "Maharashtra",
+    "property_description": "Flat No. 402, Sunrise Apartments, Malabar Hill, Mumbai, admeasuring 850 sq. ft. carpet area.",
+    "possession_date": "2026-08-20",
+    "title_background": "Acquired by the Donor via registered Sale Deed dated 2010-04-15, registered with the Sub-Registrar, Mumbai.",
+    "special_conditions": "",
+    "execution_date": "2026-08-20",
+}
+
+
+def _load_mortgage_deed_fixtures():
+    schema = json.loads((REPO_ROOT / "templates" / "rera" / "mortgage-deed.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_mortgage_deed_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_mortgage_deed_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _seed_mortgage_deed(db):
+    schema, clauses = _load_mortgage_deed_fixtures()
+    template_id = "template-mortgage-deed"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Mortgage Deed",
+            "category": "rera",
+            "docx_path": "templates/rera/mortgage-deed.docx",
+            "review_status": "beta",
+            "template_key": "mortgage-deed",
+            "states_supported": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+MORTGAGE_DEED_FORM = {
+    "mortgagor_name": "Vikram Nair",
+    "mortgagor_address": "14 Anna Nagar, Chennai",
+    "mortgagee_name": "Priya Menon",
+    "mortgagee_address": "22 T Nagar, Chennai",
+    "property_state": "Delhi",
+    "property_description": "Plot No. 7, Sector 21, Dwarka, New Delhi, admeasuring 200 sq. yards.",
+    "principal_amount": "Rs. 20,00,000/- (Rupees Twenty Lakhs Only)",
+    "loan_purpose": "Working capital for a small business, per the client.",
+    "interest_rate": "12% per annum",
+    "repayment_terms": "60 equal monthly instalments commencing 2026-09-01, per the client.",
+    "title_background": "Acquired by the Mortgagor via registered Sale Deed dated 2015-06-01.",
+    "special_conditions": "",
+    "execution_date": "2026-08-20",
+}
+
+
+def _load_relinquishment_deed_fixtures():
+    schema = json.loads((REPO_ROOT / "templates" / "rera" / "relinquishment-deed.schema.json").read_text())
+    spec = _importlib_util.spec_from_file_location(
+        "seed_relinquishment_deed_template",
+        Path(__file__).resolve().parent.parent / "scripts" / "seed_relinquishment_deed_template.py",
+    )
+    module = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return schema, module.CLAUSES
+
+
+def _seed_relinquishment_deed(db):
+    schema, clauses = _load_relinquishment_deed_fixtures()
+    template_id = "template-relinquishment-deed"
+    db.table("templates").rows.append(
+        {
+            "id": template_id,
+            "name": "Relinquishment Deed",
+            "category": "rera",
+            "docx_path": "templates/rera/relinquishment-deed.docx",
+            "review_status": "beta",
+            "template_key": "relinquishment-deed",
+            "states_supported": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+            "schema_json": schema,
+        }
+    )
+    for clause in clauses:
+        db.table("template_clauses").rows.append(
+            {"id": f"clause-{clause['clause_key']}", "template_id": template_id, **clause,
+             "current_text": clause["source_text"], "review_status": "unreviewed"}
+        )
+    return template_id
+
+
+RELINQUISHMENT_DEED_FORM = {
+    "releasor_name": "Suresh Kamath",
+    "releasor_address": "5 Jayanagar, Bengaluru",
+    "releasee_name": "Meera Kamath",
+    "releasee_address": "5 Jayanagar, Bengaluru",
+    "relationship_context": "Siblings, co-heirs of their late father's self-acquired property, per the client.",
+    "property_state": "Uttar Pradesh",
+    "property_description": "House No. 18, Civil Lines, Lucknow, admeasuring 1200 sq. ft. built-up area.",
+    "share_relinquished": "undivided one-half share",
+    "consideration_amount": "",
+    "title_background": "Inherited jointly by the Releasor and Releasee from their late father, intestate, in 2018.",
+    "special_conditions": "",
+    "execution_date": "2026-08-20",
+}
+
+
+_RERA_PHASE_2B1_TEMPLATES = [
+    ("Gift Deed", "gift-deed", _seed_gift_deed, GIFT_DEED_FORM, ["recitals", "special_conditions"]),
+    ("Mortgage Deed", "mortgage-deed", _seed_mortgage_deed, MORTGAGE_DEED_FORM, ["recitals", "special_conditions"]),
+    (
+        "Relinquishment Deed", "relinquishment-deed", _seed_relinquishment_deed,
+        RELINQUISHMENT_DEED_FORM, ["recitals", "special_conditions"],
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "name,template_key,seed_fn,form_data,llm_clause_keys", _RERA_PHASE_2B1_TEMPLATES, ids=[t[1] for t in _RERA_PHASE_2B1_TEMPLATES]
+)
+def test_rera_phase_2b1_template_discoverable_under_rera_category(name, template_key, seed_fn, form_data, llm_clause_keys):
+    """Discovery: seeded the same way seed_template_pipeline() would insert
+    it, then read back with the exact projection/shape app/routers/
+    contracts.py::list_templates() selects -- category='rera' and the
+    expected template_key, matching what GET /api/templates (then
+    client-side filtered to category==='rera', per RERA Phase 1's own
+    confirmed frontend contract) would actually see."""
+    db = FakeDB()
+    template_id = seed_fn(db)
+
+    rows = (
+        db.table("templates")
+        .select("id,name,category,review_status,states_supported,template_key")
+        .execute()
+        .data
+    )
+    row = next(r for r in rows if r["id"] == template_id)
+    assert row["category"] == "rera"
+    assert row["template_key"] == template_key
+    assert row["name"] == name
+    assert row["states_supported"] == ["Delhi", "Maharashtra", "Uttar Pradesh"]
+
+
+@pytest.mark.parametrize(
+    "name,template_key,seed_fn,form_data,llm_clause_keys", _RERA_PHASE_2B1_TEMPLATES, ids=[t[1] for t in _RERA_PHASE_2B1_TEMPLATES]
+)
+def test_rera_phase_2b1_template_clause_integrity(name, template_key, seed_fn, form_data, llm_clause_keys):
+    """Clause integrity: clauses exist, ordering is deterministic
+    (display_order strictly increasing from 1, matching the real CLAUSES
+    list order -- the same invariant generate_draft()'s assembly-time
+    numbering in contracts.py relies on), clause_type is one of the two
+    values the schema/engine actually supports, and every row carries the
+    fields template_seed_utils.write_clauses_preserving_review() and
+    generate_draft() both require."""
+    db = FakeDB()
+    template_id = seed_fn(db)
+
+    clauses = (
+        db.table("template_clauses")
+        .select("*")
+        .eq("template_id", template_id)
+        .order("display_order")
+        .execute()
+        .data
+    )
+    assert len(clauses) >= 5, f"{name} should have a realistic multi-clause structure, found {len(clauses)}"
+
+    display_orders = [c["display_order"] for c in clauses]
+    assert display_orders == sorted(display_orders), f"{name} clause ordering is not deterministic"
+    assert display_orders == list(range(1, len(clauses) + 1)), (
+        f"{name} display_order must be a contiguous 1..N sequence, got {display_orders}"
+    )
+
+    required_keys = {"clause_key", "display_order", "clause_type", "applicable_condition", "heading", "source_text"}
+    for c in clauses:
+        assert required_keys <= set(c.keys()), f"{name} clause {c.get('clause_key')} missing required fields"
+        assert c["clause_type"] in ("fixed_boilerplate", "llm_fillable"), (
+            f"{name} clause {c['clause_key']} has unsupported clause_type {c['clause_type']!r} "
+            "-- no new clause type was authorized for this phase"
+        )
+
+    actual_llm_keys = [c["clause_key"] for c in clauses if c["clause_type"] == "llm_fillable"]
+    assert actual_llm_keys == llm_clause_keys, f"{name} llm_fillable clause set/order changed unexpectedly"
+
+
+@pytest.mark.parametrize(
+    "name,template_key,seed_fn,form_data,llm_clause_keys", _RERA_PHASE_2B1_TEMPLATES, ids=[t[1] for t in _RERA_PHASE_2B1_TEMPLATES]
+)
+def test_rera_phase_2b1_template_drafts_end_to_end_with_mocked_llm(monkeypatch, name, template_key, seed_fn, form_data, llm_clause_keys):
+    """Drafting integration: the real generate_draft() pipeline (no new
+    drafting code path), the real local docx skeleton this phase built,
+    mocked LLM/provider behavior only (_fake_generate -- no real Gemini/
+    Groq/Cerebras/SambaNova/Supabase-network calls, no dependency on real
+    .env credentials, matching the phase's explicit isolation
+    requirement). Verifies: the draft is produced, clause_fills exist only
+    for the llm_fillable clauses, final clause order matches template
+    display_order, and existing persistence semantics (draft_versions +
+    draft_clause_fills rows, docx saved) are unchanged for this new
+    template."""
+    db = FakeDB()
+    template_id = seed_fn(db)
+    matter_id = _seed_matter(db)
+    calls = _fake_generate(monkeypatch, canned_text=f"{template_key.upper()} CLAUSE TEXT")
+
+    result = contracts.generate_draft(matter_id, template_id, form_data, db=db)
+
+    assert [f.clause_key for f in result.clause_fills] == llm_clause_keys
+    assert len(calls) == len(llm_clause_keys)
+    assert result.docx_path.endswith(".docx")
+    # docx_path is relative to REPO_ROOT (contracts.py does
+    # docx_path.relative_to(REPO_ROOT)), not to pytest's cwd -- join
+    # against the same REPO_ROOT constant this file already defines.
+    assert (REPO_ROOT / result.docx_path).exists(), f"{name} draft docx was not actually written to disk"
+
+    draft_rows = db.table("draft_versions").rows
+    assert len(draft_rows) == 1 and draft_rows[0]["template_id"] == template_id
+    fill_rows = db.table("draft_clause_fills").rows
+    assert len(fill_rows) == len(llm_clause_keys)
 
 

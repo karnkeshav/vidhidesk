@@ -464,7 +464,7 @@ def test_audit_log_output_reflects_full_cascade(settings, caplog):
 
     info_logs = [r.message for r in caplog.records if "status=ok" in r.message]
     assert len(info_logs) == 1
-    assert "provider=groq model=openai/gpt-oss-120b attempt=1/4" in info_logs[0]
+    assert "provider=groq model=openai/gpt-oss-120b attempt=1/3" in info_logs[0]
     assert "gemini:gemini-2.5-flash (1/2)" in info_logs[0]
     assert "gemini:gemini-2.5-flash-lite (2/2)" in info_logs[0]
 
@@ -537,3 +537,79 @@ def test_generate_json_gives_up_after_max_repair_attempts_returns_none(settings,
     assert parsed is None
     assert result.text == "still bad"
     assert route.call_count == 2
+
+
+# --- Phase 4.5: selected_model (model-pool draft-session lock) -------------
+#
+# These are the most important regression tests in this file for Phase
+# 4.5: they prove generate(selected_model=...) calls ONLY that one
+# provider/model and never silently walks the rest of the failover pool,
+# even when the locked model fails -- the exact property the whole model
+# pool exists to guarantee (no cross-provider mixing within one draft).
+
+
+def _model_spec(provider: str, model: str):
+    from app.services.model_pool import Capability, ModelSpec
+    return ModelSpec(
+        provider=provider, model=model, capability=Capability.LEGAL_DRAFTING,
+        priority=1, enabled=True,
+    )
+
+
+@respx.mock
+def test_selected_model_calls_only_that_provider_on_success(settings):
+    gemini_route = respx.post(url__startswith="https://generativelanguage.googleapis.com").mock(
+        return_value=_gemini_ok("Gemini locked response")
+    )
+    groq_route = respx.post("https://api.groq.com/openai/v1/chat/completions").mock(
+        return_value=_openai_ok("Groq should never be called")
+    )
+
+    result = generate("hello", settings=settings, selected_model=_model_spec("gemini", "gemini-2.5-flash"))
+
+    assert result.provider == "gemini"
+    assert result.text == "Gemini locked response"
+    assert result.degraded is False
+    assert result.fallback_chain == []
+    assert gemini_route.call_count == 1
+    assert groq_route.call_count == 0  # never touched -- no failover walk
+
+
+@respx.mock
+def test_selected_model_failure_does_not_fail_over_to_next_provider(settings):
+    """THE critical regression test (Phase 4.5 TEST SCENARIO): Model A
+    (gemini) fails during generation. Assert Model B (groq) is NOT
+    called, and the failure propagates as a controlled ProviderError --
+    exactly the opposite of generate()'s legacy (selected_model=None)
+    behavior, which WOULD fail over (see
+    test_fails_over_gemini_to_groq_on_rate_limit above, still passing,
+    unchanged, proving the legacy path is untouched)."""
+    gemini_route = respx.post(url__startswith="https://generativelanguage.googleapis.com").mock(
+        return_value=httpx.Response(429, json={"error": "rate limited"})
+    )
+    groq_route = respx.post("https://api.groq.com/openai/v1/chat/completions").mock(
+        return_value=_openai_ok("Groq must never be reached")
+    )
+
+    with pytest.raises(ProviderError):
+        generate("hello", settings=settings, selected_model=_model_spec("gemini", "gemini-2.5-flash"))
+
+    assert gemini_route.call_count == 1
+    assert groq_route.call_count == 0  # THE assertion: no cross-provider failover mid-draft
+
+
+@respx.mock
+def test_selected_model_result_never_marked_degraded(settings):
+    """degraded/fallback_chain exist to describe the LEGACY per-call
+    failover path's outcome -- a locked-model call always used exactly
+    the model it was asked to use, so these must always read as
+    'not degraded, no fallback', regardless of that model's position in
+    the pool's own priority order."""
+    respx.post("https://api.groq.com/openai/v1/chat/completions").mock(
+        return_value=_openai_ok("ok")
+    )
+    result = generate("hello", settings=settings, selected_model=_model_spec("groq", "openai/gpt-oss-20b"))
+    assert result.degraded is False
+    assert result.fallback_chain == []
+    assert result.provider == "groq"
+    assert result.model == "openai/gpt-oss-20b"
