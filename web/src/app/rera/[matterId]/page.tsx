@@ -313,6 +313,28 @@ export default function ReraMatterPage() {
               </div>
             </header>
 
+            {error && (
+              <div role="alert" className="border-b border-[#FFDAD6] bg-[#FFF5F5] px-6 py-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-[#7A2A2A] mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-sans text-[10px] font-bold uppercase tracking-wider text-[#7A2A2A]">
+                      Draft Generation Failed
+                    </h4>
+                    <p className="mt-1 font-serif text-xs text-[#1A1A1A]">{error}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setError(null)}
+                    className="h-7 rounded-sm border-[#7A2A2A] font-sans text-[10px] font-semibold text-[#7A2A2A] hover:bg-[#FFDAD6]/30"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Sticky Editor Toolbar (Stitch Approved Layout) */}
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E4E2DD] bg-[#F0EEE9] px-6 py-2">
               <div className="flex items-center gap-3">
