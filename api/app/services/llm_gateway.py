@@ -20,6 +20,7 @@ import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from app.config import Settings, get_settings
+from app.services.model_pool import ModelSpec
 from app.services.pii_mask import MaskMap, mask_text, unmask_text
 
 logger = logging.getLogger("vidhidesk.llm_gateway")
@@ -343,10 +344,17 @@ def _providers(settings: Settings):
                 # exist or you do not have access to it." — permanent, not
                 # transient/rate-limit. openai/gpt-oss-120b (live-verified
                 # working, HTTP 200, same key) is the new pool head.
+                #
+                # llama-3.1-8b-instant removed (2026-08-19): live-verified
+                # HTTP 404 "The model `llama-3.1-8b-instant` does not exist
+                # or you do not have access to it." — identical failure
+                # shape to llama-3.3-70b-versatile above, permanent, not
+                # transient/rate-limit. Not replaced — the remaining three
+                # models are the full set live-verified working for this
+                # key/tier.
                 "openai/gpt-oss-120b",
                 "qwen/qwen3.6-27b",
                 "openai/gpt-oss-20b",
-                "llama-3.1-8b-instant",
             ],
             lambda model, sp, turns, json_mode: _call_openai_compatible(
                 "groq", "https://api.groq.com/openai/v1", settings.groq_api_key,
@@ -366,8 +374,13 @@ def _providers(settings: Settings):
         (
             "cerebras",
             [
+                # zai-glm-4.7 removed (2026-08-19): live-verified HTTP 404
+                # "Model zai-glm-4.7 is archived and unavailable for the
+                # organization." (model_archived_error) — permanent, not
+                # transient/rate-limit. gpt-oss-120b and gemma-4-31b
+                # (live-verified working, HTTP 200, same key) are the
+                # remaining pool.
                 "gpt-oss-120b",
-                "zai-glm-4.7",
                 "gemma-4-31b",
             ],
             lambda model, sp, turns, json_mode: _call_openai_compatible(
@@ -389,6 +402,7 @@ def generate(
     auto_detect_names: bool = True,
     json_mode: bool = False,
     mask_lock: threading.Lock | None = None,
+    selected_model: ModelSpec | None = None,
 ) -> GenerationResult:
     """Mask -> call providers/models in pool failover order -> unmask.
 
@@ -409,7 +423,19 @@ def generate(
     don't share a MaskMap across concurrent calls, must not pass this --
     default None preserves prior behavior exactly. The lock is held only
     around the mask_text() call below, never across the network request,
-    retry wait, or provider fallback -- those remain fully concurrent."""
+    retry wait, or provider fallback -- those remain fully concurrent.
+
+    selected_model (Phase 4.5, model-pool draft-session lock): optional.
+    When provided, generate() calls ONLY that (provider, model) -- no
+    per-call failover walk through the rest of the pool. A failure
+    raises immediately rather than trying the next provider (STAGE 2
+    semantics from model_pool.py's design: once a draft has locked a
+    model via model_pool.select_model(), silently switching mid-draft
+    would mix providers across a single document's clauses, which the
+    whole point of the pool is to prevent). Callers that omit this
+    parameter get today's exact per-call failover behavior, unchanged --
+    this is purely additive; existing callers (case_analysis.py,
+    litigation/consulting/rera modules, chat) are not affected."""
     settings = settings or get_settings()
     system_prompt = SYSTEM_PROMPTS.get(task_type, SYSTEM_PROMPTS["chat"])
 
@@ -432,10 +458,61 @@ def generate(
         (h["role"], h["content"]) for h in (history or [])
     ] + [("user", formatted_prompt)]
 
+    provider_pools = _providers(settings)
+
+    if selected_model is not None:
+        # STAGE 2: a model was already locked to this draft before
+        # generation began (model_pool.select_model(), called once by
+        # contracts.generate_draft()) -- reuse the SAME provider callable
+        # _providers() already builds (identical base_url/api_key wiring,
+        # identical retry decorator on _call_gemini/_call_openai_compatible)
+        # for exactly that one (provider, model), and do not walk the rest
+        # of the pool on failure.
+        call = next((c for name, _, c in provider_pools if name == selected_model.provider), None)
+        if call is None:
+            raise ProviderError(
+                selected_model.provider,
+                f"selected_model references unknown provider {selected_model.provider!r}",
+            )
+        start = time.monotonic()
+        try:
+            text, model = call(selected_model.model, system_prompt, turns, json_mode)
+        except Exception as exc:  # noqa: BLE001 — deliberately NOT failed over, see docstring
+            latency_ms = int((time.monotonic() - start) * 1000)
+            logger.warning(
+                "llm_gateway.generate LOCKED MODEL FAILED provider=%s model=%s task_type=%s "
+                "latency_ms=%d reason=%s (no cross-provider failover mid-draft)",
+                selected_model.provider, selected_model.model, task_type, latency_ms, exc,
+            )
+            raise ProviderError(
+                selected_model.provider,
+                f"locked model {selected_model.provider}:{selected_model.model} failed "
+                f"mid-draft, not failing over to a different provider: {exc}",
+            ) from exc
+        latency_ms = int((time.monotonic() - start) * 1000)
+        logger.info(
+            "llm_gateway.generate provider=%s model=%s task_type=%s latency_ms=%d status=ok (locked)",
+            selected_model.provider, model, task_type, latency_ms,
+        )
+        unmasked_text = unmask_text(text, mask_map) if mask_map else text
+        return GenerationResult(
+            text=unmasked_text,
+            provider=selected_model.provider,
+            model=model,
+            latency_ms=latency_ms,
+            masked_prompt=masked_prompt,
+            requested_model=selected_model.model,
+            degraded=False,
+            fallback_chain=[],
+        )
+
+    # --- below: existing per-call failover behavior, UNCHANGED ---------
+    # (used only when selected_model is not provided -- e.g. case_analysis.py,
+    # chat, litigation/consulting/rera task types, none of which use the
+    # model pool as of Phase 4.5)
     last_error: Exception | None = None
     failed_attempts: list[str] = []
     sequence_start = time.monotonic()
-    provider_pools = _providers(settings)
     requested_model = provider_pools[0][1][0] if provider_pools and provider_pools[0][1] else ""
     for provider_name, model_pool, call in provider_pools:
         pool_size = len(model_pool)

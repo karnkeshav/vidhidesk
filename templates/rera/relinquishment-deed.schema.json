@@ -1,0 +1,40 @@
+{
+  "template_key": "relinquishment-deed",
+  "title": "Relinquishment Deed",
+  "fields": [
+    {"key": "releasor_name", "label": "Releasor — Full Legal Name", "type": "text", "required": true},
+    {"key": "releasor_address", "label": "Releasor — Address", "type": "textarea", "required": true},
+    {"key": "releasee_name", "label": "Releasee — Full Legal Name", "type": "text", "required": true},
+    {"key": "releasee_address", "label": "Releasee — Address", "type": "textarea", "required": true},
+    {
+      "key": "relationship_context", "label": "Co-Ownership / Relationship Context",
+      "type": "textarea", "required": true,
+      "help": "How the Releasor and Releasee came to jointly own the property (e.g. co-heirs of a named person, joint purchasers) — used to draft the recitals. State only what is actually known."
+    },
+    {
+      "key": "property_state", "label": "State Where Property Is Situated", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"],
+      "required": true
+    },
+    {
+      "key": "property_description", "label": "Schedule of Property (full description, boundaries, survey/khasra no., area)",
+      "type": "textarea", "required": true,
+      "help": "This is copied verbatim into the Schedule of Property clause — describe it exactly as it should appear in the deed."
+    },
+    {"key": "share_relinquished", "label": "Share/Interest Being Relinquished (e.g. 'undivided one-third share')", "type": "text", "required": true},
+    {
+      "key": "consideration_amount", "label": "Consideration Paid, If Any (leave blank if relinquished without consideration)",
+      "type": "text", "required": false, "default": ""
+    },
+    {
+      "key": "title_background", "label": "How the Joint Ownership Arose (brief — inheritance/joint purchase, date)",
+      "type": "textarea", "required": true,
+      "help": "Used to draft the recitals. Do not invent — state only what you actually know."
+    },
+    {
+      "key": "special_conditions", "label": "Special Conditions (optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {"key": "execution_date", "label": "Date of Execution", "type": "date", "required": true}
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "template_key": "gift-deed",
+  "title": "Gift Deed",
+  "fields": [
+    {"key": "donor_name", "label": "Donor — Full Legal Name", "type": "text", "required": true},
+    {"key": "donor_address", "label": "Donor — Address", "type": "textarea", "required": true},
+    {"key": "donee_name", "label": "Donee — Full Legal Name", "type": "text", "required": true},
+    {"key": "donee_address", "label": "Donee — Address", "type": "textarea", "required": true},
+    {
+      "key": "relationship_with_donee", "label": "Relationship Between Donor and Donee (if any)",
+      "type": "text", "required": false, "default": "",
+      "help": "E.g. 'father and son', 'siblings', or leave blank if unrelated. Used to frame the natural love and affection recital."
+    },
+    {
+      "key": "property_state", "label": "State Where Property Is Situated", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh", "Other (Central law + verify state rules)"],
+      "required": true
+    },
+    {
+      "key": "property_description", "label": "Schedule of Property (full description, boundaries, survey/khasra no., area)",
+      "type": "textarea", "required": true,
+      "help": "This is copied verbatim into the Schedule of Property clause — describe it exactly as it should appear in the deed."
+    },
+    {"key": "possession_date", "label": "Date of Delivery of Possession", "type": "date", "required": true},
+    {
+      "key": "title_background", "label": "How the Donor Acquired Title (brief — prior deed/inheritance/allotment, date)",
+      "type": "textarea", "required": true,
+      "help": "Used to draft the recitals. Do not invent — state only what you actually know."
+    },
+    {
+      "key": "special_conditions", "label": "Special Conditions (optional)", "type": "textarea",
+      "required": false, "default": ""
+    },
+    {"key": "execution_date", "label": "Date of Execution", "type": "date", "required": true}
+  ]
+}
