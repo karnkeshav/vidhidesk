@@ -194,6 +194,22 @@ export default function ReraMatterPage() {
   const displayTitle = matter?.title ?? template.name;
   const wordCount = latestDraft ? latestDraft.full_text.split(/\s+/).filter(Boolean).length : 0;
 
+  // RERA Phase 2E: `latestDraft` (with full_text/clause_fills) is only ever
+  // set by handleGenerate/handleAmend in this session -- init()'s listDrafts()
+  // call never populates it, so a matter that already has a persisted draft
+  // (revisited fresh, or reloaded) previously lost its Download buttons and
+  // version badge entirely, even though the draft exists and downloads fine
+  // via the backend. `drafts` (from listDrafts, ordered newest-first) always
+  // has the persisted id/version_no even when full_text hasn't been fetched
+  // in this session, so it's a safe fallback for exactly those two things.
+  // The document *preview* (fullText below) still needs a real fetch of the
+  // draft's content, which no existing endpoint provides -- left as-is.
+  const latestDraftRef = latestDraft
+    ? { draft_version_id: latestDraft.draft_version_id, version_no: latestDraft.version_no }
+    : drafts[0]
+      ? { draft_version_id: drafts[0].id, version_no: drafts[0].version_no }
+      : null;
+
   return (
     <AuthedShell wide>
       <div className="-m-4 flex h-[calc(100vh-100px)] flex-col overflow-hidden md:-m-6">
@@ -244,7 +260,7 @@ export default function ReraMatterPage() {
                       Revisions Logged: {drafts.length}
                     </span>
                     <Badge variant={template.review_status === "reviewed" ? "default" : "secondary"}>
-                      {latestDraft ? `Version ${latestDraft.version_no}` : "Drafting Stage"}
+                      {latestDraftRef ? `Version ${latestDraftRef.version_no}` : "Drafting Stage"}
                     </Badge>
                   </div>
                 </div>
@@ -260,15 +276,15 @@ export default function ReraMatterPage() {
                     Share
                   </Button>
 
-                  {latestDraft && (
+                  {latestDraftRef && (
                     <>
                       <Button
                         size="sm"
                         className="h-8 gap-1.5 rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white hover:bg-[#1E2A4A]"
                         onClick={() =>
                           downloadDraftDocx(
-                            latestDraft.draft_version_id,
-                            `${template.name}-v${latestDraft.version_no}.docx`
+                            latestDraftRef.draft_version_id,
+                            `${template.name}-v${latestDraftRef.version_no}.docx`
                           )
                         }
                       >
@@ -286,8 +302,8 @@ export default function ReraMatterPage() {
                           setError(null);
                           try {
                             await downloadDraftPdf(
-                              latestDraft.draft_version_id,
-                              `${template.name}-v${latestDraft.version_no}.pdf`
+                              latestDraftRef.draft_version_id,
+                              `${template.name}-v${latestDraftRef.version_no}.pdf`
                             );
                           } catch (err) {
                             setError(err instanceof Error ? err.message : String(err));
@@ -439,7 +455,7 @@ export default function ReraMatterPage() {
               <span className="font-sans text-[10px] font-medium text-[#45464E]">Auto Save Active</span>
             </div>
             <span className="font-sans text-[10px]">
-              Version {latestDraft?.version_no || "1.0"}
+              Version {latestDraftRef?.version_no || "1.0"}
             </span>
             <span className="font-sans text-[10px]">Word Count: {wordCount}</span>
           </div>
