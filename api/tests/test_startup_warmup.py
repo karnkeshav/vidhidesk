@@ -85,25 +85,44 @@ def test_raising_loader_is_caught_and_logged_not_propagated(monkeypatch, caplog)
     assert any("warm_up_failed" in r.message and "spacy_pii_model" in r.message for r in caplog.records)
 
 
-def test_both_loaders_run_concurrently_not_sequentially(monkeypatch):
-    """Bounded wait only helps if the two loaders actually run in
-    parallel -- if they still ran sequentially, a single slow loader would
-    still consume the full timeout budget before the second one even
-    starts. Two loaders that each sleep briefly must together take close
-    to ONE sleep duration, not the sum of both."""
+def test_loaders_run_sequentially_not_concurrently(monkeypatch):
+    """RERA Phase 2J regression: Phase 2A's original design (max_workers=2,
+    both loaders in flight at once) OOM-killed the Render free-tier
+    instance (512Mi) on every boot -- live-confirmed via Render's events
+    API (oomKilled, exit 137, repeating ~every 2 minutes) the first time
+    this code was actually deployed. Serializing the two loads
+    (max_workers=1) keeps peak memory to one model's load spike at a
+    time; total resident memory once both are loaded is unchanged, only
+    the peak during loading is. This asserts the two loaders never have
+    overlapping execution windows."""
     monkeypatch.setattr(app_main, "_WARM_UP_TIMEOUT_S", 5.0)
 
-    def _sleepy(tag):
-        def _loader():
-            time.sleep(0.4)
-            return tag
-        return _loader
+    a_running = threading.Event()
+    b_running = threading.Event()
+    overlap = threading.Event()
 
-    monkeypatch.setattr(app_main.pii_mask_service, "_get_nlp", _sleepy("a"))
-    monkeypatch.setattr(app_main.retrieval_service, "_get_embedding_model", _sleepy("b"))
+    def _loader_a():
+        a_running.set()
+        time.sleep(0.2)
+        if b_running.is_set():
+            overlap.set()
+        a_running.clear()
+        return "a"
+
+    def _loader_b():
+        b_running.set()
+        if a_running.is_set():
+            overlap.set()
+        time.sleep(0.2)
+        b_running.clear()
+        return "b"
+
+    monkeypatch.setattr(app_main.pii_mask_service, "_get_nlp", _loader_a)
+    monkeypatch.setattr(app_main.retrieval_service, "_get_embedding_model", _loader_b)
 
     t0 = time.monotonic()
     app_main._warm_up_ml_models()
     elapsed = time.monotonic() - t0
 
-    assert elapsed < 0.8, f"two 0.4s loaders should overlap (~0.4s total), not sum to ~0.8s+; took {elapsed:.2f}s"
+    assert not overlap.is_set(), "loaders must not run concurrently -- concurrent loading OOM-killed the free-tier instance in production"
+    assert elapsed >= 0.4, f"two 0.2s loaders should sum to ~0.4s when sequential, not overlap; took {elapsed:.2f}s"

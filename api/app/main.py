@@ -88,7 +88,16 @@ def _warm_up_one(name: str, loader) -> None:
 
 @app.on_event("startup")
 def _warm_up_ml_models() -> None:
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    # max_workers=1 (RERA Phase 2J, 2026-08-23): loading spaCy and the
+    # sentence-transformers embedding model concurrently OOM-killed the
+    # Render free-tier instance (512Mi) every boot -- live-confirmed via
+    # Render's events API (oomKilled, exit 137, repeating ~every 2 minutes)
+    # after redeploying this code for the first time. Serializing the two
+    # loads keeps peak memory to one model's load spike at a time; total
+    # resident memory once both are loaded is unchanged, and the pre-existing
+    # lazy-load fallback below still applies to whichever model is still
+    # queued/loading when _WARM_UP_TIMEOUT_S elapses.
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     futures = {
         executor.submit(_warm_up_one, name, loader): name
         for name, loader in (
