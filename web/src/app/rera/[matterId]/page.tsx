@@ -18,6 +18,7 @@ import {
   downloadDraftDocx,
   downloadDraftPdf,
   generateDraft,
+  getDraftText,
   getMatter,
   getTemplate,
   listDrafts,
@@ -109,7 +110,31 @@ export default function ReraMatterPage() {
         }
         const tpl = await getTemplate(templateId);
         setTemplate(tpl);
-        if (existingDrafts.length > 0) setMode("draft");
+        if (existingDrafts.length > 0) {
+          setMode("draft");
+          // RERA Phase 2G: restore the historical preview (fullText) for a
+          // revisited matter -- listDrafts() is newest-first, so [0] is the
+          // current draft. Reads the actual persisted .docx server-side, no
+          // LLM call. Best-effort and isolated from the rest of init(): a
+          // failure here (e.g. the file genuinely missing) must not block
+          // the workspace from loading or show the draft-generation error
+          // banner -- latestDraftRef's drafts[0] fallback below still keeps
+          // the Download buttons/version badge working either way.
+          const latest = existingDrafts[0];
+          try {
+            const text = await getDraftText(latest.id);
+            setLatestDraft({
+              draft_version_id: latest.id,
+              version_no: latest.version_no,
+              docx_path: latest.docx_path,
+              clause_fills: [],
+              full_text: text.full_text,
+            });
+          } catch {
+            // Preview stays empty; latestDraftRef (drafts[0]) still backs
+            // the download buttons and version badge.
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }

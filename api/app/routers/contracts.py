@@ -4,6 +4,8 @@ import logging
 import time
 from pathlib import Path
 
+from docx import Document as DocxDocument
+from docx.opc.exceptions import PackageNotFoundError
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -222,6 +224,40 @@ def download_draft_pdf(draft_version_id: str, user: CurrentUser = Depends(get_cu
     except contracts.PdfConversionUnavailable as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
+
+
+class DraftTextOut(BaseModel):
+    draft_version_id: str
+    version_no: int
+    full_text: str
+
+
+@router.get("/drafts/{draft_version_id}/text", response_model=DraftTextOut)
+def get_draft_text(draft_version_id: str, user: CurrentUser = Depends(get_current_user)):
+    """RERA Phase 2G: restores a historical draft's preview on revisit.
+
+    Deliberately reads the actual persisted .docx (the same file
+    download_draft_docx above already serves) rather than reconstructing
+    text from template_clauses/draft_clause_fills -- Phase 2F found that
+    reconstruction can render factually wrong content, since which clauses
+    applied and what values filled fixed_boilerplate's Jinja are decided
+    by the generation-time form_data, which is never persisted. The
+    rendered document is the only reliably correct record of what a given
+    draft actually said. Read-only: no DB write, no LLM call, no
+    regeneration.
+    """
+    draft = _get_draft_or_404(user, draft_version_id)
+    path = REPO_ROOT / draft["docx_path"]
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Draft file missing on disk")
+    try:
+        doc = DocxDocument(str(path))
+    except PackageNotFoundError as exc:
+        raise HTTPException(status_code=422, detail="Draft file is not a valid .docx") from exc
+    full_text = "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    return DraftTextOut(
+        draft_version_id=draft["id"], version_no=draft["version_no"], full_text=full_text
+    )
 
 
 class TemplateClauseOut(BaseModel):

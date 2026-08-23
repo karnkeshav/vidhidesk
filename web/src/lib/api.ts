@@ -554,6 +554,19 @@ export function listDrafts(matterId: string): Promise<DraftVersion[]> {
   return authedFetch(`/api/matters/${matterId}/drafts`);
 }
 
+/** RERA Phase 2G — restores a historical draft's preview text by reading
+ * the actual persisted .docx server-side (see api/app/routers/contracts.py's
+ * get_draft_text), not by reconstructing from clause data client-side. */
+export type DraftText = {
+  draft_version_id: string;
+  version_no: number;
+  full_text: string;
+};
+
+export function getDraftText(draftVersionId: string): Promise<DraftText> {
+  return authedFetch(`/api/drafts/${draftVersionId}/text`);
+}
+
 /** File downloads need the auth header but aren't JSON — fetch as a blob
  * and trigger the browser's normal download flow via a temporary link. */
 async function downloadFile(path: string, filename: string) {
