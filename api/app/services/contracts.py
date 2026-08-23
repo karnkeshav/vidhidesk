@@ -31,7 +31,7 @@ from docxtpl import DocxTemplate
 from app.db import service_client
 from app.services.llm_gateway import GenerationResult, generate
 from app.services.model_pool import Capability, select_model
-from app.services.pii_mask import SupabaseMaskStore, mask_text
+from app.services.pii_mask import SupabaseMaskStore, mask_text, unmask_text
 
 logger = logging.getLogger("vidhidesk.contracts")
 
@@ -562,6 +562,28 @@ def generate_draft(
                     "draft_timing stage=clause_generation clause=%s elapsed_ms=%.1f",
                     clause.get("clause_key", "unknown"), llm_timings_ms[idx],
                 )
+
+            # RERA Phase 2H: the single authoritative internal-processing ->
+            # final-user-visible-output boundary. A fixed_boilerplate clause
+            # is rendered above (Phase 1) from `masked_form_data` -- correct
+            # for LLM-bound prompts, but its OWN rendered text never goes
+            # through an unmask step the way an llm_fillable clause's output
+            # already does inside generate() (llm_gateway.py's unmask_text
+            # calls) -- so any masked placeholder a fixed_boilerplate clause
+            # interpolated (e.g. a Jinja {{ field }} on a text/textarea
+            # field) survived verbatim into final_clause_texts, and from
+            # there into both full_text and the rendered DOCX (clauses_subdoc
+            # below is built from final_clause_texts). Applying it here,
+            # uniformly, regardless of clause_type, guarantees nothing after
+            # this point in the pipeline can still carry a placeholder --
+            # one boundary, not two clause-type-dependent ones. Idempotent
+            # for llm_fillable's already-unmasked `rendered`: unmask_text
+            # only rewrites text matching the placeholder shape itself, so
+            # a second pass over text with no remaining placeholders is a
+            # no-op. This never re-exposes anything to the LLM -- prompts
+            # were already built and sent (Phase 1/2, above) before this
+            # loop even starts.
+            rendered = unmask_text(rendered, mask_map)
 
             heading = clause.get("heading")
             if heading:
