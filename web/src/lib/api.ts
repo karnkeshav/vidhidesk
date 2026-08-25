@@ -869,7 +869,7 @@ export type ConsultingAnalysisOut = {
 // rejected as leaked (403) on every attempt, forcing the full Groq
 // fallback cascade -- 180s leaves margin above that worst case even before
 // the key is rotated.
-const CONSULTING_ANALYZE_TIMEOUT_MS = 180000;
+const CONSULTING_ANALYZE_TIMEOUT_MS = 300000;
 
 export function createConsultingAnalysis(payload: ConsultingAnalyzeRequest): Promise<ConsultingAnalysisOut> {
   return authedFetch("/api/consulting/analyze", {
