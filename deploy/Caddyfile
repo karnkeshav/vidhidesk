@@ -1,0 +1,39 @@
+# DRAFT / UNVERIFIED (Oracle Migration Sprint, Phase 6) -- no real domain
+# or DNS record exists yet for the Oracle VM as of this draft. Replace
+# api.example-vidhidesk.com below with the real domain once one is
+# registered and its A/AAAA record points at the Oracle VM's public IP,
+# then run `caddy validate --config /path/to/this/file` and reload Caddy
+# on the box itself. This file has never been applied to or tested
+# against a live Caddy instance.
+#
+# Caddy handles ACME/Let's Encrypt HTTPS automatically for any real
+# domain listed as a site block below -- no separate certbot setup
+# needed, and plain-HTTP requests on port 80 are redirected to HTTPS
+# automatically for any domain block (not the bare-IP :80 block below).
+#
+# Port 8000 (the FastAPI container from api/Dockerfile) is intentionally
+# never exposed directly to the internet -- only Caddy's 443/80 are, per
+# the Oracle Migration Sprint's safety rules. Bind Docker's -p flag to
+# 127.0.0.1:8000 (see deploy/oracle_deploy.sh), not 0.0.0.0:8000, so this
+# reverse proxy is the only path in even before firewall rules are
+# double-checked.
+
+api.example-vidhidesk.com {
+	reverse_proxy 127.0.0.1:8000
+
+	encode gzip
+
+	log {
+		output file /var/log/caddy/vidhidesk-api-access.log
+	}
+}
+
+# Fallback while no domain/DNS exists yet: serves plain HTTP on the box's
+# bare IP so the deploy pipeline's own health/drift checks have something
+# to hit before Phase 6 (domain + HTTPS) is actually done. Remove this
+# block once the domain above is live -- it deliberately does NOT get
+# HTTPS (Caddy only issues certificates for named domains, never for a
+# bare IP), so it must not be the long-term production path.
+:80 {
+	reverse_proxy 127.0.0.1:8000
+}

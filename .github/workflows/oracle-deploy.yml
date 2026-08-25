@@ -1,0 +1,74 @@
+name: Oracle Deploy
+
+# DRAFT / UNVERIFIED (Oracle Migration Sprint, Phase 4). Authored without
+# SSH access to a real Oracle VM to run this against -- do not enable
+# (rename off .disabled or otherwise wire it live) until someone with
+# Oracle access has:
+#   1. Cloned this repo once, by hand, to the path oracle_deploy.sh
+#      expects (default /opt/vidhidesk, see deploy/oracle_deploy.sh) and
+#      populated a repo-root .env there directly on the box (never via
+#      git -- secrets are never committed, per CLAUDE.md Hard Rule 6).
+#   2. Created these GitHub Secrets: ORACLE_SSH_HOST, ORACLE_SSH_USER,
+#      ORACLE_SSH_KEY (private key matching a public key already
+#      authorized on the box), and optionally ORACLE_SSH_PORT and
+#      ORACLE_BASE_URL (Oracle's public HTTPS URL once deploy/Caddyfile
+#      is live -- Phase 6).
+#   3. Dry-run deploy/oracle_deploy.sh manually on the box at least once.
+#
+# Invariant this workflow exists to uphold: Oracle is a deployment
+# TARGET, never an independent dev repo -- the script it invokes always
+# does `git fetch` + `git checkout --detach <SHA>` on the box, never
+# `git pull`, and no code is ever hand-edited there. See
+# deploy/oracle_deploy.sh for the deploy/health-gate/rollback logic
+# itself; this file only decides WHEN to run it and verifies the result.
+
+on:
+  workflow_run:
+    workflows: ["CI — Lint, Test, Verify, Deploy Gate"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA to deploy (defaults to the latest main)"
+        required: false
+
+jobs:
+  deploy-oracle:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target SHA
+        id: sha
+        run: |
+          if [ -n "${{ github.event.inputs.sha }}" ]; then
+            echo "sha=${{ github.event.inputs.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to Oracle over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_SSH_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_SSH_PORT }}
+          script_stop: true
+          # The script itself lives in the repo, checked out fresh on the
+          # box by its own `git fetch` + `checkout --detach` -- this SSH
+          # step only ever invokes it, never pastes deploy logic inline,
+          # so the workflow file and the on-box script cannot drift apart.
+          script: |
+            set -euo pipefail
+            bash /opt/vidhidesk/deploy/oracle_deploy.sh ${{ steps.sha.outputs.sha }}
+
+      - name: Verify GitHub SHA == Oracle running SHA
+        if: ${{ secrets.ORACLE_BASE_URL != '' }}
+        env:
+          ORACLE_BASE_URL: ${{ secrets.ORACLE_BASE_URL }}
+        run: |
+          pip install httpx
+          python api/scripts/check_deployment_drift.py "${{ steps.sha.outputs.sha }}" "$ORACLE_BASE_URL"
