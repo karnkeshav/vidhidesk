@@ -170,7 +170,11 @@ export function AuthedShell({
     const checkAndNotify = () => {
       if (Notification.permission !== "granted" || hearings.length === 0) return;
       const now = new Date();
-      const todayKey = now.toISOString().slice(0, 10);
+      // Local calendar day, not UTC -- the dedupe window should reset at
+      // the advocate's own midnight, not UTC midnight (see calendar
+      // page.tsx's dateKey() for the same fix and why it matters).
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
       const storageKey = `${NOTIFIED_HEARINGS_KEY_PREFIX}${todayKey}`;
       let notified: string[] = [];
       try {

@@ -43,8 +43,16 @@ import {
 
 const NO_MATTER = "none";
 
+// Local calendar day, not UTC (toISOString() is UTC) -- a hearing_at from
+// the backend, "today", and the grid's local-midnight Date objects must
+// all bucket by the advocate's own wall-clock day, or the selected/today
+// highlight and a hearing's day silently disagree by one day for anyone
+// west of UTC (confirmed live: grid highlighted the 26th while the page's
+// own "Tuesday, Aug 25" header -- built from toLocaleDateString, i.e.
+// local time -- was correct).
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function toDatetimeLocalValue(iso: string): string {
