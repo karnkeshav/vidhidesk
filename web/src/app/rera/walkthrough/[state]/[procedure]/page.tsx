@@ -201,14 +201,36 @@ export default function ReraWalkthroughProcedurePage() {
             </div>
 
             <div className="space-y-6 font-serif">
-              {currentStep.warnings && currentStep.warnings.length > 0 && (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-[#1A1A1A]">{currentStep.instruction}</p>
+
+              {/* Same verified/unverified visual language as the case citation
+                  gate (litigation-case-analysis.tsx) — procedural content
+                  needs the same "don't trust it silently" signal a case
+                  citation does. */}
+              {currentStep.verification_status === "verified" && currentStep.source_url ? (
+                <a
+                  href={currentStep.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-sans text-xs font-semibold text-[#081534] underline"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 text-[#3D5A3D]" />
+                  Verified source
+                  {currentStep.last_verified ? ` — last checked ${currentStep.last_verified}` : ""}
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-xs bg-[#FFDAD6] px-2 py-1 font-sans text-[10px] font-bold uppercase text-[#7A2A2A]">
+                  <AlertCircle className="h-3 w-3" />
+                  {currentStep.verification_status === "pending_verification"
+                    ? "Pending verification — confirm manually"
+                    : "Unverified — confirm manually"}
+                </span>
+              )}
+
+              {currentStep.warnings && (
                 <div className="p-4 bg-[#F0EEE9] border-l-2 border-[#7A2A2A] rounded-r-sm text-sm text-[#45464E]">
                   <h4 className="font-semibold text-[#1A1A1A] font-sans text-xs uppercase tracking-wider mb-2">Important Warnings</h4>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {currentStep.warnings.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
+                  <p className="whitespace-pre-line">{currentStep.warnings}</p>
                 </div>
               )}
 

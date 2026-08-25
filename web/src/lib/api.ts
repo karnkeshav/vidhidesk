@@ -832,10 +832,13 @@ export type RERAWalkthroughStepOut = {
   state: string;
   procedure: string;
   step_no: number;
-  heading: string;
+  heading: string | null;
+  instruction: string;
   required_documents: string[];
   portal_url: string | null;
-  warnings: string[];
+  warnings: string | null;
+  source_url: string | null;
+  last_verified: string | null;
   verification_status: string;
 };
 
