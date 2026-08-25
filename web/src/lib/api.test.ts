@@ -8,7 +8,15 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
-import { calculateLimitation, generateDraft, listMatters, updateMatter } from "./api";
+import {
+  calculateLimitation,
+  composePleading,
+  generateClause,
+  generateDraft,
+  generatePleadingOutline,
+  listMatters,
+  updateMatter,
+} from "./api";
 
 function jsonResponse(status: number, body: unknown): Response {
   return {
@@ -77,6 +85,93 @@ describe("authedFetch retry policy", () => {
     await expect(
       generateDraft("matter-1", { template_id: "t1", form_data: {} })
     ).rejects.toThrow(/503/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry generatePleadingOutline after a transient 5xx", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(503, { detail: "upstream down" }));
+
+    await expect(
+      generatePleadingOutline("matter-1", { case_analysis_id: "ca-1" })
+    ).rejects.toThrow(/503/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry generatePleadingOutline after an AbortController timeout", async () => {
+    fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          const err = new Error("The operation was aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      });
+    });
+
+    const promise = generatePleadingOutline("matter-1", { case_analysis_id: "ca-1" });
+    const assertion = expect(promise).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS);
+    await assertion;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry generateClause after a transient 5xx", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(503, { detail: "upstream down" }));
+
+    await expect(
+      generateClause("matter-1", "facts", { pleading_outline_id: "po-1" })
+    ).rejects.toThrow(/503/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry generateClause after an AbortController timeout", async () => {
+    fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          const err = new Error("The operation was aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      });
+    });
+
+    const promise = generateClause("matter-1", "facts", { pleading_outline_id: "po-1" });
+    const assertion = expect(promise).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS);
+    await assertion;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry composePleading after a transient 5xx", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(503, { detail: "upstream down" }));
+
+    await expect(
+      composePleading("matter-1", { pleading_outline_id: "po-1" })
+    ).rejects.toThrow(/503/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry composePleading after an AbortController timeout", async () => {
+    fetchMock.mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          const err = new Error("The operation was aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      });
+    });
+
+    const promise = composePleading("matter-1", { pleading_outline_id: "po-1" });
+    const assertion = expect(promise).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS);
+    await assertion;
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

@@ -1,116 +1,61 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Lease Deed Intake Schema",
-  "type": "object",
+  "template_key": "lease-deed",
+  "title": "Lease Deed",
+  "fields": [
+    {"key": "party_a_name", "label": "Lessor Name / Entity", "type": "text", "required": true, "help": "Full legal name of the property owner / lessor"},
+    {
+      "key": "party_a_entity_type", "label": "Lessor Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "required": false, "default": "Individual"
+    },
+    {"key": "party_a_address", "label": "Lessor Address", "type": "textarea", "required": true},
+    {"key": "party_b_name", "label": "Lessee Name / Entity", "type": "text", "required": true, "help": "Full legal name of the tenant / lessee"},
+    {
+      "key": "party_b_entity_type", "label": "Lessee Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "required": false, "default": "Private Limited Company"
+    },
+    {"key": "party_b_address", "label": "Lessee Address", "type": "textarea", "required": true},
+    {"key": "effective_date", "label": "Lease Commencement Date", "type": "date", "required": true},
+    {
+      "key": "property_address", "label": "Leased Property Address", "type": "textarea", "required": true,
+      "help": "Complete description of demised premises"
+    },
+    {"key": "monthly_rent", "label": "Monthly Rent Amount (₹)", "type": "text", "required": true},
+    {"key": "security_deposit", "label": "Interest-Free Security Deposit (₹)", "type": "text", "required": true},
+    {"key": "lease_term_years", "label": "Lease Term (Years)", "type": "text", "required": true, "default": "3"},
+    {"key": "rent_escalation_pct", "label": "Annual Rent Escalation (%)", "type": "text", "required": false, "default": "5%"},
+    {
+      "key": "property_type", "label": "Property Type", "type": "select",
+      "options": ["Commercial Office", "Industrial Warehouse", "Residential Property"],
+      "required": false, "default": "Commercial Office"
+    },
+    {
+      "key": "state", "label": "State Jurisdiction", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+      "required": true, "default": "Delhi"
+    },
+    {"key": "arbitration", "label": "Include Arbitration Clause?", "type": "boolean", "required": false, "default": true},
+    {"key": "arbitration_seat", "label": "Arbitration Seat", "type": "text", "required": false, "default": "New Delhi"}
+  ],
   "groups": [
     {
       "id": "parties",
-      "title": "Lessor & Lessee Information",
-      "fields": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"]
+      "label": "Lessor & Lessee Information",
+      "field_keys": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"],
+      "summary_template": "{{party_a_name}} · {{party_b_name}}"
     },
     {
       "id": "lease_terms",
-      "title": "Demised Property & Rent Commercials",
-      "fields": ["effective_date", "property_address", "monthly_rent", "security_deposit", "lease_term_years", "rent_escalation_pct", "property_type"]
+      "label": "Demised Property & Rent Commercials",
+      "field_keys": ["effective_date", "property_address", "monthly_rent", "security_deposit", "lease_term_years", "rent_escalation_pct", "property_type"],
+      "summary_template": "{{property_address}} · ₹{{monthly_rent}}"
     },
     {
       "id": "jurisdiction_legal",
-      "title": "State Rules & Dispute Resolution",
-      "fields": ["state", "arbitration", "arbitration_seat"]
+      "label": "State Rules & Dispute Resolution",
+      "field_keys": ["arbitration", "arbitration_seat"],
+      "summary_template": "{{arbitration}} · {{arbitration_seat}}"
     }
-  ],
-  "properties": {
-    "party_a_name": {
-      "type": "string",
-      "title": "Lessor Name / Entity",
-      "description": "Full legal name of the property owner / lessor"
-    },
-    "party_a_entity_type": {
-      "type": "string",
-      "title": "Lessor Entity Type",
-      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
-      "default": "Individual"
-    },
-    "party_a_address": {
-      "type": "string",
-      "title": "Lessor Address"
-    },
-    "party_b_name": {
-      "type": "string",
-      "title": "Lessee Name / Entity",
-      "description": "Full legal name of the tenant / lessee"
-    },
-    "party_b_entity_type": {
-      "type": "string",
-      "title": "Lessee Entity Type",
-      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
-      "default": "Private Limited Company"
-    },
-    "party_b_address": {
-      "type": "string",
-      "title": "Lessee Address"
-    },
-    "effective_date": {
-      "type": "string",
-      "title": "Lease Commencement Date",
-      "format": "date"
-    },
-    "property_address": {
-      "type": "string",
-      "title": "Leased Property Address",
-      "description": "Complete description of demised premises"
-    },
-    "monthly_rent": {
-      "type": "string",
-      "title": "Monthly Rent Amount (₹)"
-    },
-    "security_deposit": {
-      "type": "string",
-      "title": "Interest-Free Security Deposit (₹)"
-    },
-    "lease_term_years": {
-      "type": "integer",
-      "title": "Lease Term (Years)",
-      "default": 3
-    },
-    "rent_escalation_pct": {
-      "type": "string",
-      "title": "Annual Rent Escalation (%)",
-      "default": "5%"
-    },
-    "property_type": {
-      "type": "string",
-      "title": "Property Type",
-      "enum": ["Commercial Office", "Industrial Warehouse", "Residential Property"],
-      "default": "Commercial Office"
-    },
-    "state": {
-      "type": "string",
-      "title": "State Jurisdiction",
-      "enum": ["Delhi", "Maharashtra", "Uttar Pradesh"],
-      "default": "Delhi"
-    },
-    "arbitration": {
-      "type": "boolean",
-      "title": "Include Arbitration Clause?",
-      "default": true
-    },
-    "arbitration_seat": {
-      "type": "string",
-      "title": "Arbitration Seat",
-      "default": "New Delhi"
-    }
-  },
-  "required": [
-    "party_a_name",
-    "party_a_address",
-    "party_b_name",
-    "party_b_address",
-    "effective_date",
-    "property_address",
-    "monthly_rent",
-    "security_deposit",
-    "lease_term_years",
-    "state"
   ]
 }

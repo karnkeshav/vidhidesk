@@ -6,7 +6,7 @@ import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { listMatters, Matter } from "@/lib/api";
+import { listMatters, Matter, listCalendarHearings, CalendarHearing } from "@/lib/api";
 import {
   ShieldCheck,
   Globe,
@@ -35,6 +35,30 @@ export function useMatters() {
   return useContext(MattersContext);
 }
 
+// Hearings are fetched once here (same "fetch once, share via context"
+// reasoning as MattersContext above) so both the header bell and the
+// /calendar page read the same list without issuing duplicate GETs.
+type HearingsContextValue = { hearings: CalendarHearing[]; refetchHearings: () => void };
+const HearingsContext = createContext<HearingsContextValue>({
+  hearings: [],
+  refetchHearings: () => {},
+});
+export function useHearings() {
+  return useContext(HearingsContext);
+}
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const NOTIFIED_HEARINGS_KEY_PREFIX = "vidhidesk_notified_hearings_";
+
+/** Hearings landing strictly within the next 24h from `now`. */
+function hearingsWithin24h(hearings: CalendarHearing[], now: Date): CalendarHearing[] {
+  const cutoff = new Date(now.getTime() + ONE_DAY_MS);
+  return hearings.filter((h) => {
+    const t = new Date(h.hearing_at);
+    return t > now && t <= cutoff;
+  });
+}
+
 export function AuthedShell({
   children,
   wide = false,
@@ -49,6 +73,17 @@ export function AuthedShell({
   const [matters, setMatters] = useState<Matter[]>([]);
   const [mattersError, setMattersError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [hearings, setHearings] = useState<CalendarHearing[]>([]);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">(
+    "unsupported"
+  );
+
+  const refetchHearings = () => {
+    listCalendarHearings()
+      .then(setHearings)
+      .catch(() => {});
+  };
 
   const loadAdvocateProfile = () => {
     supabase.auth.getUser().then(({ data }) => {
@@ -85,8 +120,13 @@ export function AuthedShell({
             setMatters(data);
           })
           .catch((err) => setMattersError(err instanceof Error ? err.message : String(err)));
+        refetchHearings();
       }
     });
+
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotifPermission(Notification.permission);
+    }
 
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.user_metadata?.avatar_url) {
@@ -116,11 +156,67 @@ export function AuthedShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Browser "alarm" for the day-before hearing reminder: only fires once
+  // notification permission has been explicitly granted (via the button
+  // in the bell dropdown below -- requestPermission() needs a real user
+  // gesture, calling it unprompted on load is unreliable/gets ignored by
+  // browsers). Polls every 15 min while a tab stays open so it still
+  // catches a hearing crossing the 24h mark mid-session, not just on
+  // page load. De-dupes per calendar day via localStorage so the same
+  // hearing doesn't re-fire an OS notification every poll.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+
+    const checkAndNotify = () => {
+      if (Notification.permission !== "granted" || hearings.length === 0) return;
+      const now = new Date();
+      // Local calendar day, not UTC -- the dedupe window should reset at
+      // the advocate's own midnight, not UTC midnight (see calendar
+      // page.tsx's dateKey() for the same fix and why it matters).
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const storageKey = `${NOTIFIED_HEARINGS_KEY_PREFIX}${todayKey}`;
+      let notified: string[] = [];
+      try {
+        notified = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      } catch {
+        notified = [];
+      }
+
+      const due = hearingsWithin24h(hearings, now).filter((h) => !notified.includes(h.id));
+      if (due.length === 0) return;
+
+      due.forEach((h) => {
+        const when = new Date(h.hearing_at).toLocaleString([], {
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        new Notification("Hearing tomorrow", {
+          body: `${h.title}${h.court ? ` — ${h.court}` : ""} — ${when}`,
+          tag: h.id,
+        });
+      });
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify([...notified, ...due.map((h) => h.id)]));
+      } catch {}
+    };
+
+    checkAndNotify();
+    const interval = setInterval(checkAndNotify, 15 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [hearings]);
+
   const handleJurisdictionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     setJurisdiction(val);
     localStorage.setItem("vidhidesk_jurisdiction", val);
   };
+
+  const dueSoonHearings = hearingsWithin24h(hearings, new Date()).sort(
+    (a, b) => new Date(a.hearing_at).getTime() - new Date(b.hearing_at).getTime()
+  );
 
   if (session === "loading") {
     return (
@@ -164,10 +260,76 @@ export function AuthedShell({
             </select>
           </div>
 
-          {/* Notifications Icon with Badge (Stitch Approved Design) */}
-          <div className="relative cursor-pointer text-[#45464E] transition-colors hover:text-[#081534]" title="Notifications">
-            <Bell className="h-4 w-4" strokeWidth={1.5} />
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#7A2A2A]"></span>
+          {/* Notifications Bell — hearings within the next 24h */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setBellOpen((v) => !v)}
+              className="relative cursor-pointer text-[#45464E] transition-colors hover:text-[#081534]"
+              title="Notifications"
+              aria-label="Hearing notifications"
+            >
+              <Bell className="h-4 w-4" strokeWidth={1.5} />
+              {dueSoonHearings.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#7A2A2A]"></span>
+              )}
+            </button>
+
+            {bellOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setBellOpen(false)} />
+                <div className="absolute right-0 top-9 z-40 w-80 rounded-sm border border-[#E4E2DD] bg-white shadow-lg">
+                  <div className="flex items-center justify-between border-b border-[#E4E2DD] px-3 py-2">
+                    <span className="font-sans text-xs font-semibold uppercase tracking-wider text-[#081534]">
+                      Hearings — Next 24 Hours
+                    </span>
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto">
+                    {dueSoonHearings.length === 0 ? (
+                      <p className="px-3 py-4 font-serif text-xs text-[#76777F]">
+                        No hearings in the next 24 hours.
+                      </p>
+                    ) : (
+                      dueSoonHearings.map((h) => (
+                        <a
+                          key={h.id}
+                          href="/calendar"
+                          className="block border-b border-[#E4E2DD] px-3 py-2 last:border-b-0 hover:bg-[#FBF9F4]"
+                        >
+                          <p className="font-serif text-xs font-medium text-[#1A1A1A]">{h.title}</p>
+                          <p className="font-sans text-[11px] text-[#45464E]">
+                            {new Date(h.hearing_at).toLocaleString([], {
+                              weekday: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {h.court ? ` · ${h.court}` : ""}
+                          </p>
+                        </a>
+                      ))
+                    )}
+                  </div>
+
+                  {notifPermission !== "unsupported" && notifPermission !== "granted" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        Notification.requestPermission().then((perm) => setNotifPermission(perm));
+                      }}
+                      className="w-full border-t border-[#E4E2DD] px-3 py-2 text-left font-sans text-[11px] font-semibold text-[#081534] hover:bg-[#FBF9F4]"
+                    >
+                      Enable hearing alerts
+                    </button>
+                  )}
+                  {notifPermission === "granted" && (
+                    <p className="border-t border-[#E4E2DD] px-3 py-2 font-sans text-[11px] text-[#45464E]">
+                      Hearing alerts enabled
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Settings Icon — Opens Profile & Credentials Page */}
@@ -289,7 +451,9 @@ export function AuthedShell({
         {/* Main Workspace Canvas */}
         <main className={cn("w-full min-w-0 p-4 pb-20 md:p-6 md:pb-6", wide ? "max-w-7xl" : "max-w-6xl")}>
           <MattersContext.Provider value={{ matters, error: mattersError }}>
-            {children}
+            <HearingsContext.Provider value={{ hearings, refetchHearings }}>
+              {children}
+            </HearingsContext.Provider>
           </MattersContext.Provider>
         </main>
       </div>

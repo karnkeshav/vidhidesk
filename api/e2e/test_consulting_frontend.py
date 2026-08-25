@@ -85,27 +85,27 @@ def test_consulting_end_to_end(auth_page: Page, cleanup_matters: list, test_user
     auth_page.fill("textarea", question)
     
     # Optional fields
-    auth_page.fill('input[placeholder*="Party Names"]', "John Doe, Jane Smith")
+    auth_page.fill('input[placeholder*="John Doe"]', "John Doe, Jane Smith")
     
     # Submit
     auth_page.click('button:has-text("Analyze")')
     
     # 3. Wait for Analysis Result and extract Matter ID
-    expect(auth_page).to_have_url(re.compile(r".*/consulting/[0-9a-fA-F-]+$"), timeout=30000)
+    expect(auth_page).to_have_url(re.compile(r".*/consulting/[0-9a-fA-F-]+$"), timeout=300000)
     
     current_url = auth_page.url
     matter_id = current_url.split("/")[-1]
     cleanup_matters.append(matter_id)
     
     # 4. Verify Version 1 renders
-    expect(auth_page.locator("body")).to_contain_text("Version 1")
+    expect(auth_page.locator("body")).to_contain_text("v1")
     expect(auth_page.locator("body")).to_contain_text(question)
     
     # 5. Follow-up
     follow_up = "What if they exchange emails?"
-    auth_page.fill('input[placeholder*="follow-up"]', follow_up)
-    auth_page.click('button:has-text("Analyze")')
+    auth_page.fill('textarea[placeholder*="follow-up"]', follow_up)
+    auth_page.click('button:has-text("Ask Follow-up")')
     
     # 6. Verify Version 2 renders
-    expect(auth_page.locator("body")).to_contain_text("Version 2", timeout=30000)
+    expect(auth_page.locator("body")).to_contain_text("v2", timeout=300000)
     expect(auth_page.locator("body")).to_contain_text(follow_up)

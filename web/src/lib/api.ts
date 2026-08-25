@@ -86,6 +86,26 @@ export type Matter = {
   created_at: string;
 };
 
+// Cross-module practice calendar entry (Calendar page). Distinct from the
+// per-litigation-matter docket log below (listHearings(matterId) /
+// addHearing / LitigationHearingOut) -- that tracks outcomes/next-dates
+// for one case's hearing history; CalendarHearing is a lighter, optional
+// matter-linked reminder spanning every module, scheduled from /calendar.
+export type CalendarHearing = {
+  id: string;
+  matter_id: string | null;
+  case_no: string | null;
+  title: string;
+  court: string | null;
+  bench: string | null;
+  item_no: string | null;
+  stage: string | null;
+  hearing_at: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant" | "system";
@@ -426,6 +446,49 @@ export function updateMatter(matterId: string, input: { title: string }): Promis
   });
 }
 
+export type CalendarHearingInput = {
+  matter_id?: string | null;
+  case_no?: string | null;
+  title: string;
+  court?: string | null;
+  bench?: string | null;
+  item_no?: string | null;
+  stage?: string | null;
+  hearing_at: string;
+  notes?: string | null;
+};
+
+export function listCalendarHearings(): Promise<CalendarHearing[]> {
+  return authedFetch("/api/hearings");
+}
+
+export function createCalendarHearing(input: CalendarHearingInput): Promise<CalendarHearing> {
+  return authedFetch(
+    "/api/hearings",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
+}
+
+export function updateCalendarHearing(
+  hearingId: string,
+  input: Partial<CalendarHearingInput>
+): Promise<CalendarHearing> {
+  return authedFetch(`/api/hearings/${hearingId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteCalendarHearing(hearingId: string): Promise<{ status: string; id: string }> {
+  return authedFetch(`/api/hearings/${hearingId}`, {
+    method: "DELETE",
+  });
+}
+
 export function listMessages(matterId: string): Promise<Message[]> {
   return authedFetch(`/api/matters/${matterId}/messages`);
 }
@@ -703,10 +766,14 @@ export type PleadingDraft = {
 };
 
 export function generatePleadingOutline(matterId: string, payload: { case_analysis_id: string }): Promise<PleadingOutline> {
-  return authedFetch(`/api/matters/${matterId}/pleading-outline`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/pleading-outline`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function listPleadingOutlines(matterId: string): Promise<PleadingOutline[]> {
@@ -714,10 +781,14 @@ export function listPleadingOutlines(matterId: string): Promise<PleadingOutline[
 }
 
 export function generateClause(matterId: string, clauseType: string, payload: { pleading_outline_id: string }): Promise<PleadingClause> {
-  return authedFetch(`/api/matters/${matterId}/clauses/${clauseType}/generate`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/clauses/${clauseType}/generate`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function listClauses(matterId: string, pleadingOutlineId: string): Promise<PleadingClause[]> {
@@ -732,10 +803,14 @@ export function reviewPleadingClause(matterId: string, clauseId: string, status:
 }
 
 export function composePleading(matterId: string, payload: { pleading_outline_id: string }): Promise<PleadingDraft> {
-  return authedFetch(`/api/matters/${matterId}/pleading-draft/compose`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/pleading-draft/compose`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function listPleadingDrafts(matterId: string, pleadingOutlineId: string): Promise<PleadingDraft[]> {
@@ -757,10 +832,13 @@ export type RERAWalkthroughStepOut = {
   state: string;
   procedure: string;
   step_no: number;
-  heading: string;
+  heading: string | null;
+  instruction: string;
   required_documents: string[];
   portal_url: string | null;
-  warnings: string[];
+  warnings: string | null;
+  source_url: string | null;
+  last_verified: string | null;
   verification_status: string;
 };
 
@@ -869,7 +947,7 @@ export type ConsultingAnalysisOut = {
 // rejected as leaked (403) on every attempt, forcing the full Groq
 // fallback cascade -- 180s leaves margin above that worst case even before
 // the key is rotated.
-const CONSULTING_ANALYZE_TIMEOUT_MS = 180000;
+const CONSULTING_ANALYZE_TIMEOUT_MS = 300000;
 
 export function createConsultingAnalysis(payload: ConsultingAnalyzeRequest): Promise<ConsultingAnalysisOut> {
   return authedFetch("/api/consulting/analyze", {

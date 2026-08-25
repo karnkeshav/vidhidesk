@@ -168,6 +168,17 @@ def test_list_procedures_returns_curated_procedures_only():
     assert by_name == {"project-registration": 3, "complaint-filing": 2}
 
 
+def test_list_procedures_works_for_uttar_pradesh():
+    """Delhi and Maharashtra are already exercised throughout this file;
+    "Uttar Pradesh" (the only Phase 1 state whose exact identifier
+    contains a space) had no discovery coverage of its own — confirms the
+    same generic, state-agnostic query path works for it too."""
+    db = FakeDB()
+    _seed_steps(db, "Uttar Pradesh", "project-registration", 6)
+    result = rera.list_procedures("Uttar Pradesh", db)
+    assert result == [{"state": "Uttar Pradesh", "procedure": "project-registration", "step_count": 6}]
+
+
 def test_list_procedures_rejects_unsupported_state():
     db = FakeDB()
     with pytest.raises(rera.RERAError):
