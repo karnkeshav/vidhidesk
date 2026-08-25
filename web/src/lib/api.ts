@@ -86,6 +86,26 @@ export type Matter = {
   created_at: string;
 };
 
+// Cross-module practice calendar entry (Calendar page). Distinct from the
+// per-litigation-matter docket log below (listHearings(matterId) /
+// addHearing / LitigationHearingOut) -- that tracks outcomes/next-dates
+// for one case's hearing history; CalendarHearing is a lighter, optional
+// matter-linked reminder spanning every module, scheduled from /calendar.
+export type CalendarHearing = {
+  id: string;
+  matter_id: string | null;
+  case_no: string | null;
+  title: string;
+  court: string | null;
+  bench: string | null;
+  item_no: string | null;
+  stage: string | null;
+  hearing_at: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant" | "system";
@@ -423,6 +443,49 @@ export function updateMatter(matterId: string, input: { title: string }): Promis
   return authedFetch(`/api/matters/${matterId}`, {
     method: "PATCH",
     body: JSON.stringify(input),
+  });
+}
+
+export type CalendarHearingInput = {
+  matter_id?: string | null;
+  case_no?: string | null;
+  title: string;
+  court?: string | null;
+  bench?: string | null;
+  item_no?: string | null;
+  stage?: string | null;
+  hearing_at: string;
+  notes?: string | null;
+};
+
+export function listCalendarHearings(): Promise<CalendarHearing[]> {
+  return authedFetch("/api/hearings");
+}
+
+export function createCalendarHearing(input: CalendarHearingInput): Promise<CalendarHearing> {
+  return authedFetch(
+    "/api/hearings",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
+}
+
+export function updateCalendarHearing(
+  hearingId: string,
+  input: Partial<CalendarHearingInput>
+): Promise<CalendarHearing> {
+  return authedFetch(`/api/hearings/${hearingId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteCalendarHearing(hearingId: string): Promise<{ status: string; id: string }> {
+  return authedFetch(`/api/hearings/${hearingId}`, {
+    method: "DELETE",
   });
 }
 
