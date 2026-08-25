@@ -18,6 +18,7 @@ import {
   downloadDraftDocx,
   downloadDraftPdf,
   generateDraft,
+  getDraftText,
   getMatter,
   getTemplate,
   listDrafts,
@@ -109,7 +110,32 @@ export default function ContractMatterPage() {
         }
         const tpl = await getTemplate(templateId);
         setTemplate(tpl);
-        if (existingDrafts.length > 0) setMode("draft");
+        if (existingDrafts.length > 0) {
+          setMode("draft");
+          // Restore the historical preview (fullText) for a revisited
+          // matter -- listDrafts() is newest-first, so [0] is the current
+          // draft. Reads the actual persisted .docx server-side, no LLM
+          // call. Best-effort and isolated from the rest of init(): a
+          // failure here (e.g. the file genuinely missing) must not block
+          // the workspace from loading -- latestDraftRef's drafts[0]
+          // fallback below still keeps the Download buttons/version badge
+          // working either way. Mirrors the same pattern already shipped
+          // for RERA (web/src/app/rera/[matterId]/page.tsx).
+          const latest = existingDrafts[0];
+          try {
+            const text = await getDraftText(latest.id);
+            setLatestDraft({
+              draft_version_id: latest.id,
+              version_no: latest.version_no,
+              docx_path: latest.docx_path,
+              clause_fills: [],
+              full_text: text.full_text,
+            });
+          } catch {
+            // Preview stays empty; latestDraftRef (drafts[0]) still backs
+            // the download buttons and version badge.
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
@@ -194,6 +220,20 @@ export default function ContractMatterPage() {
   const displayTitle = matter?.title ?? template.name;
   const wordCount = latestDraft ? latestDraft.full_text.split(/\s+/).filter(Boolean).length : 0;
 
+  // `latestDraft` (with full_text/clause_fills) is only ever set by
+  // handleGenerate/handleAmend in this session, or by init()'s best-effort
+  // getDraftText() fetch above. `drafts` (from listDrafts, ordered
+  // newest-first) always has the persisted id/version_no even when
+  // getDraftText hasn't resolved (or failed) in this session, so it's a
+  // safe fallback for exactly those two things -- the document *preview*
+  // (fullText below) still needs the real getDraftText() fetch to have
+  // succeeded.
+  const latestDraftRef = latestDraft
+    ? { draft_version_id: latestDraft.draft_version_id, version_no: latestDraft.version_no }
+    : drafts[0]
+      ? { draft_version_id: drafts[0].id, version_no: drafts[0].version_no }
+      : null;
+
   return (
     <AuthedShell wide>
       <div className="-m-4 flex h-[calc(100vh-100px)] flex-col overflow-hidden md:-m-6">
@@ -244,7 +284,7 @@ export default function ContractMatterPage() {
                       Revisions Logged: {drafts.length}
                     </span>
                     <Badge variant={template.review_status === "reviewed" ? "default" : "secondary"}>
-                      {latestDraft ? `Version ${latestDraft.version_no}` : "Drafting Stage"}
+                      {latestDraftRef ? `Version ${latestDraftRef.version_no}` : "Drafting Stage"}
                     </Badge>
                   </div>
                 </div>
@@ -260,15 +300,15 @@ export default function ContractMatterPage() {
                     Share
                   </Button>
 
-                  {latestDraft && (
+                  {latestDraftRef && (
                     <>
                       <Button
                         size="sm"
                         className="h-8 gap-1.5 rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white hover:bg-[#1E2A4A]"
                         onClick={() =>
                           downloadDraftDocx(
-                            latestDraft.draft_version_id,
-                            `${template.name}-v${latestDraft.version_no}.docx`
+                            latestDraftRef.draft_version_id,
+                            `${template.name}-v${latestDraftRef.version_no}.docx`
                           )
                         }
                       >
@@ -286,8 +326,8 @@ export default function ContractMatterPage() {
                           setError(null);
                           try {
                             await downloadDraftPdf(
-                              latestDraft.draft_version_id,
-                              `${template.name}-v${latestDraft.version_no}.pdf`
+                              latestDraftRef.draft_version_id,
+                              `${template.name}-v${latestDraftRef.version_no}.pdf`
                             );
                           } catch (err) {
                             setError(err instanceof Error ? err.message : String(err));
@@ -417,7 +457,7 @@ export default function ContractMatterPage() {
               <span className="font-sans text-[10px] font-medium text-[#45464E]">Auto Save Active</span>
             </div>
             <span className="font-sans text-[10px]">
-              Version {latestDraft?.version_no || "1.0"}
+              Version {latestDraftRef?.version_no || "1.0"}
             </span>
             <span className="font-sans text-[10px]">Word Count: {wordCount}</span>
           </div>
