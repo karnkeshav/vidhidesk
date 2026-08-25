@@ -21,8 +21,16 @@
 
 FROM python:3.11.10-slim
 
+# Injected at build time by CI (docker build --build-arg GIT_COMMIT_SHA=<sha> .),
+# never hardcoded and never read from .git inside the image (this image does
+# not COPY .git at all -- see GET /version, api/app/routers/version.py, which
+# reads this as a plain env var at runtime and reports "unknown" if unset,
+# rather than guessing).
+ARG GIT_COMMIT_SHA=unknown
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
 
 WORKDIR /app
 
