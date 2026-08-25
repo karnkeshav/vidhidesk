@@ -1,24 +1,36 @@
 #!/usr/bin/env python3
 """Seed curated RERA filing-walkthrough content into `rera_guides`.
 
-One real, source-cited procedure: Maharashtra / project-registration,
-grounded in the Real Estate (Regulation and Development) Act, 2016
-(Central Act 16 of 2016 — applies uniformly; MahaRERA has not modified
-these particular sections) — Sections 3 and 4. Verified 2026-08-25 by
-directly opening the official India Code PDF in a live browser session:
+Three real, source-cited project-registration procedures — Maharashtra,
+Delhi, and Uttar Pradesh — all grounded in the Real Estate (Regulation and
+Development) Act, 2016 (Central Act 16 of 2016 — applies uniformly across
+every state; no state has modified Sections 3-4 themselves) — Sections 3
+and 4. Re-verified 2026-08-25 by directly opening the official India Code
+PDF in a live browser session:
 https://www.indiacode.nic.in/bitstream/123456789/2158/1/A201616.pdf
 (loaded successfully — confirmed live, not just cited from search).
 
-Steps 1-5 (verification_status="verified") paraphrase only what Sections
-3-4 actually state — no invented document, requirement, or portal step.
-Step 6 (the online portal submission) is deliberately
-verification_status="pending_verification": the cited portal URL
-(https://maharerait.mahaonline.gov.in, confirmed via web search as
-MahaRERA's current official registration portal) could NOT be reached
-from this session (WebFetch: ECONNREFUSED; browser navigation: connection
-error) — likely bot-blocking or transient, but not independently
-confirmed live, so it is not marked "verified". A human must confirm the
-portal loads before promoting that row to "verified".
+Because Sections 3-4 are the same central law for all three states, steps
+1-5 of every group below paraphrase the identical statutory text, only
+the Authority name changes (MahaRERA / Delhi RERA / UP RERA). Step 6 (the
+state's own online portal submission) is where the states genuinely
+differ, and where verification_status differs per state:
+
+  - Maharashtra: portal https://maharerait.mahaonline.gov.in could NOT be
+    reached this session (WebFetch: ECONNREFUSED; browser navigation:
+    connection error) — "pending_verification".
+  - Delhi: portal https://rera.delhi.gov.in/ (its official .gov.in
+    domain, corroborated by multiple independent sources for the
+    registration flow and contact details) could NOT be reached this
+    session either (WebFetch: ECONNREFUSED; browser navigation: connection
+    error, both on 2026-08-25) — "pending_verification".
+  - Uttar Pradesh: portal https://www.up-rera.in/ WAS successfully
+    fetched this session (2026-08-25) and its live content directly
+    confirmed the promoter-then-project registration flow described in
+    step 6 — "verified".
+
+A human must confirm a "pending_verification" portal loads before
+promoting that row to "verified".
 
 Why this exists / how to use it for additional states/procedures
 (CLAUDE.md Hard Rule 3 + this module's own design, app/services/rera.py's
@@ -68,6 +80,8 @@ from app.db import service_client  # noqa: E402
 
 RERA_ACT_PDF = "https://www.indiacode.nic.in/bitstream/123456789/2158/1/A201616.pdf"
 MAHARERA_PORTAL = "https://maharerait.mahaonline.gov.in"
+DELHI_RERA_PORTAL = "https://rera.delhi.gov.in/"
+UP_RERA_PORTAL = "https://www.up-rera.in/"
 
 WALKTHROUGH_GROUPS: list[dict[str, Any]] = [
     {
@@ -213,6 +227,295 @@ WALKTHROUGH_GROUPS: list[dict[str, Any]] = [
                 "source_url": MAHARERA_PORTAL,
                 "last_verified": None,
                 "verification_status": "pending_verification",
+            },
+        ],
+    },
+    {
+        "state": "Delhi",
+        "procedure": "project-registration",
+        "steps": [
+            {
+                "step_no": 1,
+                "heading": "Confirm the project must be registered before you advertise, market, or book units",
+                "instruction": (
+                    "Under Section 3 of the Real Estate (Regulation and Development) Act, 2016, "
+                    "a promoter must register the real estate project with the Real Estate "
+                    "Regulatory Authority, Delhi (Delhi RERA) before advertising, marketing, "
+                    "booking, selling, offering for sale, or inviting persons to purchase any "
+                    "plot, apartment, or building in it. Registration applies where the proposed "
+                    "land area exceeds 500 square metres, or the number of apartments proposed "
+                    "across all phases exceeds 8 — whichever condition applies, check both before "
+                    "concluding registration is optional."
+                ),
+                "required_documents": [],
+                "portal_url": None,
+                "warnings": (
+                    "Advertising or accepting bookings before registration is itself a "
+                    "contravention under the Act — confirm registration status before any "
+                    "marketing activity begins, not just before signing agreements for sale."
+                ),
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 2,
+                "heading": "File the registration application with the prescribed fee",
+                "instruction": (
+                    "Under Section 4(1), the promoter applies to the Authority (Delhi RERA) for "
+                    "registration of the project in the prescribed form and manner, within the "
+                    "prescribed time, accompanied by the prescribed fee. The remaining steps in "
+                    "this walkthrough cover what Section 4(2) requires to accompany that "
+                    "application."
+                ),
+                "required_documents": [],
+                "portal_url": None,
+                "warnings": None,
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 3,
+                "heading": "Assemble promoter details and past-project disclosure",
+                "instruction": (
+                    "Section 4(2)(a)-(b) requires the application to enclose brief details of "
+                    "the promoter's enterprise (name, registered address, type of enterprise, "
+                    "and the names and photographs of the promoter), plus a disclosure of every "
+                    "project the promoter has launched in the preceding five years — its "
+                    "completion status, any delays, pending litigation, the type of land "
+                    "involved, and outstanding dues."
+                ),
+                "required_documents": [
+                    "Enterprise/promoter details: name, registered address, type of enterprise, promoter photographs",
+                    "Disclosure of projects launched in the preceding 5 years: completion status, delays, pending cases, land type, outstanding dues",
+                ],
+                "portal_url": None,
+                "warnings": None,
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 4,
+                "heading": "Assemble project approvals and technical documents",
+                "instruction": (
+                    "Section 4(2)(c)-(f) requires authenticated copies of every approval and "
+                    "commencement certificate obtained from the competent authority (separately "
+                    "for each phase, if the project is phased), the sanctioned layout plan and "
+                    "specifications for the project or phase, the plan of development works "
+                    "including firefighting, drinking water, emergency evacuation, and renewable "
+                    "energy facilities, and the project's location details with clear "
+                    "demarcation of the land, its boundaries, and latitude/longitude of the end "
+                    "points."
+                ),
+                "required_documents": [
+                    "Authenticated copies of approvals and commencement certificates (per phase, if phased)",
+                    "Sanctioned layout plan and specifications for the project/phase",
+                    "Development-work plan: firefighting, drinking water, emergency evacuation, renewable-energy facilities",
+                    "Location details: land demarcation, boundaries, latitude/longitude of end points",
+                ],
+                "portal_url": None,
+                "warnings": None,
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 5,
+                "heading": "Assemble sale documents, unit/personnel particulars, and the statutory affidavit",
+                "instruction": (
+                    "Section 4(2)(g)-(l) requires proforma copies of the allotment letter, "
+                    "agreement for sale, and conveyance deed the promoter proposes to use; the "
+                    "number, type, and carpet area of apartments for sale (including exclusive "
+                    "balcony/verandah area) and the number and area of garages for sale; names "
+                    "and addresses of any real estate agents engaged; names and addresses of the "
+                    "contractors, architect, and structural engineer; and a declaratory affidavit "
+                    "covering the promoter's legal title and any encumbrances, the time period "
+                    "for completion, an undertaking that 70% of amounts realised from allottees "
+                    "will be deposited in a separate scheduled-bank account to cover construction "
+                    "and land cost, and the status of any pending approvals."
+                ),
+                "required_documents": [
+                    "Proforma allotment letter, agreement for sale, and conveyance deed",
+                    "Number, type, and carpet area of apartments for sale (incl. balcony/verandah area)",
+                    "Number and area of garages for sale",
+                    "Names and addresses of real estate agents engaged (if any)",
+                    "Names and addresses of contractors, architect, and structural engineer",
+                    "Declaratory affidavit: legal title and encumbrances, completion timeline, 70% escrow undertaking, pending approvals",
+                ],
+                "portal_url": None,
+                "warnings": (
+                    "The 70% escrow undertaking (amounts realised from allottees deposited in a "
+                    "separate scheduled-bank account for construction and land cost) is a common "
+                    "post-registration compliance failure — confirm the promoter's banking "
+                    "arrangement can actually meet this before the affidavit is filed, not after."
+                ),
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 6,
+                "heading": "Submit the application and fee on the Delhi RERA online portal",
+                "instruction": (
+                    "File the completed application, the documents from steps 3-5, and the "
+                    "prescribed fee through Delhi RERA's online project-registration portal."
+                ),
+                "required_documents": [],
+                "portal_url": DELHI_RERA_PORTAL,
+                "warnings": (
+                    "This portal URL could not be independently confirmed reachable during "
+                    "content verification on 2026-08-25 (connection failed both via automated "
+                    "fetch and a live browser session) — confirm it loads before relying on it."
+                ),
+                "source_url": DELHI_RERA_PORTAL,
+                "last_verified": None,
+                "verification_status": "pending_verification",
+            },
+        ],
+    },
+    {
+        "state": "Uttar Pradesh",
+        "procedure": "project-registration",
+        "steps": [
+            {
+                "step_no": 1,
+                "heading": "Confirm the project must be registered before you advertise, market, or book units",
+                "instruction": (
+                    "Under Section 3 of the Real Estate (Regulation and Development) Act, 2016, "
+                    "a promoter must register the real estate project with the Real Estate "
+                    "Regulatory Authority, Uttar Pradesh (UP RERA) before advertising, marketing, "
+                    "booking, selling, offering for sale, or inviting persons to purchase any "
+                    "plot, apartment, or building in it. Registration applies where the proposed "
+                    "land area exceeds 500 square metres, or the number of apartments proposed "
+                    "across all phases exceeds 8 — whichever condition applies, check both before "
+                    "concluding registration is optional."
+                ),
+                "required_documents": [],
+                "portal_url": None,
+                "warnings": (
+                    "Advertising or accepting bookings before registration is itself a "
+                    "contravention under the Act — confirm registration status before any "
+                    "marketing activity begins, not just before signing agreements for sale."
+                ),
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 2,
+                "heading": "Register as a promoter before registering the project",
+                "instruction": (
+                    "Under Section 4(1), the promoter applies to the Authority (UP RERA) for "
+                    "registration of the project in the prescribed form and manner, within the "
+                    "prescribed time, accompanied by the prescribed fee. On UP RERA's own online "
+                    "portal specifically, project registration is only accessible after promoter "
+                    "registration is completed first — a promoter account must exist before a "
+                    "project can be submitted for registration. The remaining steps in this "
+                    "walkthrough cover what Section 4(2) requires to accompany the project "
+                    "application itself."
+                ),
+                "required_documents": [],
+                "portal_url": None,
+                "warnings": None,
+                "source_url": UP_RERA_PORTAL,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 3,
+                "heading": "Assemble promoter details and past-project disclosure",
+                "instruction": (
+                    "Section 4(2)(a)-(b) requires the application to enclose brief details of "
+                    "the promoter's enterprise (name, registered address, type of enterprise, "
+                    "and the names and photographs of the promoter), plus a disclosure of every "
+                    "project the promoter has launched in the preceding five years — its "
+                    "completion status, any delays, pending litigation, the type of land "
+                    "involved, and outstanding dues."
+                ),
+                "required_documents": [
+                    "Enterprise/promoter details: name, registered address, type of enterprise, promoter photographs",
+                    "Disclosure of projects launched in the preceding 5 years: completion status, delays, pending cases, land type, outstanding dues",
+                ],
+                "portal_url": None,
+                "warnings": None,
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 4,
+                "heading": "Assemble project approvals and technical documents",
+                "instruction": (
+                    "Section 4(2)(c)-(f) requires authenticated copies of every approval and "
+                    "commencement certificate obtained from the competent authority (separately "
+                    "for each phase, if the project is phased), the sanctioned layout plan and "
+                    "specifications for the project or phase, the plan of development works "
+                    "including firefighting, drinking water, emergency evacuation, and renewable "
+                    "energy facilities, and the project's location details with clear "
+                    "demarcation of the land, its boundaries, and latitude/longitude of the end "
+                    "points."
+                ),
+                "required_documents": [
+                    "Authenticated copies of approvals and commencement certificates (per phase, if phased)",
+                    "Sanctioned layout plan and specifications for the project/phase",
+                    "Development-work plan: firefighting, drinking water, emergency evacuation, renewable-energy facilities",
+                    "Location details: land demarcation, boundaries, latitude/longitude of end points",
+                ],
+                "portal_url": None,
+                "warnings": None,
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 5,
+                "heading": "Assemble sale documents, unit/personnel particulars, and the statutory affidavit",
+                "instruction": (
+                    "Section 4(2)(g)-(l) requires proforma copies of the allotment letter, "
+                    "agreement for sale, and conveyance deed the promoter proposes to use; the "
+                    "number, type, and carpet area of apartments for sale (including exclusive "
+                    "balcony/verandah area) and the number and area of garages for sale; names "
+                    "and addresses of any real estate agents engaged; names and addresses of the "
+                    "contractors, architect, and structural engineer; and a declaratory affidavit "
+                    "covering the promoter's legal title and any encumbrances, the time period "
+                    "for completion, an undertaking that 70% of amounts realised from allottees "
+                    "will be deposited in a separate scheduled-bank account to cover construction "
+                    "and land cost, and the status of any pending approvals."
+                ),
+                "required_documents": [
+                    "Proforma allotment letter, agreement for sale, and conveyance deed",
+                    "Number, type, and carpet area of apartments for sale (incl. balcony/verandah area)",
+                    "Number and area of garages for sale",
+                    "Names and addresses of real estate agents engaged (if any)",
+                    "Names and addresses of contractors, architect, and structural engineer",
+                    "Declaratory affidavit: legal title and encumbrances, completion timeline, 70% escrow undertaking, pending approvals",
+                ],
+                "portal_url": None,
+                "warnings": (
+                    "The 70% escrow undertaking (amounts realised from allottees deposited in a "
+                    "separate scheduled-bank account for construction and land cost) is a common "
+                    "post-registration compliance failure — confirm the promoter's banking "
+                    "arrangement can actually meet this before the affidavit is filed, not after."
+                ),
+                "source_url": RERA_ACT_PDF,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
+            },
+            {
+                "step_no": 6,
+                "heading": "Submit the application and fee on the UP RERA online portal",
+                "instruction": (
+                    "File the completed application, the documents from steps 3-5, and the "
+                    "prescribed fee through UP RERA's online project-registration portal."
+                ),
+                "required_documents": [],
+                "portal_url": UP_RERA_PORTAL,
+                "warnings": None,
+                "source_url": UP_RERA_PORTAL,
+                "last_verified": "2026-08-25",
+                "verification_status": "verified",
             },
         ],
     },
