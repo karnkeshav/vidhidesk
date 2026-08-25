@@ -703,10 +703,14 @@ export type PleadingDraft = {
 };
 
 export function generatePleadingOutline(matterId: string, payload: { case_analysis_id: string }): Promise<PleadingOutline> {
-  return authedFetch(`/api/matters/${matterId}/pleading-outline`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/pleading-outline`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function listPleadingOutlines(matterId: string): Promise<PleadingOutline[]> {
@@ -714,10 +718,14 @@ export function listPleadingOutlines(matterId: string): Promise<PleadingOutline[
 }
 
 export function generateClause(matterId: string, clauseType: string, payload: { pleading_outline_id: string }): Promise<PleadingClause> {
-  return authedFetch(`/api/matters/${matterId}/clauses/${clauseType}/generate`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/clauses/${clauseType}/generate`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function listClauses(matterId: string, pleadingOutlineId: string): Promise<PleadingClause[]> {
@@ -732,10 +740,14 @@ export function reviewPleadingClause(matterId: string, clauseId: string, status:
 }
 
 export function composePleading(matterId: string, payload: { pleading_outline_id: string }): Promise<PleadingDraft> {
-  return authedFetch(`/api/matters/${matterId}/pleading-draft/compose`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return authedFetch(
+    `/api/matters/${matterId}/pleading-draft/compose`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function listPleadingDrafts(matterId: string, pleadingOutlineId: string): Promise<PleadingDraft[]> {
