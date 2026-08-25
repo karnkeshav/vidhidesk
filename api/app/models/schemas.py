@@ -45,6 +45,45 @@ class MatterOut(BaseModel):
     created_at: datetime
 
 
+class HearingCreate(BaseModel):
+    matter_id: str | None = None
+    case_no: str | None = None
+    title: str = Field(min_length=1, max_length=200)
+    court: str | None = None
+    bench: str | None = None
+    item_no: str | None = None
+    stage: str | None = None
+    hearing_at: datetime
+    notes: str | None = None
+
+
+class HearingOut(BaseModel):
+    id: str
+    matter_id: str | None = None
+    case_no: str | None = None
+    title: str
+    court: str | None = None
+    bench: str | None = None
+    item_no: str | None = None
+    stage: str | None = None
+    hearing_at: datetime
+    notes: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class HearingUpdate(BaseModel):
+    matter_id: str | None = None
+    case_no: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    court: str | None = None
+    bench: str | None = None
+    item_no: str | None = None
+    stage: str | None = None
+    hearing_at: datetime | None = None
+    notes: str | None = None
+
+
 class LitigationMatterUpdate(BaseModel):
     court_category: str | None = None
     jurisdiction_state: str | None = None

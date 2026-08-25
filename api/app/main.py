@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routers import citations, consulting, contracts, health, litigation, matters, profile, rera, retrieval
+from app.routers import citations, consulting, contracts, health, hearings, litigation, matters, profile, rera, retrieval
 from app.services import pii_mask as pii_mask_service
 from app.services import retrieval as retrieval_service
 
@@ -216,6 +216,7 @@ app.include_router(contracts.router)
 app.include_router(profile.router)
 app.include_router(rera.router)
 app.include_router(consulting.router)
+app.include_router(hearings.router)
 
 _auth_logger = logging.getLogger("vidhidesk.auth")
 
