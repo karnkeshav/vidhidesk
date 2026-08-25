@@ -33,6 +33,22 @@ on:
         description: "Commit SHA to deploy (defaults to the latest main)"
         required: false
 
+# Deployment race hardening (Oracle Migration Sprint): a single shared
+# group means a newer main push's deploy run cancels an older, still-
+# running one at the GitHub Actions level, instead of both running to
+# completion and whichever happens to finish LAST winning regardless of
+# which commit is actually newer -- that's the exact "commit A finishes
+# after commit B and overwrites Oracle with stale code" scenario this is
+# meant to prevent. This is a first layer, not the only one: it stops a
+# stale Actions job from starting/continuing, but cancelling a runner job
+# does not guarantee an already-dispatched SSH command is killed on the
+# Oracle box itself -- deploy/oracle_deploy.sh's own flock-based lock is
+# the second, independent layer that protects the box regardless of what
+# happens here.
+concurrency:
+  group: oracle-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy-oracle:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
