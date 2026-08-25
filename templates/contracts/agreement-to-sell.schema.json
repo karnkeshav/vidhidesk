@@ -1,110 +1,56 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Agreement to Sell Intake Schema",
-  "type": "object",
+  "template_key": "agreement-to-sell",
+  "title": "Agreement to Sell",
+  "fields": [
+    {"key": "party_a_name", "label": "Vendor / Seller Name", "type": "text", "required": true, "help": "Full legal name of property owner / seller"},
+    {
+      "key": "party_a_entity_type", "label": "Vendor Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "required": false, "default": "Individual"
+    },
+    {"key": "party_a_address", "label": "Vendor Registered Address", "type": "textarea", "required": true},
+    {"key": "party_b_name", "label": "Purchaser / Buyer Name", "type": "text", "required": true, "help": "Full legal name of buyer / purchaser"},
+    {
+      "key": "party_b_entity_type", "label": "Purchaser Entity Type", "type": "select",
+      "options": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
+      "required": false, "default": "Individual"
+    },
+    {"key": "party_b_address", "label": "Purchaser Address", "type": "textarea", "required": true},
+    {"key": "effective_date", "label": "Agreement Date", "type": "date", "required": true},
+    {
+      "key": "property_address", "label": "Immovable Property Schedule", "type": "textarea", "required": true,
+      "help": "Complete description of plot, flat, or building being sold"
+    },
+    {"key": "total_sale_consideration", "label": "Total Sale Consideration (₹)", "type": "text", "required": true},
+    {"key": "earnest_money", "label": "Earnest Money / Advance Paid (₹)", "type": "text", "required": true},
+    {"key": "completion_period_months", "label": "Completion / Sale Deed Execution Period (Months)", "type": "text", "required": true, "default": "3"},
+    {"key": "encumbrance_free", "label": "Vendor Warrants Clear & Marketable Title?", "type": "boolean", "required": false, "default": true},
+    {
+      "key": "state", "label": "State Jurisdiction", "type": "select",
+      "options": ["Delhi", "Maharashtra", "Uttar Pradesh"],
+      "required": true, "default": "Delhi"
+    },
+    {"key": "arbitration", "label": "Include Arbitration Clause?", "type": "boolean", "required": false, "default": true},
+    {"key": "arbitration_seat", "label": "Arbitration Seat", "type": "text", "required": false, "default": "New Delhi"}
+  ],
   "groups": [
     {
       "id": "parties",
-      "title": "Vendor & Purchaser Information",
-      "fields": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"]
+      "label": "Vendor & Purchaser Information",
+      "field_keys": ["party_a_name", "party_a_entity_type", "party_a_address", "party_b_name", "party_b_entity_type", "party_b_address"],
+      "summary_template": "{{party_a_name}} · {{party_b_name}}"
     },
     {
       "id": "property_consideration",
-      "title": "Property Details & Consideration",
-      "fields": ["effective_date", "property_address", "total_sale_consideration", "earnest_money", "completion_period_months", "encumbrance_free"]
+      "label": "Property Details & Consideration",
+      "field_keys": ["effective_date", "property_address", "total_sale_consideration", "earnest_money", "completion_period_months", "encumbrance_free"],
+      "summary_template": "{{property_address}} · ₹{{total_sale_consideration}}"
     },
     {
       "id": "jurisdiction_legal",
-      "title": "State Rules & Dispute Resolution",
-      "fields": ["state", "arbitration", "arbitration_seat"]
+      "label": "State Rules & Dispute Resolution",
+      "field_keys": ["arbitration", "arbitration_seat"],
+      "summary_template": "{{arbitration}} · {{arbitration_seat}}"
     }
-  ],
-  "properties": {
-    "party_a_name": {
-      "type": "string",
-      "title": "Vendor / Seller Name",
-      "description": "Full legal name of property owner / seller"
-    },
-    "party_a_entity_type": {
-      "type": "string",
-      "title": "Vendor Entity Type",
-      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
-      "default": "Individual"
-    },
-    "party_a_address": {
-      "type": "string",
-      "title": "Vendor Registered Address"
-    },
-    "party_b_name": {
-      "type": "string",
-      "title": "Purchaser / Buyer Name",
-      "description": "Full legal name of buyer / purchaser"
-    },
-    "party_b_entity_type": {
-      "type": "string",
-      "title": "Purchaser Entity Type",
-      "enum": ["Individual", "Private Limited Company", "Partnership Firm", "LLP", "HUF"],
-      "default": "Individual"
-    },
-    "party_b_address": {
-      "type": "string",
-      "title": "Purchaser Address"
-    },
-    "effective_date": {
-      "type": "string",
-      "title": "Agreement Date",
-      "format": "date"
-    },
-    "property_address": {
-      "type": "string",
-      "title": "Immovable Property Schedule",
-      "description": "Complete description of plot, flat, or building being sold"
-    },
-    "total_sale_consideration": {
-      "type": "string",
-      "title": "Total Sale Consideration (₹)"
-    },
-    "earnest_money": {
-      "type": "string",
-      "title": "Earnest Money / Advance Paid (₹)"
-    },
-    "completion_period_months": {
-      "type": "integer",
-      "title": "Completion / Sale Deed Execution Period (Months)",
-      "default": 3
-    },
-    "encumbrance_free": {
-      "type": "boolean",
-      "title": "Vendor Warrants Clear & Marketable Title?",
-      "default": true
-    },
-    "state": {
-      "type": "string",
-      "title": "State Jurisdiction",
-      "enum": ["Delhi", "Maharashtra", "Uttar Pradesh"],
-      "default": "Delhi"
-    },
-    "arbitration": {
-      "type": "boolean",
-      "title": "Include Arbitration Clause?",
-      "default": true
-    },
-    "arbitration_seat": {
-      "type": "string",
-      "title": "Arbitration Seat",
-      "default": "New Delhi"
-    }
-  },
-  "required": [
-    "party_a_name",
-    "party_a_address",
-    "party_b_name",
-    "party_b_address",
-    "effective_date",
-    "property_address",
-    "total_sale_consideration",
-    "earnest_money",
-    "completion_period_months",
-    "state"
   ]
 }
