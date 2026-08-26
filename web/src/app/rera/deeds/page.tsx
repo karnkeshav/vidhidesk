@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createMatter, listTemplates, listMatters, Matter, Template, ApiError } from "@/lib/api";
 import { Search, FolderOpen, FileText, AlertCircle, RotateCcw } from "lucide-react";
+import { TemplateReviewGateDialog } from "@/components/template-review-gate-dialog";
 
 function friendlyLoadError(err: unknown): string {
   if (err && typeof err === "object" && "name" in err && (err as { name?: string }).name === "AbortError") {
@@ -36,6 +37,7 @@ export default function PropertyDeedsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
+  const [gatedTemplate, setGatedTemplate] = useState<Template | null>(null);
 
   function loadData() {
     setError(null);
@@ -69,6 +71,10 @@ export default function PropertyDeedsPage() {
   });
 
   async function handleStart(template: Template) {
+    if (template.review_status !== "reviewed") {
+      setGatedTemplate(template);
+      return;
+    }
     setBusyTemplateId(template.id);
     setError(null);
     try {
@@ -206,9 +212,18 @@ export default function PropertyDeedsPage() {
                   <Button
                     onClick={() => handleStart(t)}
                     disabled={busyTemplateId === t.id}
-                    className="w-full h-9 rounded-sm bg-[#081534] font-sans text-xs font-semibold text-white transition-colors hover:bg-[#1E2A4A]"
+                    className={
+                      "w-full h-9 rounded-sm font-sans text-xs font-semibold transition-colors " +
+                      (t.review_status === "reviewed"
+                        ? "bg-[#081534] text-white hover:bg-[#1E2A4A]"
+                        : "border border-[#E4E2DD] bg-[#FBF9F4] text-[#45464E] hover:bg-[#F0EDE6]")
+                    }
                   >
-                    {busyTemplateId === t.id ? "Drafting..." : "Start Drafting"}
+                    {busyTemplateId === t.id
+                      ? "Drafting..."
+                      : t.review_status === "reviewed"
+                        ? "Start Drafting"
+                        : "Complete clause review to unlock"}
                   </Button>
                 </div>
               </Card>
@@ -216,6 +231,12 @@ export default function PropertyDeedsPage() {
           </div>
         </div>
       </div>
+      <TemplateReviewGateDialog
+        template={gatedTemplate}
+        onOpenChange={(open) => {
+          if (!open) setGatedTemplate(null);
+        }}
+      />
     </AuthedShell>
   );
 }

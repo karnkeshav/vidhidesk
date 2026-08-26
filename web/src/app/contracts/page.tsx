@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { createMatter, listTemplates, listMatters, Matter, Template, ApiError } from "@/lib/api";
-import { Search, Plus, FolderOpen, FileText, AlertCircle, RotateCcw } from "lucide-react";
+import { Search, Plus, FolderOpen, FileText, AlertCircle, RotateCcw, Lock } from "lucide-react";
+import { TemplateReviewGateDialog } from "@/components/template-review-gate-dialog";
 
 // Friendlier copy for the common failure shapes -- authedFetch (lib/api.ts)
 // already retries a transient upstream hiccup automatically before this is
@@ -48,6 +49,15 @@ export default function ContractsPage() {
   const [selected, setSelected] = useState<Template | null>(null);
   const [clientName, setClientName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [gatedTemplate, setGatedTemplate] = useState<Template | null>(null);
+
+  function handleSelectTemplate(t: Template) {
+    if (t.review_status !== "reviewed") {
+      setGatedTemplate(t);
+      return;
+    }
+    setSelected(t);
+  }
 
   function loadData() {
     setError(null);
@@ -108,6 +118,10 @@ export default function ContractsPage() {
   async function handleStart(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
+    if (selected.review_status !== "reviewed") {
+      setGatedTemplate(selected);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -130,7 +144,10 @@ export default function ContractsPage() {
         {/* Left Sidebar: Matter Navigator (280px Stitch Design) */}
         <aside className="w-full shrink-0 space-y-4 rounded-sm border border-[#E4E2DD] bg-[#F6F3EE] p-4 lg:w-[280px]">
           <Button
-            onClick={() => setSelected(filteredTemplates[0] || templates[0] || null)}
+            onClick={() => {
+              const first = filteredTemplates[0] || templates[0];
+              if (first) handleSelectTemplate(first);
+            }}
             className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#081534] py-2.5 font-sans text-xs font-semibold uppercase tracking-wider text-white hover:bg-[#1E2A4A]"
           >
             <Plus className="h-4 w-4" strokeWidth={1.5} />
@@ -285,7 +302,7 @@ export default function ContractsPage() {
                     ? "border-[#081534] bg-[#FBF9F4]"
                     : "border-[#E4E2DD] hover:border-[#081534]")
                 }
-                onClick={() => setSelected(t)}
+                onClick={() => handleSelectTemplate(t)}
               >
                 <div className="flex flex-col justify-between h-full space-y-3">
                   <div className="space-y-1">
@@ -297,10 +314,13 @@ export default function ContractsPage() {
                       Supported States: {t.states_supported.join(", ") || "Central Jurisdictions"}
                     </p>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-1.5">
                     <Badge variant={t.review_status === "reviewed" ? "default" : "secondary"}>
                       {t.review_status === "reviewed" ? "Reviewed" : "Beta — pending clause review"}
                     </Badge>
+                    {t.review_status !== "reviewed" && (
+                      <Lock className="h-3 w-3 text-[#76777F]" aria-label="Locked until clause review is complete" />
+                    )}
                   </div>
                 </div>
               </Card>
@@ -344,6 +364,12 @@ export default function ContractsPage() {
           )}
         </div>
       </div>
+      <TemplateReviewGateDialog
+        template={gatedTemplate}
+        onOpenChange={(open) => {
+          if (!open) setGatedTemplate(null);
+        }}
+      />
     </AuthedShell>
   );
 }
