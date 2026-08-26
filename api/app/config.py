@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Indian Kanoon
     indian_kanoon_api_token: str = ""
 
+    # eCourtsIndia (reserved for the Court Data Gateway — see
+    # docs/00_Product/Enhancement_Roadmap.md §4; no service reads this yet)
+    ecourts_api_key: str = ""
+
     # LLM providers — failover order per CLAUDE.md Decision 3
     gemini_api_key: str = ""
     groq_api_key: str = ""

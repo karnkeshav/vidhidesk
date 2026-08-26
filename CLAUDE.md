@@ -66,6 +66,12 @@ rule below). Read before major work:
 INDIAN_KANOON_API_TOKEN, GEMINI_API_KEY, GROQ_API_KEY, SAMBANOVA_API_KEY,
 CEREBRAS_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
 
+Reserved, not yet provisioned everywhere: ECOURTS_API_KEY (Court Data
+Gateway — see docs/00_Product/Enhancement_Roadmap.md §4; the Settings
+field exists in api/app/config.py but no service reads it yet). Add the
+real value to your local .env and, once the integration ships, to the
+Oracle box's .env — never commit it.
+
 ## Indian Kanoon API (verify live behaviour in Sprint 0 before relying on this)
 - Auth: HTTP header `Authorization: Token $INDIAN_KANOON_API_TOKEN`
 - Endpoints: /search/ (query via formInput; pagenum starts at 0),
