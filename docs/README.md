@@ -59,7 +59,7 @@ This policy itself supersedes the "where /docs conflict... [Project Plan] wins" 
 
 ## Canonical documents (current source of truth)
 
-- `00_Product/Product_Constitution.md`, `Product_Vision.md`, `Roadmap.md`
+- `00_Product/Product_Constitution.md`, `Product_Vision.md`, `Roadmap.md`, `Enhancement_Roadmap.md`
 - `10_Architecture/` — all four files
 - `20_Engineering/` — all four files, plus `Lessons_Learned.md`
 - `30_Implementation/Build_Tracker.md`, `Backlog.md`, `Technical_Design/Litigation_Module_Architecture.md`, all of `ADR/`, all of `Acceptance_Testing/` (the Sprint 3.5.3 acceptance testing guide and its validation report template — gates the pleading-generation go/no-go decision)

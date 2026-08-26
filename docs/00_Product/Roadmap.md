@@ -26,7 +26,7 @@ This reverses the original Scope of Work's Litigation-first sequence. Two separa
 | Phase 1 | Contracts MVP — full Phase 1 template library, intake→draft→amend loop, jurisdiction layer | ✅ Complete — 10/10 Phase 1 templates live |
 | Phase 2 | Litigation + citation engine — RAG pipeline, pleading generation, full citation verification | 🔶 Partially complete: matter/parties/facts/evidence-upload, Limitation Engine, Forum Advisor, and a full end-to-end AI Case Analysis vertical slice (Sprint 3.5.3, [ADR-011](../30_Implementation/ADR/ADR-011-ai-case-analysis-before-pleading.md)) are ✅ built and tested. Pleading generation itself ([`Litigation_Module_Architecture.md`](../30_Implementation/Technical_Design/Litigation_Module_Architecture.md)) remains 📐 architecture approved, implementation not started — gated on user signoff |
 | Phase 3 | Consulting & RERA | 📐 Designed only — tiles live on dashboard, no workspace implementation |
-| Phase 4 | Productisation (multi-user, matter management, billing, client portal) | 🔮 Not started — explicitly deferred until the advocate has used the tool in live practice for 4–6 weeks post-Phase 3 |
+| Phase 4 | Productisation (multi-user, matter management, billing, client portal) | 🔶 Multi-tenancy foundation (organizations/memberships/`organization_id`/RLS) and a platform-owner Master Dashboard approved to start now, ahead of the original 4–6-week-post-Phase-3 deferral — see [`Enhancement_Roadmap.md`](Enhancement_Roadmap.md). Billing automation and client portal remain deferred as originally planned. |
 
 For evidence-backed detail behind each status, see [`../30_Implementation/Build_Tracker.md`](../30_Implementation/Build_Tracker.md) §4–§8.
 
