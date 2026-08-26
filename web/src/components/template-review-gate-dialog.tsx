@@ -46,7 +46,7 @@ export function TemplateReviewGateDialog({
           <li><strong>Delete</strong> — remove it from future drafts, with a note why.</li>
         </ul>
         <p className="font-serif text-xs text-[#76777F]">
-          Once every clause has a decision, this template flips to "Reviewed" and
+          Once every clause has a decision, this template flips to &ldquo;Reviewed&rdquo; and
           becomes available to start a matter from.
         </p>
         <DialogFooter>
