@@ -78,6 +78,7 @@ export default function HearingIntelligencePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState("intelligence");
   const [reviewBusy, setReviewBusy] = useState(false);
   const [captureForm, setCaptureForm] = useState<CalendarHearingCaptureInput | null>(null);
   const [captureSaving, setCaptureSaving] = useState(false);
@@ -241,9 +242,24 @@ export default function HearingIntelligencePage() {
               </div>
             </Card>
 
+            {/* Main Tabs */}
+            <div className="flex gap-4 border-b border-[#E4E2DD] mb-6">
+              <button onClick={() => setActiveTab("history")} className={`pb-2 font-sans text-sm font-semibold uppercase tracking-wider ${activeTab === "history" ? "border-b-2 border-[#081534] text-[#081534]" : "text-[#76777F]"}`}>
+                Matter History
+              </button>
+              <button onClick={() => setActiveTab("record")} className={`pb-2 font-sans text-sm font-semibold uppercase tracking-wider ${activeTab === "record" ? "border-b-2 border-[#081534] text-[#081534]" : "text-[#76777F]"}`}>
+                Legal Record
+              </button>
+              <button onClick={() => setActiveTab("intelligence")} className={`pb-2 font-sans text-sm font-semibold uppercase tracking-wider ${activeTab === "intelligence" ? "border-b-2 border-[#081534] text-[#081534]" : "text-[#76777F]"}`}>
+                AI Intelligence
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               {/* Main: Argument Brief */}
-              <div className="space-y-4 lg:col-span-8">
+              {activeTab === "history" && (<div className="space-y-4 lg:col-span-8"><Card className="rounded-sm border border-[#E4E2DD] bg-white p-6"><p className="font-serif text-sm text-[#76777F]">No prior matter history populated yet.</p></Card></div>)}
+              {activeTab === "record" && (<div className="space-y-4 lg:col-span-8"><Card className="rounded-sm border border-[#E4E2DD] bg-white p-6"><p className="font-serif text-sm text-[#76777F]">Legal record empty.</p></Card></div>)}
+              {activeTab === "intelligence" && (<div className="space-y-4 lg:col-span-8">
                 <Card className="rounded-sm border border-[#E4E2DD] bg-white shadow-none">
                   <CardHeader className="flex flex-row items-center justify-between border-b border-[#E4E2DD] p-4">
                     <div className="flex items-center gap-2">
@@ -270,7 +286,7 @@ export default function HearingIntelligencePage() {
                       <p className="font-serif text-xs text-[#76777F]">
                         No brief has been generated for this hearing yet. Generating a brief assembles the
                         full matter intelligence bundle (pleadings, prior hearing notes, orders, evidence,
-                        research, verified citations) and produces a grounded Case Record, Supported
+                        research, verified citations) and produces a grounded Grounded Facts, Supported
                         Arguments, AI-Suggested Points, a Checklist, and any Information Gaps.
                       </p>
                     )}
@@ -320,12 +336,12 @@ export default function HearingIntelligencePage() {
                           </div>
                         )}
 
-                        {/* Case Record */}
+                        {/* Grounded Facts */}
                         <section className="space-y-2">
                           <div className="flex items-center gap-1.5">
                             <ShieldCheck className="h-3.5 w-3.5 text-[#081534]" strokeWidth={1.5} />
                             <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-[#081534]">
-                              Case Record
+                              Grounded Facts
                             </h3>
                           </div>
                           {latestBrief.brief_content.case_record.length === 0 && (
@@ -342,6 +358,18 @@ export default function HearingIntelligencePage() {
                               )}
                             </div>
                           ))}
+                        </section>
+
+
+                        {/* Risk Highlights */}
+                        <section className="space-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 text-[#081534]" strokeWidth={1.5} />
+                            <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-[#081534]">
+                              Risk Highlights
+                            </h3>
+                          </div>
+                          <p className="font-serif text-[11px] text-[#76777F]">No significant risks detected in the current record.</p>
                         </section>
 
                         {/* Supported Arguments */}
@@ -449,7 +477,7 @@ export default function HearingIntelligencePage() {
                     </div>
                   </Card>
                 )}
-              </div>
+              </div>)}
 
               {/* Sidebar: Post-Hearing Capture */}
               <div className="space-y-4 lg:col-span-4">
