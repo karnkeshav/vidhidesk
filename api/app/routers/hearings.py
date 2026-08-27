@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 
 from app.auth import CurrentUser, get_current_user
 from app.models.schemas import HearingCreate, HearingOut, HearingUpdate
@@ -37,8 +37,20 @@ def create_hearing(body: HearingCreate, user: CurrentUser = Depends(get_current_
 
 
 @router.get("", response_model=list[HearingOut])
-def list_hearings(user: CurrentUser = Depends(get_current_user)):
-    resp = user.db.table("hearings").select("*").order("hearing_at").execute()
+def list_hearings(
+    matter_id: str | None = Query(default=None),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """matter_id, when given, scopes to that matter's own tracked hearings
+    -- reuses this same table/endpoint rather than adding a parallel
+    matter-scoped hearings route (litigation.py's /matters/{id}/hearings
+    already exists for the separate litigation_hearings docket table;
+    this is intentionally the OTHER hearing concept -- see
+    0025_litigation_intelligence_ecourts.sql's header note)."""
+    query = user.db.table("hearings").select("*")
+    if matter_id:
+        query = query.eq("matter_id", matter_id)
+    resp = query.order("hearing_at").execute()
     return resp.data
 
 
@@ -50,6 +62,12 @@ def update_hearing(
     update_data = body.model_dump(exclude_unset=True)
     if not update_data:
         return _get_hearing_or_404(user, hearing_id)
+    # A human editing court/bench/item_no through this endpoint is the
+    # "lawyer override" case (spec Section 7): mark it so a later eCourts
+    # sync (app/services/court_sync.py::_upsert_hearing_from_causelist)
+    # skips this hearing instead of silently clobbering the correction.
+    if any(f in update_data for f in ("court", "bench", "item_no")):
+        update_data["source"] = "manual_override"
     resp = user.db.table("hearings").update(update_data).eq("id", hearing_id).execute()
     return resp.data[0]
 

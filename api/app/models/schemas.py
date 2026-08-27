@@ -70,6 +70,17 @@ class HearingOut(BaseModel):
     stage: str | None = None
     hearing_at: datetime
     notes: str | None = None
+    # Litigation Intelligence + eCourts (27 Aug 2026) additions --
+    # 0025_litigation_intelligence_ecourts.sql.
+    judge: str | None = None
+    listing_details: dict | None = None
+    arguments_made: str | None = None
+    judge_questions: str | None = None
+    opposing_counsel_position: str | None = None
+    outcome: str | None = None
+    next_steps: str | None = None
+    source: str = "manual"
+    source_synced_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -84,6 +95,18 @@ class HearingUpdate(BaseModel):
     stage: str | None = None
     hearing_at: datetime | None = None
     notes: str | None = None
+    # Post-hearing capture (spec Section 12) -- freely editable by the
+    # lawyer at any time, not just "after" the hearing; source/
+    # listing_details/source_synced_at are deliberately NOT exposed here
+    # -- those are sync-owned (app/services/court_sync.py) or derived
+    # server-side (manual_override, set automatically in the router when
+    # court/bench/item_no are edited through this endpoint).
+    judge: str | None = None
+    arguments_made: str | None = None
+    judge_questions: str | None = None
+    opposing_counsel_position: str | None = None
+    outcome: str | None = None
+    next_steps: str | None = None
 
 
 class LitigationMatterUpdate(BaseModel):
@@ -783,4 +806,136 @@ class PlatformOverviewOut(BaseModel):
     users_with_a_matter: int
     users_with_a_draft: int
     onboarding_funnel: dict[str, int]
+
+
+# ---------------------------------------------------------------------------
+# Litigation Intelligence + eCourts (27 Aug 2026, migration
+# 0025_litigation_intelligence_ecourts.sql). CNR/court tracking, Orders,
+# Hearing Briefs, and in-app Notifications.
+# ---------------------------------------------------------------------------
+
+
+class OrderCreate(BaseModel):
+    hearing_id: str | None = None
+    order_date: str | None = None  # YYYY-MM-DD
+    court: str | None = None
+    raw_text: str | None = None
+    file_url: str | None = None
+
+
+class OrderUpdate(BaseModel):
+    order_date: str | None = None
+    court: str | None = None
+    raw_text: str | None = None
+    file_url: str | None = None
+    status: str | None = Field(default=None, pattern="^(active|complied|superseded)$")
+    ai_extracted_directions: list[dict] | None = None
+
+
+class OrderOut(BaseModel):
+    id: str
+    matter_id: str
+    hearing_id: str | None = None
+    order_date: str | None = None
+    court: str | None = None
+    raw_text: str | None = None
+    file_url: str | None = None
+    ai_extracted_directions: list[dict] = Field(default_factory=list)
+    status: str
+    source: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CourtCaseTrackingUpdate(BaseModel):
+    """PUT/PATCH body for enabling/editing court tracking on a matter.
+    cnr_number is validated as non-empty, trimmed, uppercased text --
+    eCourtsIndia's own bulk-refresh endpoint documents that it trims/
+    uppercases/dedupes CNRs server-side too, so this mirrors rather than
+    duplicates a stricter format check this project cannot verify without
+    a live provider response to test against."""
+
+    cnr_number: str | None = Field(default=None, max_length=32)
+    tracking_enabled: bool | None = None
+
+    @field_validator("cnr_number")
+    @classmethod
+    def _normalize_cnr(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip().upper()
+        if not v:
+            raise ValueError("cnr_number must not be blank")
+        return v
+
+
+class CourtCaseTrackingOut(BaseModel):
+    id: str
+    matter_id: str
+    cnr_number: str | None = None
+    tracking_enabled: bool
+    last_synced_at: datetime | None = None
+    next_hearing_date: str | None = None
+    sync_status: str
+    last_error: str | None = None
+    provider_metadata: dict | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class HearingBriefCaseRecordEntry(BaseModel):
+    heading: str
+    content: str
+    source_refs: list[str]
+
+
+class HearingBriefArgumentEntry(BaseModel):
+    argument: str
+    source_refs: list[str]
+
+
+class HearingBriefContentOut(BaseModel):
+    case_record: list[HearingBriefCaseRecordEntry] = Field(default_factory=list)
+    supported_arguments: list[HearingBriefArgumentEntry] = Field(default_factory=list)
+    ai_suggested_points: list[str] = Field(default_factory=list)
+    checklist: list[str] = Field(default_factory=list)
+    information_gaps: list[str] = Field(default_factory=list)
+    generation_warning: str | None = None
+
+
+class HearingBriefOut(BaseModel):
+    id: str
+    matter_id: str
+    hearing_id: str
+    version: int
+    status: str  # 'draft' | 'reviewed' | 'approved_for_hearing'
+    generated_at: datetime
+    generated_by: str | None = None
+    source_snapshot: dict = Field(default_factory=dict)
+    brief_content: HearingBriefContentOut
+    lawyer_edits: dict | None = None
+    reviewed_at: datetime | None = None
+    approved_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+    notice: str = (
+        "AI-generated hearing preparation aid for advocate review. Not legal advice. "
+        "Section C (AI-suggested points) is explicitly the model's own suggestion, "
+        "never an established fact from the matter record."
+    )
+
+
+class HearingBriefReviewRequest(BaseModel):
+    status: str = Field(pattern="^(reviewed|approved_for_hearing)$")
+    lawyer_edits: dict | None = None
+
+
+class NotificationOut(BaseModel):
+    id: str
+    type: str
+    title: str
+    body: str
+    matter_id: str | None = None
+    read_at: datetime | None = None
+    created_at: datetime
 

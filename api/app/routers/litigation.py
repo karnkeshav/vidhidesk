@@ -26,12 +26,15 @@ from app.models.schemas import (
     LitigationPartyCreate,
     LitigationPartyOut,
     MatterOut,
+    OrderCreate,
+    OrderOut,
+    OrderUpdate,
     PleadingClauseOut,
     PleadingDraftOut,
     PleadingOutlineGenerateRequest,
     PleadingOutlineOut,
 )
-from app.services import case_analysis, clause_generator, contracts, document_composer, forum, limitation, litigation, pleading_outline
+from app.services import case_analysis, clause_generator, contracts, document_composer, forum, limitation, litigation, orders, pleading_outline
 from app.services.llm_gateway import ProviderError
 
 router = APIRouter(prefix="/api", tags=["litigation"])
@@ -474,3 +477,55 @@ def download_pleading_draft_pdf(
     except contracts.PdfConversionUnavailable as exc:
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc)) from exc
     return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
+
+
+# --- Orders (Litigation Intelligence + eCourts, 27 Aug 2026) ----------------
+
+@router.get("/matters/{matter_id}/orders", response_model=list[OrderOut])
+def list_orders(matter_id: str, user: CurrentUser = Depends(get_current_user)):
+    """List all orders recorded for a matter, most recent first."""
+    _get_matter_or_404(user, matter_id)
+    return orders.list_orders(matter_id, user.db)
+
+
+@router.post("/matters/{matter_id}/orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
+def add_order(
+    matter_id: str,
+    payload: OrderCreate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Record an order manually (source='manual'). eCourts-sourced orders
+    are a future extension of app/services/court_sync.py, not wired to
+    this endpoint -- this phase records manual entries and AI-extracted
+    directions the advocate adds after reading the order text."""
+    matter = _get_matter_or_404(user, matter_id)
+    return orders.add_order(matter_id, matter["organization_id"], payload.model_dump(exclude_none=True), user.db)
+
+
+@router.patch("/matters/{matter_id}/orders/{order_id}", response_model=OrderOut)
+def update_order(
+    matter_id: str,
+    order_id: str,
+    payload: OrderUpdate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Edit an order's text/status/extracted directions, or mark a
+    direction complied with."""
+    _get_matter_or_404(user, matter_id)
+    update_data = payload.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields provided to update")
+    updated = orders.update_order(order_id, matter_id, update_data, user.db)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return updated
+
+
+@router.delete("/matters/{matter_id}/orders/{order_id}")
+def delete_order(matter_id: str, order_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Delete an order (e.g. entered in error)."""
+    _get_matter_or_404(user, matter_id)
+    success = orders.delete_order(order_id, matter_id, user.db)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return {"status": "deleted", "id": order_id}
