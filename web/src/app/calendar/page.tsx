@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AuthedShell, useHearings, useMatters } from "@/components/authed-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
   ChevronRight,
   Pencil,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import {
   createCalendarHearing,
@@ -323,6 +325,15 @@ export default function CalendarPage() {
                         </span>
                       )}
                       <div className="flex items-center gap-2">
+                        {h.matter_id && (
+                          <Link
+                            href={`/hearings/${h.id}?matterId=${h.matter_id}`}
+                            className="text-[#45464E] transition-colors hover:text-[#081534]"
+                            title="Open Hearing Intelligence Workspace"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => openEditDialog(h)}

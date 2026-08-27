@@ -9,9 +9,17 @@ import { LitigationPartyModal } from "@/components/litigation-party-modal";
 import { LitigationFactTimeline, FactItem } from "@/components/litigation-fact-timeline";
 import { LitigationCaseAnalysis } from "@/components/litigation-case-analysis";
 import { LitigationPleadingWorkbench } from "@/components/litigation-pleading-workbench";
-import { UserPlus, Calendar, Plus, Trash2, Send, Clock, Gavel, Sparkles, FileText } from "lucide-react";
+import { UserPlus, Calendar, Plus, Trash2, Send, Clock, Gavel, Sparkles, FileText, Radar, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CaseAnalysis, listCaseAnalyses } from "@/lib/api";
+import {
+  CourtCaseTracking,
+  CalendarHearing,
+  getCourtTracking,
+  updateCourtTracking,
+  triggerCourtSync,
+  listCalendarHearings,
+} from "@/lib/api";
 
 interface PartyItem {
   id: string;
@@ -107,6 +115,10 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
   const [forumDefState, setForumDefState] = useState("");
   const [forumCalculating, setForumCalculating] = useState(false);
   const [forumResult, setForumResult] = useState<ForumResult | null>(null);
+  const [courtTracking, setCourtTracking] = useState<CourtCaseTracking | null>(null);
+  const [cnrInput, setCnrInput] = useState("");
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackedHearings, setTrackedHearings] = useState<CalendarHearing[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   async function loadData() {
@@ -114,16 +126,21 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
       const m = await getMatter(matterId);
       setMatter(m);
       if (m.module === "litigation") {
-        const [pList, fList, hList, aList] = await Promise.all([
+        const [pList, fList, hList, aList, tracking, trackedHearingsList] = await Promise.all([
           listParties(matterId).catch(() => []),
           listEvidence(matterId).catch(() => []),
           listHearings(matterId).catch(() => []),
-          listCaseAnalyses(matterId).catch(() => [])
+          listCaseAnalyses(matterId).catch(() => []),
+          getCourtTracking(matterId).catch(() => null),
+          listCalendarHearings({ matter_id: matterId }).catch(() => []),
         ]);
         setParties(pList);
         setFacts(fList);
         setHearings(hList);
         setAnalyses(aList);
+        setCourtTracking(tracking);
+        setCnrInput(tracking?.cnr_number || "");
+        setTrackedHearings(trackedHearingsList);
       }
       setMessages(await listMessages(matterId).catch(() => []));
     } catch (err) {
@@ -203,6 +220,48 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
       setShowHearingForm(false);
     } catch (err) {
       console.error("Failed to add hearing", err);
+    }
+  }
+
+  async function handleSaveCnr(e: React.FormEvent) {
+    e.preventDefault();
+    setTrackingBusy(true);
+    setError(null);
+    try {
+      const updated = await updateCourtTracking(matterId, { cnr_number: cnrInput || null });
+      setCourtTracking(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrackingBusy(false);
+    }
+  }
+
+  async function handleToggleTracking(enabled: boolean) {
+    setTrackingBusy(true);
+    setError(null);
+    try {
+      const updated = await updateCourtTracking(matterId, { tracking_enabled: enabled });
+      setCourtTracking(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrackingBusy(false);
+    }
+  }
+
+  async function handleSyncNow() {
+    setTrackingBusy(true);
+    setError(null);
+    try {
+      const updated = await triggerCourtSync(matterId);
+      setCourtTracking(updated);
+      const hList = await listCalendarHearings({ matter_id: matterId }).catch(() => []);
+      setTrackedHearings(hList);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrackingBusy(false);
     }
   }
 
@@ -377,6 +436,107 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                       <p><strong className="text-[#081534]">Case No:</strong> {matter?.case_number_formatted || "Pending"}</p>
                       <p><strong className="text-[#081534]">CNR:</strong> {matter?.cnr_number || "Not Assigned"}</p>
                     </div>
+                  </div>
+
+                  {/* Court Tracking / CNR (Litigation Intelligence + eCourts, 27 Aug 2026) --
+                      extends this existing screen rather than a new one, per the
+                      "reuse before creating" rule; CNR belongs to the Matter. */}
+                  <div className="rounded-sm border border-[#E4E2DD] bg-white p-5 space-y-3 font-sans text-xs">
+                    <div className="flex items-center gap-2 border-b border-[#E4E2DD] pb-2">
+                      <Radar className="h-4 w-4 text-[#081534]" />
+                      <h4 className="font-semibold uppercase tracking-wider text-[#081534]">Court Tracking</h4>
+                    </div>
+
+                    <form onSubmit={handleSaveCnr} className="space-y-2">
+                      <label className="font-semibold text-[#081534]">CNR Number</label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="e.g. DLND020047882015"
+                          value={cnrInput}
+                          onChange={(e) => setCnrInput(e.target.value)}
+                          className="h-8 w-full rounded-sm border border-[#E4E2DD] bg-white px-2 text-xs text-[#1A1A1A]"
+                        />
+                        <Button
+                          type="submit"
+                          disabled={trackingBusy}
+                          size="sm"
+                          className="h-8 shrink-0 rounded-sm bg-[#081534] px-3 font-sans text-[11px] font-semibold text-white hover:bg-[#1E2A4A]"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </form>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={courtTracking?.tracking_enabled || false}
+                        disabled={trackingBusy || !courtTracking?.cnr_number}
+                        onChange={(e) => handleToggleTracking(e.target.checked)}
+                        className="rounded border-[#E4E2DD]"
+                      />
+                      <span className="text-[#45464E]">
+                        Enable automated eCourts tracking
+                        {!courtTracking?.cnr_number && " (enter a CNR first)"}
+                      </span>
+                    </label>
+
+                    {courtTracking?.tracking_enabled && (
+                      <div className="space-y-1.5 rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-2.5">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={cn(
+                              "rounded-xs px-1.5 py-0.5 text-[10px] font-bold uppercase",
+                              courtTracking.sync_status === "synced" && "bg-[#D4EDDA] text-[#155724]",
+                              courtTracking.sync_status === "error" && "bg-[#FFF5F5] text-[#7A2A2A]",
+                              (courtTracking.sync_status === "idle" || courtTracking.sync_status === "syncing") &&
+                                "bg-[#F0EEE9] text-[#45464E]"
+                            )}
+                          >
+                            {courtTracking.sync_status}
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={trackingBusy}
+                            onClick={handleSyncNow}
+                            className="h-7 gap-1 rounded-sm border-[#E4E2DD] px-2 font-sans text-[11px] font-semibold text-[#081534]"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            {trackingBusy ? "Syncing..." : "Sync Now"}
+                          </Button>
+                        </div>
+                        {courtTracking.last_synced_at && (
+                          <p className="font-serif text-[10px] text-[#76777F]">
+                            Last synced: {new Date(courtTracking.last_synced_at).toLocaleString()}
+                          </p>
+                        )}
+                        {courtTracking.last_error && (
+                          <p className="font-serif text-[10px] text-[#7A2A2A]">{courtTracking.last_error}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {trackedHearings.length > 0 && (
+                      <div className="space-y-1 border-t border-[#E4E2DD] pt-2">
+                        <p className="font-semibold text-[#081534]">Tracked Hearings</p>
+                        {trackedHearings.map((h) => (
+                          <a
+                            key={h.id}
+                            href={`/hearings/${h.id}?matterId=${matterId}`}
+                            className="block rounded-sm px-1.5 py-1 hover:bg-[#F0EEE9]"
+                          >
+                            <span className="font-medium text-[#1A1A1A]">
+                              {new Date(h.hearing_at).toLocaleDateString()}
+                            </span>
+                            {h.court && <span className="text-[#76777F]"> — {h.court}</span>}
+                            {h.bench && <span className="text-[#76777F]">, {h.bench}</span>}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Limitation Intelligence Assistant (Sprint 3.5.2A) */}

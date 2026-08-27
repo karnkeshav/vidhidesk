@@ -129,6 +129,16 @@ export type CalendarHearing = {
   stage: string | null;
   hearing_at: string;
   notes: string | null;
+  // Litigation Intelligence + eCourts (27 Aug 2026) additions.
+  judge: string | null;
+  listing_details: Record<string, unknown> | null;
+  arguments_made: string | null;
+  judge_questions: string | null;
+  opposing_counsel_position: string | null;
+  outcome: string | null;
+  next_steps: string | null;
+  source: "manual" | "ecourts" | "manual_override";
+  source_synced_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -507,8 +517,26 @@ export type CalendarHearingInput = {
   notes?: string | null;
 };
 
-export function listCalendarHearings(): Promise<CalendarHearing[]> {
-  return authedFetch("/api/hearings");
+/** Post-hearing capture (Section 12) -- freely editable at any time, not
+ * just "after" the hearing. Deliberately excludes source/listing_details/
+ * source_synced_at (sync-owned/derived server-side) — see
+ * HearingUpdate's own comment in api/app/models/schemas.py. */
+export type CalendarHearingCaptureInput = {
+  court?: string | null;
+  bench?: string | null;
+  item_no?: string | null;
+  judge?: string | null;
+  arguments_made?: string | null;
+  judge_questions?: string | null;
+  opposing_counsel_position?: string | null;
+  outcome?: string | null;
+  next_steps?: string | null;
+  notes?: string | null;
+};
+
+export function listCalendarHearings(filters?: { matter_id?: string }): Promise<CalendarHearing[]> {
+  const query = filters?.matter_id ? `?matter_id=${encodeURIComponent(filters.matter_id)}` : "";
+  return authedFetch(`/api/hearings${query}`);
 }
 
 export function createCalendarHearing(input: CalendarHearingInput): Promise<CalendarHearing> {
@@ -524,7 +552,7 @@ export function createCalendarHearing(input: CalendarHearingInput): Promise<Cale
 
 export function updateCalendarHearing(
   hearingId: string,
-  input: Partial<CalendarHearingInput>
+  input: Partial<CalendarHearingInput> | CalendarHearingCaptureInput
 ): Promise<CalendarHearing> {
   return authedFetch(`/api/hearings/${hearingId}`, {
     method: "PATCH",
@@ -1103,4 +1131,152 @@ export function updateOrganizationAccess(
     },
     { retry: false }
   );
+}
+
+// ==========================================
+// LITIGATION INTELLIGENCE + ECOURTS (27 Aug 2026)
+// ==========================================
+
+export type OrderOut = {
+  id: string;
+  matter_id: string;
+  hearing_id: string | null;
+  order_date: string | null;
+  court: string | null;
+  raw_text: string | null;
+  file_url: string | null;
+  ai_extracted_directions: Array<{ direction: string; deadline: string | null; complied: boolean }>;
+  status: "active" | "complied" | "superseded";
+  source: "manual" | "ecourts";
+  created_at: string;
+  updated_at: string;
+};
+
+export function listOrders(matterId: string): Promise<OrderOut[]> {
+  return authedFetch(`/api/matters/${matterId}/orders`);
+}
+
+export function addOrder(
+  matterId: string,
+  input: { hearing_id?: string; order_date?: string; court?: string; raw_text?: string; file_url?: string }
+): Promise<OrderOut> {
+  return authedFetch(`/api/matters/${matterId}/orders`, { method: "POST", body: JSON.stringify(input) }, { retry: false });
+}
+
+export function updateOrder(
+  matterId: string,
+  orderId: string,
+  input: Partial<{ order_date: string; court: string; raw_text: string; file_url: string; status: OrderOut["status"]; ai_extracted_directions: OrderOut["ai_extracted_directions"] }>
+): Promise<OrderOut> {
+  return authedFetch(`/api/matters/${matterId}/orders/${orderId}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function deleteOrder(matterId: string, orderId: string): Promise<{ status: string; id: string }> {
+  return authedFetch(`/api/matters/${matterId}/orders/${orderId}`, { method: "DELETE" });
+}
+
+export type CourtCaseTracking = {
+  id: string;
+  matter_id: string;
+  cnr_number: string | null;
+  tracking_enabled: boolean;
+  last_synced_at: string | null;
+  next_hearing_date: string | null;
+  sync_status: "idle" | "syncing" | "synced" | "error";
+  last_error: string | null;
+  provider_metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export function getCourtTracking(matterId: string): Promise<CourtCaseTracking> {
+  return authedFetch(`/api/matters/${matterId}/court-tracking`);
+}
+
+export function updateCourtTracking(
+  matterId: string,
+  input: { cnr_number?: string | null; tracking_enabled?: boolean }
+): Promise<CourtCaseTracking> {
+  return authedFetch(`/api/matters/${matterId}/court-tracking`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+/** Longer timeout than the default: this calls the live eCourts provider
+ * (case lookup + causelist), not a local computation. */
+const COURT_SYNC_TIMEOUT_MS = 45000;
+
+export function triggerCourtSync(matterId: string): Promise<CourtCaseTracking> {
+  return authedFetch(
+    `/api/matters/${matterId}/court-tracking/sync`,
+    { method: "POST" },
+    { retry: false, timeoutMs: COURT_SYNC_TIMEOUT_MS }
+  );
+}
+
+export type HearingBriefContent = {
+  case_record: Array<{ heading: string; content: string; source_refs: string[] }>;
+  supported_arguments: Array<{ argument: string; source_refs: string[] }>;
+  ai_suggested_points: string[];
+  checklist: string[];
+  information_gaps: string[];
+  generation_warning?: string | null;
+};
+
+export type HearingBrief = {
+  id: string;
+  matter_id: string;
+  hearing_id: string;
+  version: number;
+  status: "draft" | "reviewed" | "approved_for_hearing";
+  generated_at: string;
+  generated_by: string | null;
+  source_snapshot: Record<string, unknown>;
+  brief_content: HearingBriefContent;
+  lawyer_edits: Record<string, unknown> | null;
+  reviewed_at: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  notice: string;
+};
+
+/** LLM generation call -- same generous timeout rationale as
+ * createConsultingAnalysis above (masking + retrieval + LLM failover). */
+const HEARING_BRIEF_GENERATE_TIMEOUT_MS = 180000;
+
+export function generateHearingBrief(matterId: string, hearingId: string): Promise<HearingBrief> {
+  return authedFetch(
+    `/api/matters/${matterId}/hearings/${hearingId}/briefs`,
+    { method: "POST" },
+    { retry: false, timeoutMs: HEARING_BRIEF_GENERATE_TIMEOUT_MS }
+  );
+}
+
+export function listHearingBriefs(matterId: string, hearingId: string): Promise<HearingBrief[]> {
+  return authedFetch(`/api/matters/${matterId}/hearings/${hearingId}/briefs`);
+}
+
+export function reviewHearingBrief(
+  matterId: string,
+  briefId: string,
+  input: { status: "reviewed" | "approved_for_hearing"; lawyer_edits?: Record<string, unknown> }
+): Promise<HearingBrief> {
+  return authedFetch(`/api/matters/${matterId}/briefs/${briefId}/review`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export type NotificationOut = {
+  id: string;
+  type: "hearing_listed" | "brief_ready";
+  title: string;
+  body: string;
+  matter_id: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
+export function listNotifications(): Promise<NotificationOut[]> {
+  return authedFetch("/api/notifications");
+}
+
+export function markNotificationRead(notificationId: string): Promise<NotificationOut> {
+  return authedFetch(`/api/notifications/${notificationId}/read`, { method: "PATCH" });
 }
