@@ -1,0 +1,54 @@
+name: eCourts Sync
+
+# DRAFT / UNVERIFIED (Litigation Intelligence + eCourts, 27 Aug 2026) --
+# same posture as oracle-deploy.yml, which this file directly mirrors: no
+# Oracle SSH access exists in the environment that authored this. Do not
+# rely on this actually running until someone with real Oracle access has:
+#   1. Confirmed the same ORACLE_SSH_HOST/ORACLE_SSH_USER/ORACLE_SSH_KEY/
+#      ORACLE_SSH_PORT secrets oracle-deploy.yml uses are valid.
+#   2. Confirmed ECOURTS_API_KEY is set in the box's repo-root .env
+#      (never committed -- see CLAUDE.md Hard Rule 6).
+#   3. Manually run `python api/scripts/court_sync_scheduler.py --now` on
+#      the box at least once and inspected the result before trusting the
+#      schedule below.
+#
+# Cron below fires hourly; the script itself (scripts/court_sync_scheduler.py)
+# is what actually enforces the configured ECOURTS_SYNC_START_HOUR/
+# ECOURTS_SYNC_END_HOUR window and skips outside it -- this workflow does
+# not try to encode that window in the cron expression itself, so changing
+# the window only ever requires an env var change, never a workflow edit.
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      now:
+        description: "Force a sync pass now, ignoring the configured hour window"
+        required: false
+        default: "false"
+
+concurrency:
+  group: ecourts-sync
+  cancel-in-progress: false  # a sync in flight should finish, not be killed mid-write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run court sync on Oracle over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_SSH_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_SSH_PORT }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/vidhidesk/api
+            FORCE_FLAG=""
+            if [ "${{ github.event.inputs.now }}" = "true" ]; then
+              FORCE_FLAG="--now"
+            fi
+            python scripts/court_sync_scheduler.py $FORCE_FLAG

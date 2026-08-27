@@ -17,9 +17,19 @@ class Settings(BaseSettings):
     # Indian Kanoon
     indian_kanoon_api_token: str = ""
 
-    # eCourtsIndia (reserved for the Court Data Gateway — see
-    # docs/00_Product/Enhancement_Roadmap.md §4; no service reads this yet)
+    # eCourtsIndia — read by app/services/court_data_gateway.py
+    # (docs/00_Product/Enhancement_Roadmap.md §4).
     ecourts_api_key: str = ""
+
+    # Sync window configuration (spec Section 8: "do not hardcode
+    # production timing unnecessarily") -- read by
+    # scripts/court_sync_scheduler.py. Defaults target the evening-before-
+    # hearing window the product spec anticipates; every value is
+    # overridable via env without a code change.
+    ecourts_sync_start_hour: int = 15  # 3pm IST
+    ecourts_sync_end_hour: int = 23  # 11pm IST
+    ecourts_sync_interval_minutes: int = 60
+    ecourts_sync_lookahead_days: int = 2  # sync matters whose next_hearing_date is within N days
 
     # Platform-owner allowlist (Enhancement_Roadmap.md §4/§17): comma-
     # separated emails, compared server-side against the already-verified
