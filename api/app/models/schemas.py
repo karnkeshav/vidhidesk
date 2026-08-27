@@ -34,6 +34,7 @@ class MatterOut(BaseModel):
     title: str
     client_name: str | None
     module: str
+    organization_id: str | None = None
     template_id: str | None = None
     court_category: str | None = None
     jurisdiction_state: str | None = None
@@ -60,6 +61,7 @@ class HearingCreate(BaseModel):
 class HearingOut(BaseModel):
     id: str
     matter_id: str | None = None
+    organization_id: str | None = None
     case_no: str | None = None
     title: str
     court: str | None = None
@@ -705,4 +707,80 @@ class ConsultingAnalysisOut(BaseModel):
     generation_warning: str | None = None
     created_at: datetime
     notice: str = "AI-generated legal research for advocate review. Not legal advice."
+
+
+# ---------------------------------------------------------------------------
+# Tenant Foundation / Platform Owner Dashboard (Enhancement_Roadmap.md §2/§4,
+# migration 0024_tenant_foundation.sql). All /api/platform/* routes require
+# app/auth.py::require_platform_owner.
+# ---------------------------------------------------------------------------
+
+
+class OrganizationOut(BaseModel):
+    id: str
+    name: str
+    organization_type: str
+    subscription_status: str
+    trial_started_at: datetime
+    trial_ends_at: datetime
+    access_enabled: bool
+    payment_marked_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MembershipOut(BaseModel):
+    id: str
+    organization_id: str
+    user_id: str
+    role: str
+    email: str | None = None
+    # Dashboard clarity (security review round 3, 27 Aug 2026): coarse
+    # category only ("trial_active" | "trial_expired" | "payment_received"
+    # | "not_started") -- deliberately never the raw account_security row
+    # (login_started_at, etc.). See app/routers/platform.py::_account_status.
+    account_status: str | None = None
+    created_at: datetime
+
+
+class OrganizationDetailOut(OrganizationOut):
+    members: list[MembershipOut]
+    matter_count: int
+    modules_used: list[str]
+    last_activity_at: datetime | None = None
+
+
+class OrganizationListItemOut(OrganizationOut):
+    member_count: int
+    matter_count: int
+
+
+class OrganizationAccessUpdate(BaseModel):
+    action: str = Field(pattern="^(mark_payment|enable|suspend|reactivate|extend_trial)$")
+    reason: str | None = None
+    extend_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class OrganizationAccessEventOut(BaseModel):
+    id: str
+    organization_id: str
+    previous_status: str | None = None
+    new_status: str | None = None
+    action: str
+    actor_user_id: str | None = None
+    reason: str | None = None
+    created_at: datetime
+
+
+class PlatformOverviewOut(BaseModel):
+    total_organizations: int
+    individual_organizations: int
+    firm_organizations: int
+    trial_organizations: int
+    active_organizations: int
+    expired_organizations: int
+    suspended_organizations: int
+    users_with_a_matter: int
+    users_with_a_draft: int
+    onboarding_funnel: dict[str, int]
 

@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     # docs/00_Product/Enhancement_Roadmap.md §4; no service reads this yet)
     ecourts_api_key: str = ""
 
+    # Platform-owner allowlist (Enhancement_Roadmap.md §4/§17): comma-
+    # separated emails, compared server-side against the already-verified
+    # JWT `email` claim in app/auth.py::require_platform_owner. Never
+    # trusted from a request header/body — the frontend may use the same
+    # address for a nav-visibility hint only, which is not security.
+    platform_owner_emails: str = "keshav.karn@gmail.com"
+
     # LLM providers — failover order per CLAUDE.md Decision 3
     gemini_api_key: str = ""
     groq_api_key: str = ""

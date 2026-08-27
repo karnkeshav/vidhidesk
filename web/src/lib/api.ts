@@ -42,6 +42,33 @@ function isTransientFailure(status: number, bodyText: string): boolean {
   return false;
 }
 
+// Free-trial paywall (app/auth.py::_check_account_not_locked): the backend
+// marks this specific 401 with the literal string "TRIAL_EXPIRED" in its
+// detail so the frontend can tell "5-day trial lapsed, payment not yet
+// received" apart from every other 401 cause (expired token, malformed
+// header, ...). This deliberately does NOT sign the user out -- their
+// Supabase session is still perfectly valid, and the whole point of the
+// payment_received toggle is that access resumes the moment Nitesh flips
+// it, with no re-login required. authed-shell.tsx's own onAuthStateChange /
+// getSession() still separately owns real session-death handling.
+function isTrialExpiredFailure(status: number, bodyText: string): boolean {
+  return status === 401 && bodyText.includes("TRIAL_EXPIRED");
+}
+
+// Organization-level access gate (app/auth.py::_check_organization_access,
+// added 27 Aug 2026 alongside — never replacing — the per-user trial check
+// above). Deliberately a DISTINCT status/marker (403, not 401) and a
+// separate destination page: TRIAL_EXPIRED means "your own account's free
+// trial lapsed"; ORG_ACCESS_DISABLED means "the platform owner disabled or
+// suspended your organization" — conflating the two into one redirect would
+// misattribute the cause to the wrong actor. Same no-sign-out reasoning as
+// isTrialExpiredFailure: the Supabase session stays valid, and access
+// resumes the moment the owner re-enables the organization, no re-login
+// required.
+function isOrgAccessDisabledFailure(status: number, bodyText: string): boolean {
+  return status === 403 && bodyText.includes("ORG_ACCESS_DISABLED");
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   let timedOut = false;
@@ -194,8 +221,30 @@ async function authedFetch(path: string, init?: RequestInit, options?: { retry?:
     // detection stays where it already correctly lives: authed-shell.tsx's
     // onAuthStateChange/getSession() checks, driven by the Supabase SDK's
     // own authoritative state, not by one failed backend call.
+    if (isTrialExpiredFailure(res.status, body)) {
+      // Deliberately no sign-out here -- the Supabase session stays valid,
+      // and payment_received flipping to true should resume access with no
+      // re-login required. Hard navigation (not router.push) since this
+      // file has no router instance and every caller is in a different
+      // component tree.
+      if (typeof window !== "undefined") window.location.href = "/trial-expired";
+    } else if (isOrgAccessDisabledFailure(res.status, body)) {
+      // Same no-sign-out, hard-navigation reasoning as TRIAL_EXPIRED above
+      // -- but a distinct destination, since the cause and the actor who
+      // can fix it are different (platform owner, not "arrange payment").
+      if (typeof window !== "undefined") window.location.href = "/org-access-disabled";
+    }
     throw new ApiError(res.status, `${res.status} ${res.statusText}: ${body}`);
   }
+}
+
+// Records this user's free-trial start (app/routers/auth.py) -- a no-op
+// after the first successful call ever, by design (insert-once on the
+// backend). Called by login/page.tsx right after a real sign-in completes
+// -- never on a page load/session restore, though it would be harmless
+// either way now.
+export function startSession(): Promise<{ status: string }> {
+  return authedFetch("/api/auth/session-start", { method: "POST" }, { retry: false });
 }
 
 export function listMatters(): Promise<Matter[]> {
@@ -958,4 +1007,100 @@ export function createConsultingAnalysis(payload: ConsultingAnalyzeRequest): Pro
 
 export function listConsultingAnalyses(matterId: string): Promise<ConsultingAnalysisOut[]> {
   return authedFetch(`/api/consulting/matters/${matterId}/analyses`);
+}
+
+// ==========================================
+// PLATFORM OWNER DASHBOARD (Enhancement_Roadmap.md §4)
+// Every call below hits a /api/platform/* route gated server-side by
+// app/auth.py::require_platform_owner -- a non-owner gets a 403 from
+// authedFetch itself (surfaces as ApiError, status 403), not a redirect.
+// ==========================================
+
+export type OrganizationOut = {
+  id: string;
+  name: string;
+  organization_type: "individual" | "firm";
+  subscription_status: "trial" | "active" | "suspended" | "expired";
+  trial_started_at: string;
+  trial_ends_at: string;
+  access_enabled: boolean;
+  payment_marked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrganizationListItem = OrganizationOut & {
+  member_count: number;
+  matter_count: number;
+};
+
+export type MembershipOut = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: "org_admin" | "member";
+  email: string | null;
+  // Dashboard clarity (27 Aug 2026): this member's own account_security
+  // state, entirely separate from organization-level access below —
+  // "trial_active" | "trial_expired" | "payment_received" | "not_started".
+  // Never the raw login_started_at timestamp.
+  account_status: "trial_active" | "trial_expired" | "payment_received" | "not_started" | null;
+  created_at: string;
+};
+
+export type OrganizationDetail = OrganizationOut & {
+  members: MembershipOut[];
+  matter_count: number;
+  modules_used: string[];
+  last_activity_at: string | null;
+};
+
+export type PlatformOverview = {
+  total_organizations: number;
+  individual_organizations: number;
+  firm_organizations: number;
+  trial_organizations: number;
+  active_organizations: number;
+  expired_organizations: number;
+  suspended_organizations: number;
+  users_with_a_matter: number;
+  users_with_a_draft: number;
+  onboarding_funnel: Record<string, number>;
+};
+
+export function getPlatformOverview(): Promise<PlatformOverview> {
+  return authedFetch("/api/platform/overview");
+}
+
+export function listOrganizations(filters?: {
+  status?: OrganizationOut["subscription_status"];
+  org_type?: OrganizationOut["organization_type"];
+}): Promise<OrganizationListItem[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.org_type) params.set("org_type", filters.org_type);
+  const query = params.toString();
+  return authedFetch(`/api/platform/organizations${query ? `?${query}` : ""}`);
+}
+
+export function getOrganization(orgId: string): Promise<OrganizationDetail> {
+  return authedFetch(`/api/platform/organizations/${orgId}`);
+}
+
+export function updateOrganizationAccess(
+  orgId: string,
+  input: {
+    action: "mark_payment" | "enable" | "suspend" | "reactivate" | "extend_trial";
+    reason?: string;
+    extend_days?: number;
+  }
+): Promise<OrganizationOut> {
+  return authedFetch(
+    `/api/platform/organizations/${orgId}/access`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
 }

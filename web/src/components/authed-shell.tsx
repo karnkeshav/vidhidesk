@@ -20,6 +20,7 @@ import {
   Bell,
   Settings,
   User,
+  Building2,
 } from "lucide-react";
 
 // AuthedShell already needs the full matters list for its "Recent
@@ -84,6 +85,15 @@ export function AuthedShell({
       .then(setHearings)
       .catch(() => {});
   };
+
+  // Nav-visibility hint only, NOT security -- the real check is server-side
+  // (api/app/auth.py::require_platform_owner). Showing/hiding this link
+  // just avoids dangling a 403-only link in front of every signed-in user.
+  const isPlatformOwner =
+    session !== "loading" &&
+    !!session?.user?.email &&
+    session.user.email.trim().toLowerCase() ===
+      (process.env.NEXT_PUBLIC_PLATFORM_OWNER_EMAIL || "").trim().toLowerCase();
 
   const loadAdvocateProfile = () => {
     supabase.auth.getUser().then(({ data }) => {
@@ -416,6 +426,15 @@ export function AuthedShell({
                 <Calendar className="h-4 w-4" strokeWidth={1.5} />
                 <span>Calendar</span>
               </a>
+              {isPlatformOwner && (
+                <a
+                  href="/platform"
+                  className="flex items-center gap-3 rounded-sm p-2.5 font-sans text-xs font-medium text-[#45464E] transition-colors hover:bg-[#E4E2DD] hover:text-[#081534]"
+                >
+                  <Building2 className="h-4 w-4" strokeWidth={1.5} />
+                  <span>Platform</span>
+                </a>
+              )}
             </nav>
           </div>
 

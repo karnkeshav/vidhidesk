@@ -87,7 +87,7 @@ class DummyDBClient:
 
 
 def get_mock_user():
-    return CurrentUser(id="user-123", email="advocate@vidhidesk.com", db=DummyDBClient())
+    return CurrentUser(id="user-123", email="advocate@vidhidesk.com", db=DummyDBClient(), organization_id="org-test-1")
 
 
 def _seed_matter(db: DummyDBClient, module: str = "litigation") -> str:

@@ -102,7 +102,7 @@ class FakeDB:
 
 def _make_client(fake_db):
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        id="user-1", email="nitesh@example.com", db=fake_db
+        id="user-1", email="nitesh@example.com", db=fake_db, organization_id="org-test-1"
     )
     return TestClient(app)
 

@@ -172,7 +172,7 @@ def golden_patterns():
 @pytest.fixture
 def api_client():
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        id="golden-test-user", email="golden@example.com", db=None
+        id="golden-test-user", email="golden@example.com", db=None, organization_id="org-test-1"
     )
     try:
         yield TestClient(app)

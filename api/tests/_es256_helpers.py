@@ -48,3 +48,47 @@ def make_token(private_key, kid: str = DEFAULT_KID, **claim_overrides) -> str:
     }
     payload.update(claim_overrides)
     return jwt.encode(payload, private_key, algorithm="ES256", headers={"kid": kid})
+
+
+class _PermissiveQuery:
+    """Ignores every filter/select arg and always returns the same canned
+    row(s) -- see AlwaysAllowServiceClient below."""
+
+    def __init__(self, data):
+        self._data = data
+
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, *_a, **_k):
+        return self
+
+    def limit(self, *_a, **_k):
+        return self
+
+    def execute(self):
+        return type("_Response", (), {"data": self._data})()
+
+
+class AlwaysAllowServiceClient:
+    """Permissive fake for app/auth.py::service_client(), for tests that
+    exercise get_current_user() to verify JWT handling specifically (see
+    test_auth.py / test_auth_jwt_verification.py) and have no reason to
+    care about organization/account_security data -- both of which
+    get_current_user() also checks as of the 27 Aug 2026 tenant-foundation
+    work (account_security trial gate, then the organization membership/
+    access gate). Every query returns exactly the row needed to pass both
+    checks regardless of which user_id/organization_id is actually
+    queried, so these tests keep testing only what they're named for.
+    Do NOT reuse this for a test that asserts anything about organization
+    or trial behavior -- use the real fakes in test_tenant_access_gate.py
+    for that."""
+
+    def table(self, name: str):
+        if name == "account_security":
+            return _PermissiveQuery([])  # no row -> "nothing to enforce yet"
+        if name == "memberships":
+            return _PermissiveQuery([{"organization_id": "always-allow-test-org"}])
+        if name == "organizations":
+            return _PermissiveQuery([{"access_enabled": True, "subscription_status": "active"}])
+        return _PermissiveQuery([])

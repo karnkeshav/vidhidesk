@@ -39,6 +39,19 @@ import uuid
 
 @router.post("", response_model=MatterOut, status_code=201)
 def create_matter(body: MatterCreate, user: CurrentUser = Depends(get_current_user)):
+    # Tenant Foundation (0024_tenant_foundation.sql): matters' RLS now
+    # requires organization_id IS NOT NULL + a matching membership row on
+    # every write. organization_id is normally set by session-start's
+    # _ensure_organization() right after sign-in -- this only trips for a
+    # session predating that provisioning (or its best-effort insert
+    # having failed), and a clear 400 here beats a raw RLS-violation
+    # exception surfacing as an opaque 500.
+    if not user.organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No organization found for this account. Please sign out and sign in again.",
+        )
+
     resolved_template_id = body.template_id
     if resolved_template_id:
         try:
@@ -57,6 +70,7 @@ def create_matter(body: MatterCreate, user: CurrentUser = Depends(get_current_us
 
     row = {
         "user_id": user.id,
+        "organization_id": user.organization_id,
         "title": body.title,
         "client_name": body.client_name,
         "module": body.module,

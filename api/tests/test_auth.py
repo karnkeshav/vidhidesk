@@ -36,6 +36,7 @@ from app.db import jwks_client
 from tests._es256_helpers import (
     DEFAULT_KID,
     TEST_SUPABASE_URL,
+    AlwaysAllowServiceClient,
     generate_keypair,
     jwks_body,
     make_token,
@@ -49,6 +50,17 @@ from app.auth import get_current_user
 def _mock_env(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", TEST_SUPABASE_URL)
     monkeypatch.setenv("SUPABASE_ANON_KEY", "fake-anon-key")
+    # get_current_user() also runs the account_security trial check and
+    # the organization membership/access gate (27 Aug 2026, fail-closed
+    # as of the security review's round 2) -- this file is about JWT
+    # verification specifically, so both are given a permissive fake
+    # rather than hitting a real (and here, unconfigured) Supabase
+    # project, which would now correctly 503 instead of the old
+    # silent-fail-open behavior these tests never accounted for.
+    monkeypatch.setattr(auth_module, "service_client", lambda: AlwaysAllowServiceClient())
+    auth_module._account_lock_cache.clear()
+    auth_module._org_id_cache.clear()
+    auth_module._org_access_cache.clear()
     get_settings.cache_clear()
     jwks_client.cache_clear()
     yield

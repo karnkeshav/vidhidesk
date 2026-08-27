@@ -24,7 +24,7 @@ from tests.test_case_analysis import DummyDBClient
 
 
 def get_mock_user(user_id: str = "user-123"):
-    return CurrentUser(id=user_id, email=f"{user_id}@vidhidesk.com", db=DummyDBClient())
+    return CurrentUser(id=user_id, email=f"{user_id}@vidhidesk.com", db=DummyDBClient(), organization_id="org-test-1")
 
 
 def _seed_matter(db: DummyDBClient, module: str = "consulting", user_id: str = "user-123") -> str:

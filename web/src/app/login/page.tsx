@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { startSession } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,12 @@ export default function LoginPage() {
         return;
       }
     }
+    // Records the free-trial start on this user's very first login ever;
+    // a no-op on every call after that (backend insert-once semantics, see
+    // app/routers/auth.py), so it's safe to call unconditionally here,
+    // including on a plain session-restore. Best-effort: a slow/failed
+    // call should never block sign-in itself.
+    startSession().catch(() => {});
     router.push("/dashboard");
   }
 
@@ -84,6 +91,9 @@ export default function LoginPage() {
         code: totpCode,
       });
       if (verifyError) throw verifyError;
+      // Same best-effort reset as the no-MFA path in afterSignIn() above --
+      // this is the fresh-login completion point when TOTP is enabled.
+      startSession().catch(() => {});
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -2125,7 +2125,7 @@ def test_matter_centric_loading_model_stores_and_returns_template_id(monkeypatch
     client = TestClient(app)
 
     def mock_user():
-        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=fake_db)
+        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=fake_db, organization_id="org-test-1")
 
     app.dependency_overrides[get_current_user] = mock_user
 
@@ -2195,7 +2195,7 @@ def test_template_lookup_supports_both_uuid_and_slug_keys(monkeypatch):
     client = TestClient(app)
 
     def mock_user():
-        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=fake_db)
+        return CurrentUser(id="21e63e8f-e00c-4ae6-afe4-17ba6b400be5", email="test@example.com", db=fake_db, organization_id="org-test-1")
 
     app.dependency_overrides[get_current_user] = mock_user
 

@@ -29,7 +29,7 @@ AUTH = {"Authorization": "Bearer test-token"}
 
 def _make_client(fake_db, user_id="user-1"):
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        id=user_id, email="nitesh@example.com", db=fake_db
+        id=user_id, email="nitesh@example.com", db=fake_db, organization_id="org-test-1"
     )
     return TestClient(app)
 

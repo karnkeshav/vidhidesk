@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.routers import citations, consulting, contracts, health, hearings, litigation, matters, profile, rera, retrieval, version
+from app.routers import auth, citations, consulting, contracts, health, hearings, litigation, matters, platform, profile, rera, retrieval, version
 from app.services import pii_mask as pii_mask_service
 from app.services import retrieval as retrieval_service
 
@@ -208,6 +208,8 @@ def root():
 
 
 app.include_router(health.router)
+app.include_router(auth.router)
+app.include_router(platform.router)
 app.include_router(matters.router)
 app.include_router(litigation.router)
 app.include_router(citations.router)

@@ -8,6 +8,16 @@ from app.models.schemas import HearingCreate, HearingOut, HearingUpdate
 router = APIRouter(prefix="/api/hearings", tags=["hearings"])
 
 
+def _require_organization(user: CurrentUser) -> str:
+    # Same rationale as matters.py::create_matter -- see that comment.
+    if not user.organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No organization found for this account. Please sign out and sign in again.",
+        )
+    return user.organization_id
+
+
 def _get_hearing_or_404(user: CurrentUser, hearing_id: str) -> dict:
     resp = user.db.table("hearings").select("*").eq("id", hearing_id).limit(1).execute()
     if not resp.data:
@@ -20,7 +30,8 @@ def _get_hearing_or_404(user: CurrentUser, hearing_id: str) -> dict:
 
 @router.post("", response_model=HearingOut, status_code=201)
 def create_hearing(body: HearingCreate, user: CurrentUser = Depends(get_current_user)):
-    row = {**body.model_dump(), "user_id": user.id}
+    organization_id = _require_organization(user)
+    row = {**body.model_dump(), "user_id": user.id, "organization_id": organization_id}
     resp = user.db.table("hearings").insert(row).execute()
     return resp.data[0]
 
