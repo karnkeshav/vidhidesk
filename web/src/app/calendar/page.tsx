@@ -105,7 +105,17 @@ function formFromHearing(h: CalendarHearing): FormState {
   };
 }
 
-export default function CalendarPage() {
+// Rendered strictly inside <AuthedShell> (see CalendarPage below) so that
+// useHearings()/useMatters() resolve against HearingsContext/MattersContext's
+// real Provider (mounted by AuthedShell around its own children) instead of
+// each context's default empty value. useContext() resolves against
+// ancestors of the calling component's own position in the tree -- a
+// component cannot consume a context that only becomes an ancestor because
+// of JSX it itself passes down as children (the bug this split fixes: this
+// logic used to live directly in CalendarPage, which called useHearings()
+// in its own render, one level *above* where AuthedShell -- and therefore
+// the Provider -- actually mounts).
+function CalendarContent() {
   const { hearings, refetchHearings } = useHearings();
   const { matters } = useMatters();
 
@@ -210,7 +220,7 @@ export default function CalendarPage() {
   const today = new Date();
 
   return (
-    <AuthedShell wide>
+    <>
       <div className="space-y-6">
         {/* Page Title Banner */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -569,6 +579,18 @@ export default function CalendarPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+// Thin wrapper: mounts AuthedShell (and, inside it, HearingsContext.Provider/
+// MattersContext.Provider) as a genuine ancestor of CalendarContent, so its
+// useHearings()/useMatters() calls resolve against the real, live-fetched
+// values rather than each context's default.
+export default function CalendarPage() {
+  return (
+    <AuthedShell wide>
+      <CalendarContent />
     </AuthedShell>
   );
 }
