@@ -1265,6 +1265,41 @@ export function reviewHearingBrief(
   return authedFetch(`/api/matters/${matterId}/briefs/${briefId}/review`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
+// Matter History (Hearing Intelligence, Iter 3B) -- read-only projection
+// from api/app/routers/matter_history.py, backed by the same
+// matter_bundle.py assembly hearing_brief.py already grounds its prompt
+// with. prior_hearings reuses CalendarHearing's own shape (same
+// public.hearings rows), not a separate type.
+export type MatterHistoryParty = {
+  id: string;
+  matter_id: string;
+  party_type: string;
+  party_name: string;
+  party_number: number;
+  address: string | null;
+  advocate_name: string | null;
+  created_at: string;
+};
+
+export type MatterHistoryChronologyEntry = {
+  event_date: string | null;
+  fact_summary: string;
+  exhibit_number: string | null;
+};
+
+export type MatterHistory = {
+  matter_id: string;
+  parties: MatterHistoryParty[];
+  chronology: MatterHistoryChronologyEntry[];
+  prior_hearings: CalendarHearing[];
+  lawyer_notes: string[];
+  missing: string[];
+};
+
+export function getMatterHistory(matterId: string, hearingId: string): Promise<MatterHistory> {
+  return authedFetch(`/api/matters/${matterId}/hearings/${hearingId}/history`);
+}
+
 export type NotificationOut = {
   id: string;
   type: "hearing_listed" | "brief_ready";

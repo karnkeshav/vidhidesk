@@ -927,6 +927,26 @@ class HearingBriefOut(BaseModel):
 
 class HearingBriefReviewRequest(BaseModel):
     status: str = Field(pattern="^(reviewed|approved_for_hearing)$")
+
+
+# Matter History (Hearing Intelligence, Iter 3B, 30 Aug 2026) -- a
+# read-only projection of app/services/matter_bundle.py's existing
+# assembly. No new table: LitigationPartyOut and HearingOut are the same
+# response models already used by litigation.py/hearings.py for these
+# rows, reused here rather than re-declared.
+class MatterHistoryChronologyEntry(BaseModel):
+    event_date: str | None = None
+    fact_summary: str
+    exhibit_number: str | None = None
+
+
+class MatterHistoryOut(BaseModel):
+    matter_id: str
+    parties: list[LitigationPartyOut]
+    chronology: list[MatterHistoryChronologyEntry]
+    prior_hearings: list[HearingOut]
+    lawyer_notes: list[str]
+    missing: list[str]
     lawyer_edits: dict | None = None
 
 

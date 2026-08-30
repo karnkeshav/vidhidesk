@@ -19,18 +19,26 @@ import {
   RefreshCw,
   CheckCircle2,
   ListChecks,
+  Users,
+  Clock,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import {
   Matter,
   CalendarHearing,
   CalendarHearingCaptureInput,
   HearingBrief,
+  MatterHistory,
+  OrderOut,
   getMatter,
   listCalendarHearings,
   updateCalendarHearing,
   generateHearingBrief,
   listHearingBriefs,
   reviewHearingBrief,
+  getMatterHistory,
+  listOrders,
 } from "@/lib/api";
 
 const SOURCE_LABEL: Record<CalendarHearing["source"], string> = {
@@ -83,6 +91,10 @@ export default function HearingIntelligencePage() {
   const [captureForm, setCaptureForm] = useState<CalendarHearingCaptureInput | null>(null);
   const [captureSaving, setCaptureSaving] = useState(false);
   const [captureSavedAt, setCaptureSavedAt] = useState<number | null>(null);
+  const [history, setHistory] = useState<MatterHistory | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [orders, setOrders] = useState<OrderOut[] | null>(null);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   async function loadAll() {
     setLoading(true);
@@ -107,12 +119,23 @@ export default function HearingIntelligencePage() {
 
       const matterId = matterIdFromUrl ?? found.matter_id;
       if (matterId) {
+        // Matter History and Legal Record are independent, non-blocking
+        // reads (each tab reports its own error) -- neither should stop
+        // the matter header or the AI Intelligence tab (briefList) from
+        // rendering if the other fails.
         const [m, briefList] = await Promise.all([
           getMatter(matterId).catch(() => null),
           listHearingBriefs(matterId, hearingId).catch(() => []),
         ]);
         setMatter(m);
         setBriefs(briefList.slice().sort((a, b) => b.version - a.version));
+
+        getMatterHistory(matterId, hearingId)
+          .then(setHistory)
+          .catch((err) => setHistoryError(err instanceof Error ? err.message : String(err)));
+        listOrders(matterId)
+          .then(setOrders)
+          .catch((err) => setOrdersError(err instanceof Error ? err.message : String(err)));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -257,8 +280,182 @@ export default function HearingIntelligencePage() {
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               {/* Main: Argument Brief */}
-              {activeTab === "history" && (<div className="space-y-4 lg:col-span-8"><Card className="rounded-sm border border-[#E4E2DD] bg-white p-6"><p className="font-serif text-sm text-[#76777F]">No prior matter history populated yet.</p></Card></div>)}
-              {activeTab === "record" && (<div className="space-y-4 lg:col-span-8"><Card className="rounded-sm border border-[#E4E2DD] bg-white p-6"><p className="font-serif text-sm text-[#76777F]">Legal record empty.</p></Card></div>)}
+              {activeTab === "history" && (
+                <div className="space-y-4 lg:col-span-8">
+                  {historyError && (
+                    <Card className="rounded-sm border border-[#7A2A2A] bg-[#FBEAEA] p-4">
+                      <p className="font-serif text-xs text-[#7A2A2A]">
+                        Could not load Matter History: {historyError}
+                      </p>
+                    </Card>
+                  )}
+                  {!historyError && !history && (
+                    <Card className="rounded-sm border border-[#E4E2DD] bg-white p-6">
+                      <p className="font-serif text-xs text-[#76777F]">Loading matter history…</p>
+                    </Card>
+                  )}
+                  {history && (
+                    <>
+                      <Card className="rounded-sm border border-[#E4E2DD] bg-white shadow-none">
+                        <CardHeader className="flex flex-row items-center gap-2 border-b border-[#E4E2DD] p-4">
+                          <Users className="h-4 w-4 text-[#081534]" strokeWidth={1.5} />
+                          <CardTitle className="font-sans text-xs font-semibold uppercase tracking-wider text-[#081534]">
+                            Parties
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-1.5 p-4">
+                          {history.parties.length === 0 && (
+                            <p className="font-serif text-xs text-[#76777F]">No parties recorded for this matter.</p>
+                          )}
+                          {history.parties.map((p) => (
+                            <div key={p.id} className="flex items-center justify-between font-sans text-xs text-[#1A1A1A]">
+                              <span>{p.party_type} #{p.party_number} — {p.party_name}</span>
+                              {p.advocate_name && <span className="text-[#76777F]">Adv. {p.advocate_name}</span>}
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+
+                      <Card className="rounded-sm border border-[#E4E2DD] bg-white shadow-none">
+                        <CardHeader className="flex flex-row items-center gap-2 border-b border-[#E4E2DD] p-4">
+                          <Gavel className="h-4 w-4 text-[#081534]" strokeWidth={1.5} />
+                          <CardTitle className="font-sans text-xs font-semibold uppercase tracking-wider text-[#081534]">
+                            Prior Hearings
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 p-4">
+                          {history.prior_hearings.length === 0 && (
+                            <p className="font-serif text-xs text-[#76777F]">
+                              No prior hearing history recorded for this matter.
+                            </p>
+                          )}
+                          {history.prior_hearings.map((h) => (
+                            <div key={h.id} className="rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-1 font-sans text-xs font-semibold text-[#081534]">
+                                <span>{new Date(h.hearing_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}</span>
+                                {h.stage && <span className="text-[#76777F]">{h.stage}</span>}
+                              </div>
+                              {h.outcome && <p className="mt-1 font-serif text-xs text-[#45464E]">Outcome: {h.outcome}</p>}
+                              {h.next_steps && <p className="mt-1 font-serif text-xs text-[#45464E]">Next steps: {h.next_steps}</p>}
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+
+                      <Card className="rounded-sm border border-[#E4E2DD] bg-white shadow-none">
+                        <CardHeader className="flex flex-row items-center gap-2 border-b border-[#E4E2DD] p-4">
+                          <Clock className="h-4 w-4 text-[#081534]" strokeWidth={1.5} />
+                          <CardTitle className="font-sans text-xs font-semibold uppercase tracking-wider text-[#081534]">
+                            Chronology
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 p-4">
+                          {history.chronology.length === 0 && (
+                            <p className="font-serif text-xs text-[#76777F]">
+                              No facts/chronology recorded for this matter.
+                            </p>
+                          )}
+                          {history.chronology.map((c, i) => (
+                            <div key={i} className="flex gap-3 font-serif text-xs text-[#1A1A1A]">
+                              <span className="w-24 shrink-0 text-[#76777F]">{c.event_date ?? "Undated"}</span>
+                              <span>
+                                {c.fact_summary}
+                                {c.exhibit_number && (
+                                  <span className="ml-1.5 text-[10px] text-[#76777F]">[{c.exhibit_number}]</span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+
+                      {history.lawyer_notes.length > 0 && (
+                        <Card className="rounded-sm border border-[#E4E2DD] bg-white shadow-none">
+                          <CardHeader className="border-b border-[#E4E2DD] p-4">
+                            <CardTitle className="font-sans text-xs font-semibold uppercase tracking-wider text-[#081534]">
+                              Lawyer Notes from Prior Hearings
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-1.5 p-4">
+                            {history.lawyer_notes.map((n, i) => (
+                              <p key={i} className="font-serif text-xs text-[#45464E]">— {n}</p>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+              {activeTab === "record" && (
+                <div className="space-y-4 lg:col-span-8">
+                  {ordersError && (
+                    <Card className="rounded-sm border border-[#7A2A2A] bg-[#FBEAEA] p-4">
+                      <p className="font-serif text-xs text-[#7A2A2A]">
+                        Could not load Legal Record: {ordersError}
+                      </p>
+                    </Card>
+                  )}
+                  {!ordersError && !orders && (
+                    <Card className="rounded-sm border border-[#E4E2DD] bg-white p-6">
+                      <p className="font-serif text-xs text-[#76777F]">Loading legal record…</p>
+                    </Card>
+                  )}
+                  {orders && orders.length === 0 && (
+                    <Card className="rounded-sm border border-[#E4E2DD] bg-white p-6">
+                      <p className="font-serif text-xs text-[#76777F]">No orders recorded for this matter.</p>
+                    </Card>
+                  )}
+                  {orders && orders.length > 0 && (
+                    <Card className="rounded-sm border border-[#E4E2DD] bg-white shadow-none">
+                      <CardHeader className="flex flex-row items-center justify-between border-b border-[#E4E2DD] p-4">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-[#081534]" strokeWidth={1.5} />
+                          <CardTitle className="font-sans text-xs font-semibold uppercase tracking-wider text-[#081534]">
+                            Orders — Established Record
+                          </CardTitle>
+                        </div>
+                        {matter && (
+                          <Link
+                            href={`/litigation/${matter.id}`}
+                            className="flex items-center gap-1 font-sans text-[11px] font-semibold text-[#081534] hover:underline"
+                          >
+                            Edit in Matter <ExternalLink className="h-3 w-3" strokeWidth={1.5} />
+                          </Link>
+                        )}
+                      </CardHeader>
+                      <CardContent className="space-y-3 p-4">
+                        {orders.map((o) => (
+                          <div key={o.id} className="rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-3 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-1 font-sans text-xs font-semibold text-[#081534]">
+                              <span>{o.order_date ?? "Undated order"}{o.court ? ` — ${o.court}` : ""}</span>
+                              <span className="rounded-sm border border-[#E4E2DD] bg-white px-1.5 py-0.5 text-[10px] uppercase text-[#45464E]">
+                                {o.status} · {o.source === "ecourts" ? "Synced from eCourts" : "Manually Entered"}
+                              </span>
+                            </div>
+                            {o.raw_text && (
+                              <p className="font-serif text-xs text-[#1A1A1A]">{o.raw_text}</p>
+                            )}
+                            {o.ai_extracted_directions.length > 0 && (
+                              <div className="space-y-1 border-t border-dashed border-[#D9C088] pt-2">
+                                <p className="font-sans text-[10px] font-bold uppercase tracking-wider text-[#7A5A1A]">
+                                  AI-Extracted Directions — Verify Against Order Text
+                                </p>
+                                {o.ai_extracted_directions.map((d, i) => (
+                                  <p key={i} className="font-serif text-[11px] text-[#5A431A]">
+                                    {d.direction}
+                                    {d.deadline ? ` (by ${d.deadline})` : ""} — {d.complied ? "Complied" : "Pending"}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
               {activeTab === "intelligence" && (<div className="space-y-4 lg:col-span-8">
                 <Card className="rounded-sm border border-[#E4E2DD] bg-white shadow-none">
                   <CardHeader className="flex flex-row items-center justify-between border-b border-[#E4E2DD] p-4">
