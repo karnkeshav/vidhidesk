@@ -109,6 +109,7 @@ def _fake_generate_factory(text: str):
 VALID_JSON = """{
   "case_record": [{"heading": "Posture", "content": "Matter is at arguments stage.", "source_refs": ["Order dated 2026-08-01"]}],
   "supported_arguments": [{"argument": "Limitation has not expired.", "source_refs": ["Pleading: Facts"]}],
+  "risk_highlights": [{"text": "Last order's direction to file additional documents has not been complied with.", "source_refs": ["Order dated 2026-08-01"]}],
   "ai_suggested_points": ["Consider requesting an adjournment if evidence is not ready."],
   "checklist": ["Carry certified copy of last order"],
   "information_gaps": ["No argument notes from the previous hearing"]
@@ -117,6 +118,19 @@ VALID_JSON = """{
 UNGROUNDED_JSON = """{
   "case_record": [{"heading": "Fabricated", "content": "An order that does not exist", "source_refs": []}],
   "supported_arguments": [{"argument": "An argument with no source", "source_refs": []}],
+  "risk_highlights": [{"text": "A risk with no source", "source_refs": []}],
+  "ai_suggested_points": [],
+  "checklist": [],
+  "information_gaps": []
+}"""
+
+MIXED_RISK_JSON = """{
+  "case_record": [],
+  "supported_arguments": [],
+  "risk_highlights": [
+    {"text": "Grounded risk", "source_refs": ["Order dated 2026-08-01"]},
+    {"text": "Ungrounded risk", "source_refs": []}
+  ],
   "ai_suggested_points": [],
   "checklist": [],
   "information_gaps": []
@@ -160,6 +174,8 @@ def test_happy_path_creates_draft_brief_and_notification(monkeypatch):
     assert result["version"] == 1
     assert len(result["brief_content"]["case_record"]) == 1
     assert result["brief_content"]["case_record"][0]["source_refs"] == ["Order dated 2026-08-01"]
+    assert len(result["brief_content"]["risk_highlights"]) == 1
+    assert result["brief_content"]["risk_highlights"][0]["source_refs"] == ["Order dated 2026-08-01"]
     assert len(result["brief_content"]["ai_suggested_points"]) == 1
 
     notifications = db.store.get("notifications", [])
@@ -180,6 +196,25 @@ def test_ungrounded_entries_are_dropped(monkeypatch):
 
     assert result["brief_content"]["case_record"] == []
     assert result["brief_content"]["supported_arguments"] == []
+    assert result["brief_content"]["risk_highlights"] == []
+
+
+def test_risk_highlights_drops_only_ungrounded_entries(monkeypatch):
+    """Requirement: an individual risk item without source_refs is
+    rejected, not the whole section -- a grounded risk alongside an
+    ungrounded one in the same response must still survive."""
+    db = DummyDBClient()
+    _seed_matter(db)
+    _seed_hearing(db)
+    monkeypatch.setattr(hearing_brief, "service_client", lambda: db)
+    monkeypatch.setattr(hearing_brief, "generate", _fake_generate_factory(MIXED_RISK_JSON))
+
+    result = hearing_brief.generate_hearing_brief("m1", "h1", db)
+
+    risks = result["brief_content"]["risk_highlights"]
+    assert len(risks) == 1
+    assert risks[0]["text"] == "Grounded risk"
+    assert risks[0]["source_refs"] == ["Order dated 2026-08-01"]
 
 
 def test_malformed_json_degrades_with_warning(monkeypatch):

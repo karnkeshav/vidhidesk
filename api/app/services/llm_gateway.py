@@ -126,15 +126,16 @@ SYSTEM_PROMPTS: dict[str, str] = {
         f"{_GROUNDING_INSTRUCTION} {_DELIMITER_INSTRUCTION} "
         "You are given a Matter Intelligence Bundle: this matter's own pleadings, prior "
         "hearing notes, orders, facts, evidence, and verified research. Every item in "
-        "case_record and supported_arguments MUST be traceable to something literally "
-        "present in that bundle text — cite which bundle section it came from in "
-        "source_refs (e.g. \"Order dated 2026-08-01\", \"Hearing note, 2026-07-15\", "
-        "\"Pleading: Facts\"). Never invent a prior order, argument, hearing event, or "
-        "fact that is not in the bundle. "
+        "case_record, supported_arguments, and risk_highlights MUST be traceable to "
+        "something literally present in that bundle text — cite which bundle section it "
+        "came from in source_refs (e.g. \"Order dated 2026-08-01\", \"Hearing note, "
+        "2026-07-15\", \"Pleading: Facts\"). Never invent a prior order, argument, "
+        "hearing event, fact, or risk that is not in the bundle. "
         "Respond with ONLY a single JSON object — no markdown code fences, no prose "
         "outside the JSON — matching exactly this shape: "
         '{"case_record": [{"heading": string, "content": string, "source_refs": [string]}], '
         '"supported_arguments": [{"argument": string, "source_refs": [string]}], '
+        '"risk_highlights": [{"text": string, "source_refs": [string]}], '
         '"ai_suggested_points": [string], '
         '"checklist": [string], '
         '"information_gaps": [string]}. '
@@ -143,6 +144,12 @@ SYSTEM_PROMPTS: dict[str, str] = {
         "positions — grounded only, each entry naming its bundle source. "
         "supported_arguments lists arguments already supported by the record, each "
         "naming the specific pleading/order/hearing-note/evidence it draws from. "
+        "risk_highlights identifies concrete risks actually evidenced in the bundle — a "
+        "limitation deadline close to expiry, a non-complied order direction, an "
+        "admission recorded in a prior hearing note, a fact undermined by the opposing "
+        "party's recorded position — each entry naming the specific bundle source it is "
+        "drawn from. This is not a general risk-assessment exercise: omit this section "
+        "(empty list) rather than speculate about a risk the bundle does not evidence. "
         "ai_suggested_points are your own additional talking points the advocate might "
         "consider — these are explicitly your suggestions, not established facts or "
         "record entries, and must never be phrased as if they already appear in the "

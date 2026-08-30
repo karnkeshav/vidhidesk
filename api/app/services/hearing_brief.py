@@ -8,11 +8,12 @@ case_analysis.py does -- no new AI infrastructure introduced:
 
 Structure enforced in code (CLAUDE.md Hard Rule 2 applied to briefs, not
 just contracts: the LLM fills content, it never invents the document's
-shape): every persisted brief has exactly five sections --
-case_record, supported_arguments, ai_suggested_points, checklist,
-information_gaps -- and the first two are checked for a source_refs
-citation on every entry (a missing one is dropped, not silently kept, so
-a brief can never present an unsourced claim as record fact).
+shape): every persisted brief has exactly six sections --
+case_record, supported_arguments, risk_highlights, ai_suggested_points,
+checklist, information_gaps -- and the first three are checked for a
+source_refs citation on every entry (a missing one is dropped, not
+silently kept, so a brief can never present an unsourced claim as record
+fact).
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from app.services.pii_mask import SupabaseMaskStore
 
 logger = logging.getLogger("vidhidesk.hearing_brief")
 
-REQUIRED_SECTIONS = ("case_record", "supported_arguments", "ai_suggested_points", "checklist", "information_gaps")
+REQUIRED_SECTIONS = ("case_record", "supported_arguments", "risk_highlights", "ai_suggested_points", "checklist", "information_gaps")
 
 
 class HearingBriefError(ValueError):
@@ -65,11 +66,12 @@ def _extract_json(raw_text: str) -> dict[str, Any] | None:
 
 
 def _validate_brief_sections(parsed: dict[str, Any]) -> dict[str, Any]:
-    """Enforces the five-section structure and drops any case_record/
-    supported_arguments entry missing a source_refs citation -- an
-    unsourced entry in those two sections would be indistinguishable from
-    a grounded one to a reader, which is exactly the failure mode Hard
-    Rule 1/3 exist to prevent elsewhere in this codebase."""
+    """Enforces the six-section structure and drops any case_record/
+    supported_arguments/risk_highlights entry missing a source_refs
+    citation -- an unsourced entry in those three sections would be
+    indistinguishable from a grounded one to a reader, which is exactly
+    the failure mode Hard Rule 1/3 exist to prevent elsewhere in this
+    codebase."""
     out: dict[str, Any] = {s: [] for s in REQUIRED_SECTIONS}
 
     for entry in parsed.get("case_record", []) or []:
@@ -85,6 +87,16 @@ def _validate_brief_sections(parsed: dict[str, Any]) -> dict[str, Any]:
         if not refs:
             continue
         out["supported_arguments"].append({"argument": str(entry.get("argument", "")), "source_refs": refs})
+
+    # Same provenance gate as case_record/supported_arguments above -- a
+    # risk claim with no source_refs is dropped, never persisted as if it
+    # were grounded (this is the Iter 5 fix for the Iter 4 finding that
+    # "Risk Highlights" had no backing field at all).
+    for entry in parsed.get("risk_highlights", []) or []:
+        refs = [str(r) for r in (entry.get("source_refs") or []) if str(r).strip()]
+        if not refs:
+            continue
+        out["risk_highlights"].append({"text": str(entry.get("text", "")), "source_refs": refs})
 
     out["ai_suggested_points"] = [str(x) for x in (parsed.get("ai_suggested_points") or [])]
     out["checklist"] = [str(x) for x in (parsed.get("checklist") or [])]

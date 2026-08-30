@@ -558,7 +558,10 @@ export default function HearingIntelligencePage() {
                         </section>
 
 
-                        {/* Risk Highlights */}
+                        {/* Risk Highlights -- grounded like Grounded Facts/Supported
+                            Arguments above (every entry carries source_refs, enforced
+                            server-side), styled the same solid-border way to visually
+                            distinguish it from the unsourced AI-Suggested Points below. */}
                         <section className="space-y-2">
                           <div className="flex items-center gap-1.5">
                             <AlertTriangle className="h-3.5 w-3.5 text-[#081534]" strokeWidth={1.5} />
@@ -566,7 +569,21 @@ export default function HearingIntelligencePage() {
                               Risk Highlights
                             </h3>
                           </div>
-                          <p className="font-serif text-[11px] text-[#76777F]">No significant risks detected in the current record.</p>
+                          {latestBrief.brief_content.risk_highlights.length === 0 && (
+                            <p className="font-serif text-[11px] text-[#76777F]">
+                              No risks identified in the current record.
+                            </p>
+                          )}
+                          {latestBrief.brief_content.risk_highlights.map((entry, i) => (
+                            <div key={i} className="rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-3">
+                              <p className="font-serif text-xs text-[#1A1A1A]">{entry.text}</p>
+                              {entry.source_refs.length > 0 && (
+                                <p className="mt-1.5 font-sans text-[10px] text-[#76777F]">
+                                  Sources: {entry.source_refs.join(", ")}
+                                </p>
+                              )}
+                            </div>
+                          ))}
                         </section>
 
                         {/* Supported Arguments */}

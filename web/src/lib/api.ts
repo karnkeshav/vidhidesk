@@ -1217,6 +1217,10 @@ export function triggerCourtSync(matterId: string): Promise<CourtCaseTracking> {
 export type HearingBriefContent = {
   case_record: Array<{ heading: string; content: string; source_refs: string[] }>;
   supported_arguments: Array<{ argument: string; source_refs: string[] }>;
+  // Risk Highlights (Iter 5) -- same source_refs provenance requirement as
+  // case_record/supported_arguments; entries without it are dropped
+  // server-side before persistence, never sent to this client at all.
+  risk_highlights: Array<{ text: string; source_refs: string[] }>;
   ai_suggested_points: string[];
   checklist: string[];
   information_gaps: string[];

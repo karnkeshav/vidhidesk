@@ -894,9 +894,20 @@ class HearingBriefArgumentEntry(BaseModel):
     source_refs: list[str]
 
 
+# Risk Highlights (Iter 5, 30 Aug 2026) -- same provenance shape as
+# HearingBriefCaseRecordEntry/HearingBriefArgumentEntry: every entry must
+# carry source_refs, enforced in app/services/hearing_brief.py's
+# _validate_brief_sections() before persistence. Fixes the Iter 4 finding
+# that the UI's "Risk Highlights" section had no backing schema field.
+class HearingBriefRiskEntry(BaseModel):
+    text: str
+    source_refs: list[str]
+
+
 class HearingBriefContentOut(BaseModel):
     case_record: list[HearingBriefCaseRecordEntry] = Field(default_factory=list)
     supported_arguments: list[HearingBriefArgumentEntry] = Field(default_factory=list)
+    risk_highlights: list[HearingBriefRiskEntry] = Field(default_factory=list)
     ai_suggested_points: list[str] = Field(default_factory=list)
     checklist: list[str] = Field(default_factory=list)
     information_gaps: list[str] = Field(default_factory=list)
@@ -927,6 +938,15 @@ class HearingBriefOut(BaseModel):
 
 class HearingBriefReviewRequest(BaseModel):
     status: str = Field(pattern="^(reviewed|approved_for_hearing)$")
+    # Pre-existing bug fixed incidentally while writing Iter 5 Gap 2's
+    # router tests: hearing_briefs.py's review_hearing_brief_endpoint has
+    # always read payload.lawyer_edits, and web/src/lib/api.ts's
+    # reviewHearingBrief() has always sent it -- but this field never
+    # existed on this schema, so every real PATCH .../review call crashed
+    # with a 500 AttributeError regardless of status. Not part of any of
+    # the three approved Iter 5 gaps; flagged prominently in the Iter 5
+    # report rather than silently folded in.
+    lawyer_edits: dict | None = None
 
 
 # Matter History (Hearing Intelligence, Iter 3B, 30 Aug 2026) -- a

@@ -34,7 +34,6 @@ class MatterBundle:
     hearings: list[dict[str, Any]]
     orders: list[dict[str, Any]]
     evidence: list[dict[str, Any]]
-    documents: list[dict[str, Any]]
     research: list[dict[str, Any]]
     verified_citations: list[dict[str, Any]]
     lawyer_notes: list[str]
@@ -178,7 +177,20 @@ def assemble_matter_bundle(matter_id: str, db, *, exclude_hearing_id: str | None
     if not orders:
         missing.append("No orders on record for this matter.")
 
-    documents = db.table("draft_versions").select("*").eq("matter_id", matter_id).execute().data or []
+    # Iter 4/5 decision: draft_versions is deliberately NOT part of this
+    # bundle. Two independent sources confirm this: (1) the original
+    # design (docs/00_Product/Enhancement_Roadmap.md §4.3's Matter Bundle
+    # definition) lists Pleadings/Orders/Evidence/Research/Timeline/
+    # Argument Notes -- "Pleadings" there is litigation_pleading_drafts
+    # (already read above as `pleadings`), not draft_versions; (2)
+    # app/services/document_composer.py explicitly documents that a
+    # composed pleading's export "has nothing to do with the Contracts
+    # template/draft_versions pipeline... do not make Litigation use the
+    # Contracts draft export pipeline." draft_versions is a Contracts-
+    # module artifact (docx_path/template_id, per
+    # docs/20_Engineering/Database_Architecture.md) that litigation
+    # matters never populate -- fetching it here was dead weight (loaded,
+    # never rendered by as_prompt_text()), not a real grounding source.
 
     research = (
         db.table("litigation_case_analyses")
@@ -215,7 +227,6 @@ def assemble_matter_bundle(matter_id: str, db, *, exclude_hearing_id: str | None
         hearings=prior_hearings,
         orders=orders,
         evidence=facts,
-        documents=documents,
         research=research,
         verified_citations=verified_citations,
         lawyer_notes=lawyer_notes,
