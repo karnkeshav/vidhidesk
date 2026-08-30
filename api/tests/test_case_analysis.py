@@ -77,7 +77,7 @@ class DummyDBClient:
             "matters": [],
             "litigation_parties": [],
             "litigation_facts_evidence": [],
-            "litigation_hearings": [],
+            "hearings": [],  # canonical hearing source case_analysis.py now reads (0021/0025)
             "litigation_case_analyses": [],
             "pii_masks": [],
         }

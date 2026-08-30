@@ -113,11 +113,13 @@ export type Matter = {
   created_at: string;
 };
 
-// Cross-module practice calendar entry (Calendar page). Distinct from the
-// per-litigation-matter docket log below (listHearings(matterId) /
-// addHearing / LitigationHearingOut) -- that tracks outcomes/next-dates
-// for one case's hearing history; CalendarHearing is a lighter, optional
-// matter-linked reminder spanning every module, scheduled from /calendar.
+// Canonical hearing entity (public.hearings) -- the single hearing concept
+// shared by the Calendar page, a litigation Matter's own Hearing Docket
+// tab, Court Tracking/eCourts sync, and the Hearing Intelligence workspace
+// (/hearings/[hearingId]). listHearings(matterId)/addHearing/
+// LitigationHearingOut below are a separate, legacy, matter-only docket
+// log (public.litigation_hearings) kept for backward compatibility only --
+// new hearing creation from the UI always goes through this type instead.
 export type CalendarHearing = {
   id: string;
   matter_id: string | null;

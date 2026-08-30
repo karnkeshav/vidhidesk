@@ -9,6 +9,7 @@ test_matters_update.py's pattern.
 
 from __future__ import annotations
 
+import json
 import uuid
 
 from fastapi.testclient import TestClient
@@ -49,6 +50,12 @@ class _FakeQuery:
         if self.op == "select":
             return _FakeResponse(matches)
         if self.op == "update":
+            # Mirrors the real supabase-py/httpx client's own JSON encoding
+            # of the outgoing PATCH body -- a non-JSON-serializable value
+            # (e.g. a bare datetime instead of an ISO string) must fail
+            # here exactly as it would against real PostgREST, not
+            # silently succeed the way a plain dict.update() would.
+            json.dumps(self.payload)
             for r in matches:
                 r.update(self.payload)
             return _FakeResponse(matches)
@@ -74,6 +81,11 @@ class _FakeTable:
         return _FakeQuery(self, "delete")
 
     def insert(self, record):
+        # Mirrors the real supabase-py/httpx client's own JSON encoding of
+        # the outgoing INSERT body -- see _FakeQuery.execute()'s "update"
+        # branch for why this must raise the same TypeError a real,
+        # non-JSON-serializable payload would against real PostgREST.
+        json.dumps(record)
         row = dict(record)
         row.setdefault("id", str(uuid.uuid4()))
         row.setdefault("created_at", "2026-08-20T00:00:00Z")
@@ -140,6 +152,34 @@ def test_create_hearing_rejects_empty_title():
     assert resp.status_code == 422
 
 
+def test_create_hearing_serializes_datetime_hearing_at_for_the_db_client():
+    """Regression test for a real bug found via live browser testing:
+    HearingCreate.hearing_at is a datetime; create_hearing's row dict must
+    use model_dump(mode="json") so hearing_at becomes a JSON-serializable
+    ISO string before reaching the DB client -- a bare model_dump() leaves
+    it as a native datetime object, which the real supabase-py/httpx
+    client cannot JSON-encode (TypeError: Object of type datetime is not
+    JSON serializable) when it actually sends the INSERT over HTTP to
+    PostgREST. FakeTable.insert() above now runs the payload through
+    json.dumps() itself, so this test fails the same way production did
+    if create_hearing ever regresses back to a bare model_dump()."""
+    fake_db = FakeDB()
+    client = _make_client(fake_db)
+    try:
+        resp = client.post(
+            "/api/hearings",
+            json={"title": "Datetime Serialization Regression", "hearing_at": "2026-08-26T10:30:00+05:30"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 201
+    stored_hearing_at = fake_db.table("hearings").rows[0]["hearing_at"]
+    assert isinstance(stored_hearing_at, str)
+    assert stored_hearing_at.startswith("2026-08-26T")
+
+
 def test_list_hearings_orders_by_hearing_at():
     fake_db = FakeDB()
     fake_db.table("hearings").insert(
@@ -179,6 +219,32 @@ def test_update_hearing_partial_fields():
     assert resp.status_code == 200
     assert resp.json()["stage"] == "Final Arguments"
     assert resp.json()["title"] == "Draft Hearing"
+
+
+def test_update_hearing_serializes_datetime_hearing_at_for_the_db_client():
+    """Same regression as test_create_hearing_serializes_datetime_hearing_at_
+    for_the_db_client, for the PATCH path: HearingUpdate.hearing_at is also a
+    datetime, and the Calendar page's "Edit Hearing" dialog always resends
+    hearing_at, so update_hearing must use model_dump(mode="json") too."""
+    fake_db = FakeDB()
+    hearing = fake_db.table("hearings").insert(
+        {"id": str(uuid.uuid4()), "user_id": "user-1", "title": "Draft Hearing", "hearing_at": "2026-08-26T10:00:00Z"}
+    ).execute().data[0]
+
+    client = _make_client(fake_db)
+    try:
+        resp = client.patch(
+            f"/api/hearings/{hearing['id']}",
+            json={"hearing_at": "2026-09-01T11:00:00Z"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    stored_hearing_at = fake_db.table("hearings").rows[0]["hearing_at"]
+    assert isinstance(stored_hearing_at, str)
+    assert stored_hearing_at.startswith("2026-09-01T")
 
 
 def test_update_hearing_404_for_unknown_hearing():

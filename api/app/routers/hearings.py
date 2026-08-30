@@ -31,7 +31,13 @@ def _get_hearing_or_404(user: CurrentUser, hearing_id: str) -> dict:
 @router.post("", response_model=HearingOut, status_code=201)
 def create_hearing(body: HearingCreate, user: CurrentUser = Depends(get_current_user)):
     organization_id = _require_organization(user)
-    row = {**body.model_dump(), "user_id": user.id, "organization_id": organization_id}
+    # mode="json" -- HearingCreate.hearing_at is a datetime; a bare
+    # model_dump() leaves it as a native datetime object, which the real
+    # supabase-py/httpx client cannot JSON-encode when sending this INSERT
+    # to PostgREST (TypeError: Object of type datetime is not JSON
+    # serializable, confirmed via live browser testing). mode="json"
+    # renders it as the ISO 8601 string PostgREST expects.
+    row = {**body.model_dump(mode="json"), "user_id": user.id, "organization_id": organization_id}
     resp = user.db.table("hearings").insert(row).execute()
     return resp.data[0]
 
@@ -59,7 +65,11 @@ def update_hearing(
     hearing_id: str, body: HearingUpdate, user: CurrentUser = Depends(get_current_user)
 ):
     _get_hearing_or_404(user, hearing_id)
-    update_data = body.model_dump(exclude_unset=True)
+    # mode="json" -- same reason as create_hearing above: HearingUpdate.hearing_at
+    # is also a datetime, and a PATCH that includes it (e.g. the Calendar
+    # page's "Edit Hearing" dialog, which always resends hearing_at) hits
+    # the identical serialization failure otherwise.
+    update_data = body.model_dump(exclude_unset=True, mode="json")
     if not update_data:
         return _get_hearing_or_404(user, hearing_id)
     # A human editing court/bench/item_no through this endpoint is the

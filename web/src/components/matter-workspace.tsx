@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AuthedShell } from "@/components/authed-shell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getMatter, listEvidence, listHearings, listMessages, listParties, addParty, deleteParty, addEvidence, deleteEvidence, uploadEvidenceFile, addHearing, calculateLimitation, determineForum, sendMessage, Matter, Message } from "@/lib/api";
+import { getMatter, listEvidence, listMessages, listParties, addParty, deleteParty, addEvidence, deleteEvidence, uploadEvidenceFile, calculateLimitation, determineForum, sendMessage, Matter, Message } from "@/lib/api";
 import { LitigationPartyModal } from "@/components/litigation-party-modal";
 import { LitigationFactTimeline, FactItem } from "@/components/litigation-fact-timeline";
 import { LitigationCaseAnalysis } from "@/components/litigation-case-analysis";
@@ -19,6 +19,7 @@ import {
   updateCourtTracking,
   triggerCourtSync,
   listCalendarHearings,
+  createCalendarHearing,
 } from "@/lib/api";
 
 interface PartyItem {
@@ -28,14 +29,6 @@ interface PartyItem {
   party_number: number;
   address?: string | null;
   advocate_name?: string | null;
-}
-
-interface HearingItem {
-  id: string;
-  hearing_date: string;
-  purpose_of_hearing?: string | null;
-  ia_number?: string | null;
-  status: string;
 }
 
 interface LimitationResult {
@@ -94,7 +87,6 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [parties, setParties] = useState<PartyItem[]>([]);
   const [facts, setFacts] = useState<FactItem[]>([]);
-  const [hearings, setHearings] = useState<HearingItem[]>([]);
   const [analyses, setAnalyses] = useState<CaseAnalysis[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -126,17 +118,15 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
       const m = await getMatter(matterId);
       setMatter(m);
       if (m.module === "litigation") {
-        const [pList, fList, hList, aList, tracking, trackedHearingsList] = await Promise.all([
+        const [pList, fList, aList, tracking, trackedHearingsList] = await Promise.all([
           listParties(matterId).catch(() => []),
           listEvidence(matterId).catch(() => []),
-          listHearings(matterId).catch(() => []),
           listCaseAnalyses(matterId).catch(() => []),
           getCourtTracking(matterId).catch(() => null),
           listCalendarHearings({ matter_id: matterId }).catch(() => []),
         ]);
         setParties(pList);
         setFacts(fList);
-        setHearings(hList);
         setAnalyses(aList);
         setCourtTracking(tracking);
         setCnrInput(tracking?.cnr_number || "");
@@ -207,13 +197,20 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
     e.preventDefault();
     if (!hearingDate) return;
     try {
-      const newH = await addHearing(matterId, {
-        hearing_date: hearingDate,
-        purpose_of_hearing: hearingPurpose || undefined,
-        ia_number: iaNumber || undefined,
-        status: "Scheduled",
+      // Canonical public.hearings, source='manual' -- same table/entity
+      // Court Tracking (eCourts), the Calendar page, and Hearing
+      // Intelligence all read from, so a hearing logged here is
+      // immediately visible in all three (see matter-workspace.tsx's
+      // "Tracked Hearings" list and /hearings/[hearingId]). The form
+      // still only asks for a date; 10:30 is the same default hour the
+      // Calendar page's own "Schedule Hearing Date" dialog uses.
+      const newH = await createCalendarHearing({
+        matter_id: matterId,
+        title: hearingPurpose.trim() || `Hearing — ${matter?.title || "Matter"}`,
+        hearing_at: new Date(`${hearingDate}T10:30:00`).toISOString(),
+        notes: iaNumber.trim() ? `IA Number: ${iaNumber.trim()}` : undefined,
       });
-      setHearings((prev) => [...prev, newH]);
+      setTrackedHearings((prev) => [...prev, newH]);
       setHearingDate("");
       setHearingPurpose("");
       setIaNumber("");
@@ -345,7 +342,7 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                     : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"
                 )}
               >
-                Hearing Docket ({hearings.length})
+                Hearing Docket ({trackedHearings.length})
               </button>
               <button
                 onClick={() => setActiveTab("analysis")}
@@ -860,23 +857,32 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                   </form>
                 )}
 
-                {hearings.length === 0 ? (
+                {trackedHearings.length === 0 ? (
                   <p className="font-serif text-xs text-[#76777F]">No court hearing dates logged yet.</p>
                 ) : (
                   <div className="divide-y divide-[#E4E2DD]">
-                    {hearings.map((h) => (
-                      <div key={h.id} className="py-2.5 space-y-1">
+                    {trackedHearings.map((h) => (
+                      <a
+                        key={h.id}
+                        href={`/hearings/${h.id}?matterId=${matterId}`}
+                        className="block py-2.5 space-y-1 hover:bg-[#F0EEE9]"
+                      >
                         <div className="flex items-center gap-2 font-semibold text-[#081534]">
                           <Calendar className="h-3.5 w-3.5 text-[#081534]" />
-                          <span>{h.hearing_date}</span>
-                          {h.ia_number && (
+                          <span>{new Date(h.hearing_at).toLocaleDateString()}</span>
+                          {h.item_no && (
                             <span className="rounded-xs border border-[#C6C6CF] bg-[#F0EEE9] px-1.5 py-0.5 text-[10px] uppercase text-[#081534]">
-                              {h.ia_number}
+                              {h.item_no}
                             </span>
                           )}
-                          <span className="text-xs text-[#45464E]">- {h.purpose_of_hearing || "Scheduled Hearing"}</span>
+                          <span className="text-xs text-[#45464E]">- {h.title || "Scheduled Hearing"}</span>
                         </div>
-                      </div>
+                        {(h.court || h.bench) && (
+                          <p className="pl-5.5 font-serif text-[11px] text-[#76777F]">
+                            {[h.court, h.bench].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                      </a>
                     ))}
                   </div>
                 )}

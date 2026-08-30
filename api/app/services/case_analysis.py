@@ -254,7 +254,9 @@ def generate_case_analysis(
 
     parties = db.table("litigation_parties").select("*").eq("matter_id", matter_id).execute().data or []
     facts = db.table("litigation_facts_evidence").select("*").eq("matter_id", matter_id).execute().data or []
-    hearings = db.table("litigation_hearings").select("*").eq("matter_id", matter_id).execute().data or []
+    # Canonical hearing source (public.hearings, 0021/0025) -- litigation_hearings
+    # is legacy and no longer written to by the UI (see matter-workspace.tsx).
+    hearings = db.table("hearings").select("*").eq("matter_id", matter_id).execute().data or []
 
     if not parties:
         raise CaseAnalysisError("Add at least one party before generating a case analysis.")
