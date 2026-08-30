@@ -76,20 +76,10 @@ CREATE TABLE IF NOT EXISTS public.organizations (
 
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 
--- Members can see their own organization's metadata (e.g. a future
--- "trial ends in N days" banner). No INSERT/UPDATE/DELETE policy for the
--- authenticated role -- organization lifecycle (creation, status changes,
--- payment marking) is only ever done by the backend via service_client(),
--- same convention as account_security (0022/0023).
-DROP POLICY IF EXISTS organizations_select_member ON public.organizations;
-CREATE POLICY organizations_select_member ON public.organizations
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.memberships mm
-            WHERE mm.organization_id = organizations.id
-              AND mm.user_id = auth.uid()
-        )
-    );
+-- organizations_select_member is created further below, after
+-- public.memberships exists (its USING clause queries memberships, so
+-- creating it here -- before memberships exists -- fails with
+-- 42P01: relation "public.memberships" does not exist).
 
 CREATE OR REPLACE FUNCTION public.handle_organizations_updated_at()
 RETURNS TRIGGER AS $$
@@ -157,6 +147,22 @@ DROP TRIGGER IF EXISTS set_memberships_updated_at ON public.memberships;
 CREATE TRIGGER set_memberships_updated_at
     BEFORE UPDATE ON public.memberships
     FOR EACH ROW EXECUTE FUNCTION public.handle_memberships_updated_at();
+
+-- Members can see their own organization's metadata (e.g. a future
+-- "trial ends in N days" banner). No INSERT/UPDATE/DELETE policy for the
+-- authenticated role -- organization lifecycle (creation, status changes,
+-- payment marking) is only ever done by the backend via service_client(),
+-- same convention as account_security (0022/0023). Created here, after
+-- memberships exists, since its USING clause queries memberships.
+DROP POLICY IF EXISTS organizations_select_member ON public.organizations;
+CREATE POLICY organizations_select_member ON public.organizations
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.memberships mm
+            WHERE mm.organization_id = organizations.id
+              AND mm.user_id = auth.uid()
+        )
+    );
 
 -- ============================================================
 -- 3. organization_access_events (platform-owner audit trail)
