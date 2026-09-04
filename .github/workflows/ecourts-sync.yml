@@ -19,8 +19,12 @@ name: eCourts Sync
 # the window only ever requires an env var change, never a workflow edit.
 
 on:
-  schedule:
-    - cron: "0 * * * *"
+  # Scheduled trigger disabled 2026-09-04: every hourly run has been failing
+  # with "missing server host" -- ORACLE_SSH_HOST/USER/KEY/PORT secrets were
+  # never configured for this repo. Re-enable the schedule only after those
+  # secrets are set and a manual workflow_dispatch run succeeds.
+  # schedule:
+  #   - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       now:
