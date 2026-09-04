@@ -187,6 +187,83 @@ def test_rate_limit_honors_retry_after_then_succeeds(monkeypatch):
     assert sleep_calls == [0.0]
 
 
+def test_case_search_sends_filters_as_query_params(monkeypatch):
+    captured = {}
+
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        captured["method"] = method
+        captured["url"] = url
+        captured["params"] = kwargs.get("params")
+        return _FakeResponse(200, {"data": [], "meta": {}})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    gw = CourtDataGateway(settings=_settings())
+    gw.case_search(advocates=["Sharma"], case_numbers=["CS 1/2026"], page=2, page_size=50)
+
+    assert captured["method"] == "GET"
+    assert "/api/partner/search" in captured["url"]
+    assert captured["params"]["advocates"] == ["Sharma"]
+    assert captured["params"]["caseNumbers"] == ["CS 1/2026"]
+    assert captured["params"]["page"] == 2
+    assert captured["params"]["pageSize"] == 50
+
+
+def test_case_search_caps_page_size(monkeypatch):
+    captured = {}
+
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        captured["params"] = kwargs.get("params")
+        return _FakeResponse(200, {"data": []})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    gw = CourtDataGateway(settings=_settings())
+    gw.case_search(query="test", page_size=9999)
+    assert captured["params"]["pageSize"] == 200
+
+
+def test_case_search_normalizes_response(monkeypatch):
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        return _FakeResponse(200, {
+            "data": [
+                {
+                    "cnr": "DLND020047882015",
+                    "caseNumber": "CS 1/2026",
+                    "courtName": "Delhi HC",
+                    "caseType": "WP_C",
+                    "status": "Pending",
+                    "petitioners": ["A"],
+                    "respondents": ["B"],
+                    "advocates": ["Sharma"],
+                }
+            ],
+            "hasNextPage": False,
+            "meta": {"request_id": "req-search-1", "total": 1},
+        })
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    gw = CourtDataGateway(settings=_settings())
+    result = gw.case_search(advocates=["Sharma"])
+
+    assert len(result.items) == 1
+    item = result.items[0]
+    assert item.cnr == "DLND020047882015"
+    assert item.case_number == "CS 1/2026"
+    assert item.advocates == ["Sharma"]
+    assert result.has_next_page is False
+    assert result.request_id == "req-search-1"
+    assert result.total == 1
+
+
+def test_case_search_unrecognized_shape_returns_empty_not_crash(monkeypatch):
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        return _FakeResponse(200, {"something_else": "unexpected"})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    gw = CourtDataGateway(settings=_settings())
+    result = gw.case_search(query="test")
+    assert result.items == []
+
+
 def test_persistent_error_never_leaks_raw_response_text(monkeypatch):
     def fake_request(method, url, headers=None, timeout=None, **kwargs):
         return _FakeResponse(404, {"meta": {"request_id": "req-404"}, "secret_internal_detail": "should never surface"})

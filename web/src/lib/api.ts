@@ -1214,6 +1214,42 @@ export function triggerCourtSync(matterId: string): Promise<CourtCaseTracking> {
   );
 }
 
+export type CourtCaseSearchItem = {
+  cnr: string | null;
+  case_number: string | null;
+  court_name: string | null;
+  case_type: string | null;
+  status: string | null;
+  petitioners: string[];
+  respondents: string[];
+  advocates: string[];
+};
+
+export type CourtCaseSearchResult = {
+  items: CourtCaseSearchItem[];
+  total: number | null;
+  has_next_page: boolean | null;
+};
+
+/** Find a CNR by advocate name, case number, or party name when it isn't
+ * already known -- not matter-scoped, persists nothing. Same longer
+ * timeout as triggerCourtSync: this calls the live eCourts provider. */
+export function searchCourtCases(filters: {
+  query?: string;
+  advocates?: string[];
+  case_numbers?: string[];
+}): Promise<CourtCaseSearchResult> {
+  const params = new URLSearchParams();
+  if (filters.query) params.set("query", filters.query);
+  for (const a of filters.advocates || []) params.append("advocates", a);
+  for (const c of filters.case_numbers || []) params.append("case_numbers", c);
+  return authedFetch(
+    `/api/court-search?${params.toString()}`,
+    {},
+    { retry: false, timeoutMs: COURT_SYNC_TIMEOUT_MS }
+  );
+}
+
 export type HearingBriefContent = {
   case_record: Array<{ heading: string; content: string; source_refs: string[] }>;
   supported_arguments: Array<{ argument: string; source_refs: string[] }>;

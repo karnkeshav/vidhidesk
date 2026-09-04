@@ -883,6 +883,27 @@ class CourtCaseTrackingOut(BaseModel):
     updated_at: datetime
 
 
+class CourtCaseSearchItemOut(BaseModel):
+    """One eCourts search result -- see CourtDataGateway.case_search()
+    for why this shape isn't independently confirmed against a live
+    response yet."""
+
+    cnr: str | None = None
+    case_number: str | None = None
+    court_name: str | None = None
+    case_type: str | None = None
+    status: str | None = None
+    petitioners: list[str] = Field(default_factory=list)
+    respondents: list[str] = Field(default_factory=list)
+    advocates: list[str] = Field(default_factory=list)
+
+
+class CourtCaseSearchResultOut(BaseModel):
+    items: list[CourtCaseSearchItemOut]
+    total: int | None = None
+    has_next_page: bool | None = None
+
+
 class HearingBriefCaseRecordEntry(BaseModel):
     heading: str
     content: str

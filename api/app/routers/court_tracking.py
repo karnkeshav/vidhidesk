@@ -7,13 +7,13 @@ spec states explicitly.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth import CurrentUser, get_current_user
 from app.db import service_client
-from app.models.schemas import CourtCaseTrackingOut, CourtCaseTrackingUpdate
+from app.models.schemas import CourtCaseSearchResultOut, CourtCaseTrackingOut, CourtCaseTrackingUpdate
 from app.services import court_sync, court_tracking
-from app.services.court_data_gateway import CourtDataGatewayError, CourtDataNotConfiguredError
+from app.services.court_data_gateway import CourtDataGateway, CourtDataGatewayError, CourtDataNotConfiguredError
 
 router = APIRouter(prefix="/api", tags=["court-tracking"])
 
@@ -81,3 +81,63 @@ def trigger_court_sync(matter_id: str, user: CurrentUser = Depends(get_current_u
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tracking record not found")
     return rows[0]
+
+
+@router.get("/court-search", response_model=CourtCaseSearchResultOut)
+def search_court_cases(
+    query: str | None = None,
+    advocates: list[str] | None = Query(default=None),
+    case_numbers: list[str] | None = Query(default=None),
+    court_codes: list[str] | None = Query(default=None),
+    case_types: list[str] | None = Query(default=None),
+    page: int = 1,
+    page_size: int = 20,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Search eCourts by advocate name, case number, party name, or court
+    to find a CNR when one isn't already known -- not matter-scoped, and
+    persists nothing. The caller still PATCHes .../court-tracking with the
+    chosen CNR to actually attach it to a matter. See
+    CourtDataGateway.case_search() for this endpoint's verification
+    caveat -- unlike CNR-based lookups, its exact field names have not
+    been confirmed against a live provider response."""
+    if not any([query, advocates, case_numbers, court_codes, case_types]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide at least one search filter")
+    try:
+        gateway = CourtDataGateway()
+        result = gateway.case_search(
+            query=query,
+            advocates=advocates,
+            case_numbers=case_numbers,
+            court_codes=court_codes,
+            case_types=case_types,
+            page=page,
+            page_size=page_size,
+        )
+    except CourtDataNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="eCourts integration is not configured on this server.",
+        ) from exc
+    except CourtDataGatewayError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to reach the eCourts provider right now. Try again shortly.",
+        )
+    return {
+        "items": [
+            {
+                "cnr": item.cnr,
+                "case_number": item.case_number,
+                "court_name": item.court_name,
+                "case_type": item.case_type,
+                "status": item.status,
+                "petitioners": item.petitioners,
+                "respondents": item.respondents,
+                "advocates": item.advocates,
+            }
+            for item in result.items
+        ],
+        "total": result.total,
+        "has_next_page": result.has_next_page,
+    }

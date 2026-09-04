@@ -24,6 +24,12 @@ Confirmed endpoints used here:
                                              within 15s (provider-side dedup)
   POST /api/partner/causelist/cnr/batch  -- 1-100 CNRs, tells whether each is
                                              listed and where/when/what
+  GET  /api/partner/search               -- search by advocate name, case
+                                             number, party name, court, case
+                                             type, etc. (added 4 Sep 2026 --
+                                             see case_search() docstring for
+                                             this endpoint's own, separate
+                                             verification caveat)
 
 NEVER call this from the frontend -- only app/routers/court_tracking.py
 and app/services/court_sync.py reach for this class. ECOURTS_API_KEY is
@@ -51,6 +57,7 @@ _RETRY_BACKOFF_S = [1.0, 3.0]
 
 _MAX_BULK_REFRESH_CNRS = 50
 _MAX_CAUSELIST_CNRS = 100
+_MAX_SEARCH_PAGE_SIZE = 200  # provider docs: "max 200 for partners"
 
 
 class CourtDataGatewayError(Exception):
@@ -95,6 +102,28 @@ class BulkRefreshResult:
     queued: list[str]
     invalid: list[str]
     request_id: str | None
+
+
+@dataclass
+class CaseSearchItem:
+    cnr: str | None
+    case_number: str | None
+    court_name: str | None
+    case_type: str | None
+    status: str | None
+    petitioners: list[str]
+    respondents: list[str]
+    advocates: list[str]
+    raw: dict[str, Any]
+
+
+@dataclass
+class CaseSearchResult:
+    items: list[CaseSearchItem]
+    total: int | None
+    has_next_page: bool | None
+    request_id: str | None
+    raw: dict[str, Any]
 
 
 class CourtDataGateway:
@@ -215,3 +244,97 @@ class CourtDataGateway:
                 raw=item,
             )
         return results
+
+    def case_search(
+        self,
+        *,
+        query: str | None = None,
+        advocates: list[str] | None = None,
+        judges: list[str] | None = None,
+        petitioners: list[str] | None = None,
+        respondents: list[str] | None = None,
+        case_numbers: list[str] | None = None,
+        court_codes: list[str] | None = None,
+        case_types: list[str] | None = None,
+        case_statuses: list[str] | None = None,
+        filing_years: list[str] | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> CaseSearchResult:
+        """GET /api/partner/search -- find a case (and its CNR) by advocate
+        name, case number, party name, court, or case type, when the CNR
+        itself isn't already known. This is a lookup helper only: it never
+        persists anything, unlike case_lookup/bulk_refresh/causelist_batch.
+
+        Unlike the three endpoints above, this one was NOT reconstructed
+        from ecourtsindia.com's public blog excerpts within this codebase's
+        own prior verification pass -- ecourtsindia.com/api/docs still
+        403s to automated fetches (see module docstring), and a live
+        authenticated test call was blocked by this session's own tooling
+        permissions before this method was written. Parameter names
+        (advocates, judges, petitioners, respondents, caseNumbers,
+        courtCodes, caseTypes, caseStatuses, filingYears, page, pageSize)
+        come from two independent eCourtsIndia developer-blog posts dated
+        16 Apr 2026 and 18 May 2026 that agree on these names, but neither
+        is the provider's own reference doc. RE-VERIFY against a live
+        response before trusting this: a wrong param name fails silently
+        as zero matches, not as an error, which this client cannot detect
+        on its own -- see GET /api/partner/search/capabilities (documented
+        as free) for the provider's own authoritative field catalog.
+        """
+        page_size = min(page_size, _MAX_SEARCH_PAGE_SIZE)
+        params: dict[str, Any] = {"page": page, "pageSize": page_size}
+        if query:
+            params["query"] = query
+        if advocates:
+            params["advocates"] = advocates
+        if judges:
+            params["judges"] = judges
+        if petitioners:
+            params["petitioners"] = petitioners
+        if respondents:
+            params["respondents"] = respondents
+        if case_numbers:
+            params["caseNumbers"] = case_numbers
+        if court_codes:
+            params["courtCodes"] = court_codes
+        if case_types:
+            params["caseTypes"] = case_types
+        if case_statuses:
+            params["caseStatuses"] = case_statuses
+        if filing_years:
+            params["filingYears"] = filing_years
+
+        resp = self._request("GET", "/api/partner/search", params=params)
+        body = resp.json()
+        items_raw = body.get("data") or body.get("results") or body.get("items") or []
+        if not isinstance(items_raw, list):
+            logger.warning("court_data_gateway case_search: unrecognized response shape, no items parsed")
+            items_raw = []
+
+        items: list[CaseSearchItem] = []
+        for item in items_raw:
+            if not isinstance(item, dict):
+                continue
+            items.append(
+                CaseSearchItem(
+                    cnr=item.get("cnr"),
+                    case_number=item.get("caseNumber") or item.get("case_number"),
+                    court_name=item.get("courtName") or item.get("court_name"),
+                    case_type=item.get("caseType") or item.get("case_type"),
+                    status=item.get("status"),
+                    petitioners=list(item.get("petitioners") or []),
+                    respondents=list(item.get("respondents") or []),
+                    advocates=list(item.get("advocates") or []),
+                    raw=item,
+                )
+            )
+
+        meta = body.get("meta") or {}
+        return CaseSearchResult(
+            items=items,
+            total=body.get("total") if isinstance(body.get("total"), int) else meta.get("total"),
+            has_next_page=body.get("hasNextPage"),
+            request_id=meta.get("request_id"),
+            raw=body,
+        )

@@ -14,10 +14,12 @@ import { cn } from "@/lib/utils";
 import { CaseAnalysis, listCaseAnalyses } from "@/lib/api";
 import {
   CourtCaseTracking,
+  CourtCaseSearchItem,
   CalendarHearing,
   getCourtTracking,
   updateCourtTracking,
   triggerCourtSync,
+  searchCourtCases,
   listCalendarHearings,
   createCalendarHearing,
 } from "@/lib/api";
@@ -111,6 +113,12 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
   const [cnrInput, setCnrInput] = useState("");
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [trackedHearings, setTrackedHearings] = useState<CalendarHearing[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchAdvocate, setSearchAdvocate] = useState("");
+  const [searchCaseNumber, setSearchCaseNumber] = useState("");
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<CourtCaseSearchItem[] | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   async function loadData() {
@@ -255,6 +263,43 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
       setCourtTracking(updated);
       const hList = await listCalendarHearings({ matter_id: matterId }).catch(() => []);
       setTrackedHearings(hList);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrackingBusy(false);
+    }
+  }
+
+  async function handleSearchCourtCases(e: React.FormEvent) {
+    e.preventDefault();
+    if (!searchAdvocate.trim() && !searchCaseNumber.trim()) {
+      setSearchError("Enter an advocate name or a case number to search.");
+      return;
+    }
+    setSearchBusy(true);
+    setSearchError(null);
+    setSearchResults(null);
+    try {
+      const result = await searchCourtCases({
+        advocates: searchAdvocate.trim() ? [searchAdvocate.trim()] : undefined,
+        case_numbers: searchCaseNumber.trim() ? [searchCaseNumber.trim()] : undefined,
+      });
+      setSearchResults(result.items);
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSearchBusy(false);
+    }
+  }
+
+  async function handleUseSearchResult(cnr: string) {
+    setTrackingBusy(true);
+    setError(null);
+    try {
+      const updated = await updateCourtTracking(matterId, { cnr_number: cnr });
+      setCourtTracking(updated);
+      setSearchOpen(false);
+      setSearchResults(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -464,6 +509,80 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                         </Button>
                       </div>
                     </form>
+
+                    <button
+                      type="button"
+                      onClick={() => setSearchOpen((v) => !v)}
+                      className="font-serif text-[11px] text-[#081534] underline underline-offset-2"
+                    >
+                      {searchOpen ? "Hide eCourts search" : "Don't know the CNR? Search by advocate or case number"}
+                    </button>
+
+                    {searchOpen && (
+                      <div className="space-y-2 rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-2.5">
+                        <form onSubmit={handleSearchCourtCases} className="space-y-1.5">
+                          <input
+                            type="text"
+                            placeholder="Advocate name"
+                            value={searchAdvocate}
+                            onChange={(e) => setSearchAdvocate(e.target.value)}
+                            className="h-8 w-full rounded-sm border border-[#E4E2DD] bg-white px-2 text-xs text-[#1A1A1A]"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Case number, e.g. CS 1/2026"
+                            value={searchCaseNumber}
+                            onChange={(e) => setSearchCaseNumber(e.target.value)}
+                            className="h-8 w-full rounded-sm border border-[#E4E2DD] bg-white px-2 text-xs text-[#1A1A1A]"
+                          />
+                          <Button
+                            type="submit"
+                            disabled={searchBusy}
+                            size="sm"
+                            className="h-8 w-full rounded-sm bg-[#081534] font-sans text-[11px] font-semibold text-white hover:bg-[#1E2A4A]"
+                          >
+                            {searchBusy ? "Searching..." : "Search eCourts"}
+                          </Button>
+                        </form>
+
+                        {searchError && <p className="font-serif text-[10px] text-[#7A2A2A]">{searchError}</p>}
+
+                        {searchResults && searchResults.length === 0 && !searchError && (
+                          <p className="font-serif text-[10px] text-[#76777F]">No matching cases found.</p>
+                        )}
+
+                        {searchResults && searchResults.length > 0 && (
+                          <div className="space-y-1.5 border-t border-[#E4E2DD] pt-1.5">
+                            {searchResults.map((item, i) => (
+                              <div key={item.cnr || i} className="rounded-sm border border-[#E4E2DD] bg-white p-1.5">
+                                <p className="font-semibold text-[#081534]">
+                                  {item.case_number || "Case number unknown"}
+                                  {item.court_name ? ` · ${item.court_name}` : ""}
+                                </p>
+                                <p className="font-serif text-[10px] text-[#76777F]">
+                                  {[...item.petitioners, ...item.respondents].join(" vs ") || "Parties unknown"}
+                                  {item.advocates.length > 0 ? ` · Adv. ${item.advocates.join(", ")}` : ""}
+                                </p>
+                                {item.cnr ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={trackingBusy}
+                                    onClick={() => handleUseSearchResult(item.cnr as string)}
+                                    className="mt-1 h-6 rounded-sm border-[#E4E2DD] px-2 font-sans text-[10px] font-semibold text-[#081534]"
+                                  >
+                                    Use this CNR
+                                  </Button>
+                                ) : (
+                                  <p className="mt-1 font-serif text-[10px] text-[#76777F]">No CNR returned for this result.</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input

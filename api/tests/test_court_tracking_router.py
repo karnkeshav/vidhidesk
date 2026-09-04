@@ -15,7 +15,7 @@ from app.auth import CurrentUser, get_current_user
 from app.main import app
 from app.routers import court_tracking as court_tracking_router
 from app.services import court_sync
-from app.services.court_data_gateway import CourtDataGatewayError, CourtDataNotConfiguredError
+from app.services.court_data_gateway import CaseSearchItem, CaseSearchResult, CourtDataGatewayError, CourtDataNotConfiguredError
 from tests.test_platform import FakeServiceClient, _org
 
 
@@ -243,3 +243,78 @@ def test_trigger_sync_provider_error_returns_502_without_leaking_detail(monkeypa
         _teardown()
     assert resp.status_code == 502
     assert "secret internal provider detail" not in resp.text
+
+
+def test_search_court_cases_requires_a_filter():
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-search", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 400
+
+
+def test_search_court_cases_not_configured_returns_501(monkeypatch):
+    monkeypatch.setattr(
+        court_tracking_router,
+        "CourtDataGateway",
+        lambda: (_ for _ in ()).throw(CourtDataNotConfiguredError("no key")),
+    )
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-search?query=test", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 501
+
+
+def test_search_court_cases_provider_error_returns_502(monkeypatch):
+    class _ExplodingGateway:
+        def case_search(self, **_kwargs):
+            raise CourtDataGatewayError("secret internal provider detail")
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _ExplodingGateway())
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-search?query=test", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 502
+    assert "secret internal provider detail" not in resp.text
+
+
+def test_search_court_cases_returns_items(monkeypatch):
+    class _FakeGateway:
+        def case_search(self, **kwargs):
+            assert kwargs["advocates"] == ["Sharma"]
+            return CaseSearchResult(
+                items=[
+                    CaseSearchItem(
+                        cnr="DLND020047882015",
+                        case_number="CS 1/2026",
+                        court_name="Delhi HC",
+                        case_type="WP_C",
+                        status="Pending",
+                        petitioners=["A"],
+                        respondents=["B"],
+                        advocates=["Sharma"],
+                        raw={},
+                    )
+                ],
+                total=1,
+                has_next_page=False,
+                request_id="req-1",
+                raw={},
+            )
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _FakeGateway())
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-search?advocates=Sharma", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["cnr"] == "DLND020047882015"
+    assert body["items"][0]["advocates"] == ["Sharma"]
