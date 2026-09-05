@@ -270,7 +270,7 @@ export function startSession(): Promise<{ status: string }> {
 }
 
 export function listMatters(): Promise<Matter[]> {
-  return authedFetch("/api/matters");
+  return authedFetch("/api/matters", undefined, { timeoutMs: COLD_START_TIMEOUT_MS });
 }
 
 export function getMatter(matterId: string): Promise<Matter> {
@@ -658,7 +658,7 @@ export type Template = {
 export type TemplateDetail = Template & { intake_schema: IntakeSchema };
 
 export function listTemplates(): Promise<Template[]> {
-  return authedFetch("/api/templates");
+  return authedFetch("/api/templates", undefined, { timeoutMs: COLD_START_TIMEOUT_MS });
 }
 
 export function getTemplate(templateId: string): Promise<TemplateDetail> {
