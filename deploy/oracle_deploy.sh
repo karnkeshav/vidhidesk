@@ -142,6 +142,29 @@ if [ "$REPORTED_SHA" != "$SHA" ]; then
   exit 1
 fi
 
+# Best-effort restore of the pre-deploy container, shared by both rollback
+# points below. A first-ever deploy on a box has no "-previous" container
+# to fall back to -- attempting `docker rename`/`docker start` on a
+# nonexistent container would abort the whole script right here under
+# `set -e` instead of reporting cleanly (found via the GCP migration's
+# equivalent script hitting this on its first real deploy), so this is
+# checked explicitly rather than assumed.
+rollback_to_previous() {
+  if docker inspect "${CONTAINER_NAME}-previous" >/dev/null 2>&1; then
+    docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    docker rename "${CONTAINER_NAME}-previous" "$CONTAINER_NAME" >/dev/null 2>&1
+    docker start "$CONTAINER_NAME" >/dev/null 2>&1
+    sleep 3
+    if curl -fsS "http://127.0.0.1:${PROD_PORT}/health" >/dev/null 2>&1; then
+      echo "==> Rolled back: previous container restarted and confirmed healthy" >&2
+    else
+      echo "FATAL: previous container was restarted but is NOT passing its own health check -- VidhiDesk may be down, manual intervention required on the box" >&2
+    fi
+  else
+    echo "FATAL: no ${CONTAINER_NAME}-previous container exists to roll back to (first deploy on this box, or it was already cleaned up) -- VidhiDesk is down, manual intervention required on the box" >&2
+  fi
+}
+
 echo "==> Promoting: stopping old prod container (kept, not removed yet, for rollback) and swapping candidate in"
 docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
 docker rename "$CONTAINER_NAME" "${CONTAINER_NAME}-previous" >/dev/null 2>&1 || true
@@ -163,31 +186,29 @@ if ! docker run -d --name "$CONTAINER_NAME" \
   --env-file "$ENV_FILE" \
   "${IMAGE_NAME}:${SHA}"; then
   echo "FATAL: docker run failed to start the new production container at all (not merely unhealthy) -- restoring previous container" >&2
-  docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-  docker rename "${CONTAINER_NAME}-previous" "$CONTAINER_NAME" >/dev/null 2>&1
-  docker start "$CONTAINER_NAME" >/dev/null 2>&1
-  sleep 3
-  if curl -fsS "http://127.0.0.1:${PROD_PORT}/health" >/dev/null 2>&1; then
-    echo "==> Rolled back: previous container restarted and confirmed healthy" >&2
-  else
-    echo "FATAL: previous container was restarted but is NOT passing its own health check -- VidhiDesk may be down, manual intervention required on the box" >&2
-  fi
+  rollback_to_previous
   exit 1
 fi
 
+# Retry loop, not a single sleep+curl: measured on this app's GCP
+# equivalent, cold start (loading the sentence-transformers embedding
+# model + spaCy) takes ~25+ seconds -- comfortably longer than a fixed
+# `sleep 3` allows for. Same 60s budget (20 tries * 3s) as the candidate
+# health-gate above, so a genuinely slow but healthy start isn't mistaken
+# for a failure and rolled back.
 echo "==> Confirming promoted container is healthy on the real port"
-sleep 3
-if ! curl -fsS "http://127.0.0.1:${PROD_PORT}/health" >/dev/null 2>&1; then
-  echo "FATAL: promoted container failed its own health check on the real port -- rolling back" >&2
-  docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-  docker rename "${CONTAINER_NAME}-previous" "$CONTAINER_NAME" >/dev/null 2>&1
-  docker start "$CONTAINER_NAME" >/dev/null 2>&1
-  sleep 3
+PROMOTED_HEALTHY=0
+for _ in $(seq 1 20); do
   if curl -fsS "http://127.0.0.1:${PROD_PORT}/health" >/dev/null 2>&1; then
-    echo "==> Rolled back: previous container restarted and confirmed healthy" >&2
-  else
-    echo "FATAL: previous container was restarted but is NOT passing its own health check -- VidhiDesk may be down, manual intervention required on the box" >&2
+    PROMOTED_HEALTHY=1
+    break
   fi
+  sleep 3
+done
+
+if [ "$PROMOTED_HEALTHY" -ne 1 ]; then
+  echo "FATAL: promoted container failed its own health check on the real port -- rolling back" >&2
+  rollback_to_previous
   exit 1
 fi
 
