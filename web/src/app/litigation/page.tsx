@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthedShell, useMatters } from "@/components/authed-shell";
 import { Gavel, Search, Filter, LayoutGrid, List, Plus, X } from "lucide-react";
-import { createMatter } from "@/lib/api";
+import { createMatter, startSession, Matter, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 export default function LitigationPage() {
@@ -16,6 +16,7 @@ export default function LitigationPage() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // New Matter Form State
   const [title, setTitle] = useState("");
@@ -33,19 +34,40 @@ export default function LitigationPage() {
 
   async function handleCreateMatter(e: React.FormEvent) {
     e.preventDefault();
-    if (!title) return;
+    if (!title.trim()) return;
     setIsCreating(true);
+    setCreateError(null);
     try {
-      const m = await createMatter({
-        title,
-        module: "litigation",
-        client_name: clientName,
-        court_category: courtCategory,
-        jurisdiction_state: jurisdictionState,
-      });
+      let m: Matter;
+      try {
+        m = await createMatter({
+          title: title.trim(),
+          module: "litigation",
+          client_name: clientName.trim() || undefined,
+          court_category: courtCategory,
+          jurisdiction_state: jurisdictionState,
+        });
+      } catch {
+        // If organization was not yet provisioned for this session, run session-start once and retry
+        await startSession().catch(() => {});
+        m = await createMatter({
+          title: title.trim(),
+          module: "litigation",
+          client_name: clientName.trim() || undefined,
+          court_category: courtCategory,
+          jurisdiction_state: jurisdictionState,
+        });
+      }
       router.push(`/litigation/${m.id}`);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to create matter:", err);
+      let message = "Failed to create matter. Please check your connection and try again.";
+      if (err instanceof ApiError) {
+        message = err.message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setCreateError(message);
       setIsCreating(false);
     }
   }
@@ -238,6 +260,12 @@ export default function LitigationPage() {
                   <option value="Other">Other</option>
                 </select>
               </div>
+
+              {createError && (
+                <div className="rounded-sm border border-[#F8D7DA] bg-[#FFF5F5] p-3 font-sans text-xs text-[#7A2A2A]">
+                  {createError}
+                </div>
+              )}
 
               <div className="pt-4 border-t border-[#E4E2DD]">
                 <Button type="submit" disabled={isCreating} className="w-full bg-[#081534] text-white font-sans text-xs font-semibold hover:bg-[#1E2A4A] h-8">

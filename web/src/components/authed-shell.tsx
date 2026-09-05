@@ -6,7 +6,7 @@ import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { listMatters, Matter, listCalendarHearings, CalendarHearing } from "@/lib/api";
+import { listMatters, Matter, listCalendarHearings, CalendarHearing, startSession } from "@/lib/api";
 import {
   ShieldCheck,
   Globe,
@@ -124,6 +124,7 @@ export function AuthedShell({
         router.push("/login");
       } else {
         setSession(data.session);
+        startSession().catch(() => {});
         listMatters()
           .then((data) => {
             if (unmounted) console.debug("[AuthedShell] listMatters resolved after unmount");
