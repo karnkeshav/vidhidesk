@@ -177,7 +177,7 @@ docker rm -f "$CANDIDATE_CONTAINER" >/dev/null 2>&1
 # rollback below actually gets to run instead of being skipped.
 if ! docker run -d --name "$CONTAINER_NAME" \
   --restart unless-stopped \
-  -p "${PROD_PORT}:8000" \
+  -p "127.0.0.1:${PROD_PORT}:8000" \
   -v "${DRAFTS_VOLUME}:/app/api/generated_drafts" \
   --env-file "$ENV_FILE" \
   "${IMAGE_NAME}:${SHA}"; then
@@ -217,5 +217,5 @@ docker images "$IMAGE_NAME" --format '{{.Tag}} {{.CreatedAt}}' \
   | awk -v keep="$KEEP_IMAGES" 'NR>keep {print $1}' \
   | xargs -r -I{} docker rmi "${IMAGE_NAME}:{}" || true
 
-echo "==> Deploy complete: ${IMAGE_NAME}:${SHA} is live on port ${PROD_PORT}"
-echo "==> Manual rollback if ever needed later: docker rm -f ${CONTAINER_NAME} && docker run -d --name ${CONTAINER_NAME} --restart unless-stopped -p ${PROD_PORT}:8000 -v ${DRAFTS_VOLUME}:/app/api/generated_drafts --env-file ${ENV_FILE} ${IMAGE_NAME}:<previous-sha>"
+echo "==> Deploy complete: ${IMAGE_NAME}:${SHA} is live on 127.0.0.1:${PROD_PORT} (behind Caddy on 80/443 -- never exposed directly, see deploy/gcp_Caddyfile)"
+echo "==> Manual rollback if ever needed later: docker rm -f ${CONTAINER_NAME} && docker run -d --name ${CONTAINER_NAME} --restart unless-stopped -p 127.0.0.1:${PROD_PORT}:8000 -v ${DRAFTS_VOLUME}:/app/api/generated_drafts --env-file ${ENV_FILE} ${IMAGE_NAME}:<previous-sha>"
