@@ -1,0 +1,86 @@
+name: GCP Deploy
+
+# GCP Migration (2026-09-05). Same shape as .github/workflows/oracle-deploy.yml,
+# retargeted at a GCP Compute Engine VM after the Oracle migration stalled
+# on capacity -- see docs/40_Operations/Deployment.md for why. DRAFT until
+# someone with GCP access has:
+#   1. Provisioned the box per deploy/gcp_deploy.sh's assumptions (Docker
+#      installed, `ubuntu` user in the `docker` group, repo cloned to
+#      /home/ubuntu/vidhidesk, repo-root .env populated by hand -- never
+#      via git, per CLAUDE.md Hard Rule 6).
+#   2. Created these GitHub Secrets: GCP_SSH_HOST, GCP_SSH_USER,
+#      GCP_SSH_KEY (private key matching a public key already authorized
+#      on the box), and optionally GCP_SSH_PORT and GCP_BASE_URL (this
+#      box's public HTTPS URL once deploy/gcp_Caddyfile is live).
+#   3. Dry-run deploy/gcp_deploy.sh manually on the box at least once.
+#
+# Invariant this workflow exists to uphold: this box is a deployment
+# TARGET, never an independent dev repo -- the script it invokes always
+# does `git fetch` + `git checkout --detach <SHA>` on the box, never
+# `git pull`, and no code is ever hand-edited there. See
+# deploy/gcp_deploy.sh for the deploy/health-gate/rollback logic itself;
+# this file only decides WHEN to run it and verifies the result.
+
+on:
+  workflow_run:
+    workflows: ["CI — Lint, Test, Verify, Deploy Gate"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA to deploy (defaults to the latest main)"
+        required: false
+
+# Deployment race hardening: a single shared group means a newer main
+# push's deploy run cancels an older, still-running one at the GitHub
+# Actions level, instead of both running to completion and whichever
+# happens to finish LAST winning regardless of which commit is actually
+# newer. This is a first layer, not the only one: it stops a stale
+# Actions job from starting/continuing, but cancelling a runner job does
+# not guarantee an already-dispatched SSH command is killed on the box
+# itself -- deploy/gcp_deploy.sh's own flock-based lock is the second,
+# independent layer that protects the box regardless of what happens here.
+concurrency:
+  group: gcp-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-gcp:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target SHA
+        id: sha
+        run: |
+          if [ -n "${{ github.event.inputs.sha }}" ]; then
+            echo "sha=${{ github.event.inputs.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to GCP over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_SSH_HOST }}
+          username: ${{ secrets.GCP_SSH_USER }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          port: ${{ secrets.GCP_SSH_PORT }}
+          script_stop: true
+          # The script itself lives in the repo, checked out fresh on the
+          # box by its own `git fetch` + `checkout --detach` -- this SSH
+          # step only ever invokes it, never pastes deploy logic inline,
+          # so the workflow file and the on-box script cannot drift apart.
+          script: |
+            set -euo pipefail
+            bash /home/ubuntu/vidhidesk/deploy/gcp_deploy.sh ${{ steps.sha.outputs.sha }}
+
+      - name: Verify GitHub SHA == GCP running SHA
+        if: ${{ secrets.GCP_BASE_URL != '' }}
+        env:
+          GCP_BASE_URL: ${{ secrets.GCP_BASE_URL }}
+        run: |
+          pip install httpx
+          python api/scripts/check_deployment_drift.py "${{ steps.sha.outputs.sha }}" "$GCP_BASE_URL"

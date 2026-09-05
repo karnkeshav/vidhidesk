@@ -1,0 +1,41 @@
+# GCP Migration (2026-09-05). Same shape as deploy/Caddyfile (the Oracle
+# draft) -- no real domain or DNS record exists yet for this GCP VM
+# either. Replace api.example-vidhidesk.com below with the real domain
+# once one is registered and its A/AAAA record points at the box's public
+# IP (35.253.123.223 as of this draft), then run
+# `caddy validate --config /path/to/this/file` and reload Caddy on the
+# box itself. This file has never been applied to or tested against a
+# live Caddy instance.
+#
+# Caddy handles ACME/Let's Encrypt HTTPS automatically for any real
+# domain listed as a site block below -- no separate certbot setup
+# needed, and plain-HTTP requests on port 80 are redirected to HTTPS
+# automatically for any domain block (not the bare-IP :80 block below).
+#
+# Port 8000 (the FastAPI container from api/Dockerfile) is intentionally
+# never exposed directly to the internet long-term -- only Caddy's
+# 443/80 are meant to be. The GCP firewall rule added for this migration
+# (`allow-vidhidesk-http`) currently also opens 8000 directly, purely for
+# pre-Caddy manual health/version checks; tighten that rule to just
+# 80/443 once this Caddyfile is actually live, and bind Docker's -p flag
+# to 127.0.0.1:8000 (see deploy/gcp_deploy.sh) rather than 0.0.0.0:8000.
+
+api.example-vidhidesk.com {
+	reverse_proxy 127.0.0.1:8000
+
+	encode gzip
+
+	log {
+		output file /var/log/caddy/vidhidesk-api-access.log
+	}
+}
+
+# Fallback while no domain/DNS exists yet: serves plain HTTP on the box's
+# bare IP so the deploy pipeline's own health/drift checks have something
+# to hit before the domain + HTTPS step is actually done. Remove this
+# block once the domain above is live -- it deliberately does NOT get
+# HTTPS (Caddy only issues certificates for named domains, never for a
+# bare IP), so it must not be the long-term production path.
+:80 {
+	reverse_proxy 127.0.0.1:8000
+}

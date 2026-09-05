@@ -59,3 +59,48 @@ Each file above says so in its own header comment — treat all four as a
 draft for a human with Oracle/DNS/Vercel access to review, dry-run, and
 adjust before ever wiring them live, not as something already proven to
 work.
+
+## Oracle migration — on hold; GCP migration started instead (2026-09-05)
+
+A live SSH audit this session found the Oracle claims above were not
+actually true: neither Oracle Always-Free VM (`ai-orchestration-vm`,
+`sensex-bot`) has Docker installed or a vidhidesk checkout, both are
+already near their ~1GB RAM ceiling running unrelated projects, and an
+automated harvester script on `ai-orchestration-vm` had made 2,870+
+failed attempts to obtain Oracle's larger free Ampere ARM tier (host
+capacity has been exhausted in that region this whole time). The four
+Oracle files above are left in place — inert, since no `ORACLE_SSH_*`
+secrets exist — as a fallback if Ampere capacity ever frees up, but are
+not an active migration target right now.
+
+AWS and Azure were also surveyed and found in a similar state: a single
+small instance each (`cheapest-test-instance` on AWS, t4g.nano/0.5GB RAM;
+`azure-ai-node-1` on Azure, Standard_B1s/1GB, 12-month free-trial only,
+not perpetual like Oracle's Always Free tier), both running unrelated
+projects, neither with Docker.
+
+Migration is now targeting a GCP Compute Engine VM instead:
+`gcp-ai-node-1` (project `calm-catfish-464514-t6`, zone `us-central1-a`,
+public IP `35.253.123.223`), confirmed idle this session — Ubuntu 24.04,
+e2-micro, no Docker, no competing processes, ~580MB RAM free of ~955MB
+total. (The other GCP VM in the account, `cbse-pyq-harvester`, is running
+an unrelated project and is explicitly out of scope for this migration.)
+
+The GCP pipeline mirrors the Oracle one exactly, retargeted:
+`deploy/gcp_deploy.sh`, `.github/workflows/gcp-deploy.yml`, and
+`deploy/gcp_Caddyfile` are the GCP counterparts of the three Oracle files
+above (`api/scripts/check_deployment_drift.py` is reused unmodified — it
+already takes a SHA and a base URL as plain arguments). Same invariants:
+`git fetch` + detached-HEAD checkout by exact SHA, never `git pull`;
+health-gate a candidate on a throwaway port before promoting; automatic
+rollback on failure; a domain for `deploy/gcp_Caddyfile` does not exist
+yet, so HTTPS is not live.
+
+As with the Oracle files, **treat every claim in the GCP files as only as
+verified as what was actually SSH-checked in this session** — this
+section exists specifically because the Oracle files' earlier "verified
+against the real box" language turned out to be false, and that mistake
+should not repeat here. **Render remains the live production backend**
+until the GCP box is proven healthy end-to-end and Vercel is deliberately
+re-pointed at it — that cutover is a separate, explicitly-approved step,
+not implied by any of the above.
