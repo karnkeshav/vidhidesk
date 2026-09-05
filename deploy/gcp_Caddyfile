@@ -1,11 +1,12 @@
-# GCP Migration (2026-09-05). Same shape as deploy/Caddyfile (the Oracle
-# draft) -- no real domain or DNS record exists yet for this GCP VM
-# either. Replace api.example-vidhidesk.com below with the real domain
-# once one is registered and its A/AAAA record points at the box's public
-# IP (35.253.123.223 as of this draft), then run
-# `caddy validate --config /path/to/this/file` and reload Caddy on the
-# box itself. This file has never been applied to or tested against a
-# live Caddy instance.
+# GCP Migration (2026-09-05). Real domain now exists: vidhidesk-api.duckdns.org
+# (free DuckDNS dynamic-DNS record), A record verified pointing at this box's
+# public IP (35.253.123.223). This is what unblocks HTTPS -- the previous
+# bare-IP-only setup made the live app fundamentally unusable, not just
+# insecure: a browser will not let an HTTPS page (the Vercel frontend) make
+# fetch/XHR calls to a plain-HTTP backend (mixed-content blocking, enforced
+# unconditionally, no retry fixes it) -- confirmed the hard way when the
+# first cutover attempt failed every request in ~1ms, before any network
+# activity, which is that exact signature.
 #
 # Caddy handles ACME/Let's Encrypt HTTPS automatically for any real
 # domain listed as a site block below -- no separate certbot setup
@@ -13,14 +14,12 @@
 # automatically for any domain block (not the bare-IP :80 block below).
 #
 # Port 8000 (the FastAPI container from api/Dockerfile) is intentionally
-# never exposed directly to the internet long-term -- only Caddy's
-# 443/80 are meant to be. The GCP firewall rule added for this migration
-# (`allow-vidhidesk-http`) currently also opens 8000 directly, purely for
-# pre-Caddy manual health/version checks; tighten that rule to just
-# 80/443 once this Caddyfile is actually live, and bind Docker's -p flag
-# to 127.0.0.1:8000 (see deploy/gcp_deploy.sh) rather than 0.0.0.0:8000.
+# never exposed directly to the internet -- only Caddy's 443/80 are. The
+# GCP firewall (`allow-vidhidesk-http`) is already tightened to just
+# 80/443, and the prod container already binds to 127.0.0.1:8000 only
+# (deploy/gcp_deploy.sh) -- this Caddyfile is the last piece.
 
-api.example-vidhidesk.com {
+vidhidesk-api.duckdns.org {
 	reverse_proxy 127.0.0.1:8000
 
 	encode gzip
