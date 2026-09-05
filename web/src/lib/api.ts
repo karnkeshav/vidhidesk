@@ -36,6 +36,16 @@ const TRANSIENT_RETRY_DELAYS_MS = [600, 1500, 3000];
 // (FETCH_TIMEOUT_MS + backoff) x 4 attempts, not an open-ended hang.
 const FETCH_TIMEOUT_MS = 12000;
 
+// Render's free tier spins the backend down after ~15 minutes idle;
+// waking it back up measured at 60.5s end-to-end this session. The two
+// calls most likely to BE that first request after idle -- session-start
+// (fires on every login) and create-matter (fires right after, often the
+// very next thing a user does) -- get this longer timeout instead of the
+// default above, so a cold start reads as "taking a while" rather than
+// aborting with a raw "signal is aborted without reason" before Render
+// ever gets a chance to respond.
+const COLD_START_TIMEOUT_MS = 70000;
+
 function isTransientFailure(status: number, bodyText: string): boolean {
   if (status >= 500) return true;
   if (status === 401) return /server error '?5\d\d/i.test(bodyText);
@@ -256,7 +266,7 @@ async function authedFetch(path: string, init?: RequestInit, options?: { retry?:
 // -- never on a page load/session restore, though it would be harmless
 // either way now.
 export function startSession(): Promise<{ status: string }> {
-  return authedFetch("/api/auth/session-start", { method: "POST" }, { retry: false });
+  return authedFetch("/api/auth/session-start", { method: "POST" }, { retry: false, timeoutMs: COLD_START_TIMEOUT_MS });
 }
 
 export function listMatters(): Promise<Matter[]> {
@@ -283,7 +293,7 @@ export function createMatter(input: {
       method: "POST",
       body: JSON.stringify(input),
     },
-    { retry: false }
+    { retry: false, timeoutMs: COLD_START_TIMEOUT_MS }
   );
 }
 
