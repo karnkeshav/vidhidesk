@@ -79,7 +79,7 @@ jobs:
           # so the workflow file and the on-box script cannot drift apart.
           script: |
             set -euo pipefail
-            bash /opt/vidhidesk/deploy/oracle_deploy.sh ${{ steps.sha.outputs.sha }}
+            bash /home/ubuntu/vidhidesk/deploy/oracle_deploy.sh ${{ steps.sha.outputs.sha }}
 
       - name: Verify GitHub SHA == Oracle running SHA
         if: ${{ secrets.ORACLE_BASE_URL != '' }}
