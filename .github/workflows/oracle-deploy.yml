@@ -82,9 +82,20 @@ jobs:
             bash /home/ubuntu/vidhidesk/deploy/oracle_deploy.sh ${{ steps.sha.outputs.sha }}
 
       - name: Verify GitHub SHA == Oracle running SHA
-        if: ${{ secrets.ORACLE_BASE_URL != '' }}
         env:
           ORACLE_BASE_URL: ${{ secrets.ORACLE_BASE_URL }}
+        # The skip-if-unset check lives in the run script, not in `if:` --
+        # `if: ${{ secrets.ORACLE_BASE_URL != '' }}` is invalid GitHub
+        # Actions syntax ("Unrecognized named-value: 'secrets'") and
+        # silently failed EVERY automated run of this workflow since it
+        # was created (confirmed the same bug in gcp-deploy.yml's copy of
+        # this pattern via manual workflow_dispatch, which is the only
+        # trigger that actually surfaces this parse error instead of a
+        # bare unexplained "failure").
         run: |
+          if [ -z "$ORACLE_BASE_URL" ]; then
+            echo "ORACLE_BASE_URL not set -- skipping drift check"
+            exit 0
+          fi
           pip install httpx
           python api/scripts/check_deployment_drift.py "${{ steps.sha.outputs.sha }}" "$ORACLE_BASE_URL"

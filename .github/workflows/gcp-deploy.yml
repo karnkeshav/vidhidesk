@@ -78,9 +78,20 @@ jobs:
             bash /home/ubuntu/vidhidesk/deploy/gcp_deploy.sh ${{ steps.sha.outputs.sha }}
 
       - name: Verify GitHub SHA == GCP running SHA
-        if: ${{ secrets.GCP_BASE_URL != '' }}
         env:
           GCP_BASE_URL: ${{ secrets.GCP_BASE_URL }}
+        # The skip-if-unset check lives in the run script, not in `if:` --
+        # `if: ${{ secrets.GCP_BASE_URL != '' }}` is invalid GitHub Actions
+        # syntax ("Unrecognized named-value: 'secrets'") and silently
+        # failed EVERY automated run of this workflow since it was
+        # created, with zero jobs ever starting -- only discovered by
+        # manually workflow_dispatch-ing it, which surfaces parse errors
+        # that the workflow_run/push triggers swallow into a bare
+        # "failure" with no logs.
         run: |
+          if [ -z "$GCP_BASE_URL" ]; then
+            echo "GCP_BASE_URL not set -- skipping drift check"
+            exit 0
+          fi
           pip install httpx
           python api/scripts/check_deployment_drift.py "${{ steps.sha.outputs.sha }}" "$GCP_BASE_URL"
