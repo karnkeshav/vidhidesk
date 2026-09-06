@@ -51,7 +51,18 @@ def test_case_lookup_sends_bearer_header(monkeypatch):
         captured["method"] = method
         captured["url"] = url
         captured["headers"] = headers
-        return _FakeResponse(200, {"cnr": "DLND020047882015", "courtName": "Test Court", "judge": "J. Test", "status": "Pending", "petitioners": ["A"], "respondents": ["B"]})
+        return _FakeResponse(200, {
+            "data": {
+                "courtCaseData": {
+                    "cnr": "DLND020047882015",
+                    "courtName": "Test Court",
+                    "judges": ["J. Test"],
+                    "caseStatus": "Pending",
+                    "petitioners": ["A"],
+                    "respondents": ["B"],
+                }
+            }
+        })
 
     monkeypatch.setattr(httpx, "request", fake_request)
     gw = CourtDataGateway(settings=_settings())

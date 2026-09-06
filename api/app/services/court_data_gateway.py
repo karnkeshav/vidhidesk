@@ -17,7 +17,13 @@ Confirmed base URL and auth: https://webapi.ecourtsindia.com,
 Every response carries `meta.request_id` on both success and error.
 
 Confirmed endpoints used here:
-  GET  /api/partner/case/{cnr}           -- full case detail by CNR
+  GET  /api/partner/case/{cnr}           -- full case detail by CNR; response
+                                             shape confirmed 2026-09-06 against
+                                             a real CNR (see case_lookup()) --
+                                             case fields are nested under
+                                             data["data"]["courtCaseData"],
+                                             not top-level as originally
+                                             assumed from the blog posts
   POST /api/partner/case/bulk-refresh    -- up to 50 CNRs, queues a re-scrape;
                                              wait 30+s before re-fetching case
                                              detail; safe to call repeatedly
@@ -184,13 +190,25 @@ class CourtDataGateway:
     def case_lookup(self, cnr: str) -> CourtCaseDetail:
         resp = self._request("GET", f"/api/partner/case/{cnr}")
         data = resp.json()
+        # Confirmed against a real, live response (2026-09-06, real CNR
+        # DLHC010163362026, a genuine pending Delhi HC bail application) --
+        # the blog-post-derived flat shape this module's docstring warned
+        # was unverified was wrong: case fields are nested under
+        # data["data"]["courtCaseData"], "judge" is actually a "judges"
+        # list, and "status" is actually "caseStatus". This was invisible
+        # until GET /api/court-lookup-preview (the first caller to read
+        # these typed fields rather than storing case_detail.raw wholesale)
+        # went live and returned an all-null preview for a case with real,
+        # rich data on record.
+        case_data = (data.get("data") or {}).get("courtCaseData") or {}
+        judges = case_data.get("judges") or []
         return CourtCaseDetail(
-            cnr=data.get("cnr", cnr),
-            court_name=data.get("courtName"),
-            judge=data.get("judge"),
-            status=data.get("status"),
-            petitioners=list(data.get("petitioners") or []),
-            respondents=list(data.get("respondents") or []),
+            cnr=case_data.get("cnr", cnr),
+            court_name=case_data.get("courtName"),
+            judge=", ".join(judges) if judges else None,
+            status=case_data.get("caseStatus"),
+            petitioners=list(case_data.get("petitioners") or []),
+            respondents=list(case_data.get("respondents") or []),
             raw=data,
         )
 
