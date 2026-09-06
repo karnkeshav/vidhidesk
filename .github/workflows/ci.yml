@@ -55,6 +55,20 @@ jobs:
   unit_tests:
     needs: lint
     runs-on: ubuntu-latest
+    # Most of this suite is properly mocked (FakeDB + dependency_overrides)
+    # and needs no real credentials, but a minority of tests exercise route
+    # code that calls service_client() directly (e.g. matters.py's GET
+    # /api/matters/{id}, which reads draft_versions) without mocking it --
+    # those 32 tests failed with "supabase_key is required" in CI (the repo
+    # never had SUPABASE_* secrets at all until this fix) even though they
+    # pass locally wherever a root .env with real values is picked up.
+    # Wiring the same real secrets infrastructure_verification already
+    # uses is the pragmatic fix here, not retrofitting mocks into 32 tests
+    # across 9 files in the same pass as unblocking the deploy pipeline.
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
