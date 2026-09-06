@@ -3,7 +3,7 @@
 > **Status:** Active
 > **Owner:** Keshav
 > **Audience:** Engineers planning upcoming sprints
-> **Last Updated:** 6 September 2026 (GCP Migration Sprint — TICKET-28/29/30 added)
+> **Last Updated:** 6 September 2026 (GCP Migration Sprint — TICKET-28/29/30 added; TICKET-31 added and closed same day; TICKET-28 status updated)
 > **Canonical Reference:** Yes, for deferred/open engineering tickets
 > **Supersedes:** N/A
 > **Related Documents:** [`30_Implementation/Build_Tracker.md`](Build_Tracker.md), [`20_Engineering/Lessons_Learned.md`](../20_Engineering/Lessons_Learned.md)
@@ -821,6 +821,17 @@ completes automatically end-to-end for the first time.
 *Source: `Deployment.md` "GCP deploy pipeline" section, verified via
 `gh run list --workflow=ci.yml` and `--workflow=gcp-deploy.yml`,
 2026-09-06.*
+**Status update (2026-09-06, same day):** this gap had a concrete
+consequence, not just a theoretical one — the GCP box was found still
+running commit `3365d7f`, predating the two-step CNR feature, the stale
+`provider_metadata` fix, and TICKET-31 below, because the automated
+pipeline this ticket blocks has never fired. Worked around (not fixed —
+this ticket's actual fix, adding the five secrets, is still open) by
+manually re-running `deploy/gcp_deploy.sh` with the current `main` SHA
+over SSH. See `Deployment.md`'s "Two-step CNR search/save" section for
+the operational lessons that manual redeploy surfaced (SSH-orphaned
+`docker build` processes, the correct `nohup`-detached invocation form,
+and the `gcloud compute ssh` user/ownership gotchas on this box).
 
 **TICKET-29: Stray "web" Vercel project should be deleted.** Classification:
 **Minor** (cleanup, not a functional issue — the correct `vidhidesk`
@@ -846,6 +857,37 @@ careful, deliberate pass (ideally alongside TICKET-12) by someone who can
 verify against the real schema, not a mechanical find-and-guard edit.
 *Source: `api/scripts/verify_migrations.py`, run during GCP Migration
 Sprint doc pass, 2026-09-06.*
+
+**~~TICKET-31: `useMatters()`/`useHearings()` called above their own
+Provider in 4 pages — Dashboard, Litigation, Consulting, and RERA hub all
+silently rendered zero matters.~~ — SHIPPED 2026-09-06, fixed same day it
+was found.** Classification: **Critical** — Litigation's own matter list
+(the module this session was actively real-CNR-testing) rendered "0
+active cases" / "No litigation matters found" for a user with 3 real
+matters, while the same page's sidebar correctly listed them — a
+production-breaking regression in 4 of the app's core module pages, not
+a code-reading hypothesis. Root cause confirmed by walking the live React
+fiber tree in the browser: `MattersContext.Provider` is mounted *inside*
+`AuthedShell`, around `AuthedShell`'s own `children` — but
+`LitigationPage`/`DashboardPage`/`ConsultingPage`/`RERAHubPage` all called
+`useMatters()` in their own top-level render before returning
+`<AuthedShell>{...}</AuthedShell>`, making each an *ancestor* of the
+Provider it renders internally. `useContext()` therefore always resolved
+to the default `{ matters: [], error: null }`, regardless of what
+`AuthedShell` actually fetched. `calendar/page.tsx` already carried the
+correct fix for this exact shape (a `CalendarContent` split, with an
+explicit comment diagnosing the bug) from an earlier, unrelated sprint,
+but it was never propagated to the other four pages sharing the same
+hooks — this is why the bug went undetected until real interactive
+browser testing hit it live. Fixed by applying the identical split to all
+four pages; each exported page component is now a thin
+`<AuthedShell><XContent /></AuthedShell>` wrapper, with `XContent` doing
+the real `useMatters()`-dependent rendering as a genuine child. Verified
+live: Litigation list correctly shows all 3 real matters post-deploy.
+*Source: found live, mid-session, while resuming real-CNR search/save
+testing on the Litigation module — `docs/40_Operations/Deployment.md`'s
+"MattersContext.Provider bug" section has the full diagnosis. Fixed
+same day, commit `b9a4902`.*
 
 **Note — `deploy/gcp_Caddyfile` domain placeholder: already resolved,
 not a backlog item.** An earlier note flagged this file's domain as a

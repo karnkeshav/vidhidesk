@@ -3,7 +3,7 @@
 > **Status:** Active — partial (backend now live on GCP over HTTPS, not Render; CI/deploy pipeline fixed but has not yet completed a successful automated end-to-end run — see remaining gaps below)
 > **Owner:** Keshav
 > **Audience:** Engineers, operations
-> **Last Updated:** 6 September 2026 (GCP Migration Sprint — cutover + CI/CD pipeline fixes)
+> **Last Updated:** 6 September 2026 (GCP Migration Sprint — cutover + CI/CD pipeline fixes + MattersContext bug + manual redeploy)
 > **Canonical Reference:** Yes, for the facts that are documented; explicitly not a complete deployment runbook — see remaining gaps
 > **Supersedes:** N/A
 > **Related Documents:** [`../10_Architecture/Runtime_Architecture.md`](../10_Architecture/Runtime_Architecture.md), [`Local_Development_Setup.md`](Local_Development_Setup.md), [`Deployment_Verification_Guide.md`](Deployment_Verification_Guide.md), [`Infrastructure_Verification.md`](Infrastructure_Verification.md), [`Runtime_Health_Check.md`](Runtime_Health_Check.md)
@@ -202,6 +202,77 @@ the CI/pipeline fixes above, not by this workflow. Adding the five
 missing LLM/Indian-Kanoon secrets so CI goes green is the direct next
 step to prove the full push → CI → deploy chain end-to-end; tracked in
 `Backlog.md`.
+
+## MattersContext.Provider bug — 4 pages silently showed zero matters (2026-09-06)
+
+Real-CNR testing of the Search/Save feature below was blocked before it
+could even start: the Litigation module's own matter list rendered "0
+active cases" / "No litigation matters found" for a user with 3 real
+litigation matters, while the same page's sidebar ("Recent Matters")
+correctly listed those exact matters. Root cause confirmed by walking the
+live React fiber tree in the browser (not guessed from reading code): the
+`MattersContext.Provider` is mounted *inside* `AuthedShell`, wrapping
+`AuthedShell`'s own `children` prop — but `LitigationPage`,
+`DashboardPage`, `ConsultingPage`, and `RERAHubPage` all called
+`useMatters()` in their *own* top-level render, then passed the resulting
+JSX down as `<AuthedShell>{...}</AuthedShell>`. Since each of those page
+components is an *ancestor* of `AuthedShell` (and therefore of the
+Provider it renders internally), `useContext()` always resolved to
+`MattersContext`'s default `{ matters: [], error: null }`, regardless of
+what `AuthedShell` actually fetched — a component cannot consume a
+context that only becomes an ancestor because of JSX it itself passes
+down as children.
+
+`calendar/page.tsx` already carried the correct fix for this exact shape
+(a `CalendarContent` component doing the real rendering, mounted as a
+genuine child via `<AuthedShell><CalendarContent /></AuthedShell>`, with
+an explicit comment explaining why), but that fix was never propagated to
+the other four pages using the same hooks. Applied the identical split to
+all four (`litigation/page.tsx` → `LitigationContent`,
+`dashboard/page.tsx` → `DashboardContent`, `consulting/page.tsx` →
+`ConsultingContent`, `rera/page.tsx` → `RERAHubContent`); each exported
+page component is now a thin `<AuthedShell><XContent /></AuthedShell>`
+wrapper. Verified live post-deploy: Litigation list correctly shows all 3
+matters. Committed as `b9a4902`, pushed to `main`.
+
+**Consequence, caught live testing this fix (2026-09-06):** trying to
+exercise the two-step CNR feature below through the now-fixed Litigation
+list surfaced that the *backend* was still stuck on commit `3365d7f` —
+deployed before the two-step CNR search/save feature (`9cd6695`) and the
+stale `provider_metadata` fix (`ae944ee`) even existed, because automated
+GCP deploy still cannot fire (see the gap above). `GET
+/api/court-lookup-preview` returned a bare FastAPI `404
+{"detail":"Not Found"}` (an unmatched route, not the endpoint's own
+404/501/502 handling) — the tell that the route simply didn't exist in
+the running image, confirmed directly via `GET /version` reporting the
+stale commit. Fixed by manually re-running `deploy/gcp_deploy.sh` over
+SSH with the current `main` SHA, same as the original cutover.
+
+**Operational lesson from this manual redeploy:** running
+`gcp_deploy.sh` via `gcloud compute ssh --command="..."` ties the
+remote script's lifetime to the local SSH client process. If the local
+machine kills that process (this session hit "system is running low on
+memory" locally), the remote `docker build` can be left running orphaned
+— its CLI client's stdout pipe is gone, and it appears to stall rather
+than exit (observed: zero forward progress for 6+ minutes after the last
+real step completed). The deploy script's own `flock`-based lock is
+released the moment its parent bash process dies with the SSH session,
+so a second attempt does start cleanly, but the orphaned `docker build`
+should be killed first (`sudo kill -9 <pid>`) rather than left to
+contend for the box's ~1GB RAM alongside a fresh build. **For any future
+manual redeploy, launch it as**
+`sudo -u ubuntu nohup bash deploy/gcp_deploy.sh <sha> > /tmp/deploy_<sha>.log 2>&1 < /dev/null &`
+**over SSH** so it survives a dropped local connection, and poll
+`/tmp/deploy_<sha>.log` / `ps aux` / `docker images` in separate SSH
+calls rather than keeping one long-lived `--command` invocation open.
+Also note: `gcloud compute ssh ubuntu@gcp-ai-node-1 ...` (explicit user)
+fails with "Server refused our key" — the working form is
+`gcloud compute ssh gcp-ai-node-1 ...` (no explicit user; OS Login
+resolves to the caller's own account, `keysh`, which has sudo). Since
+that account is not `ubuntu` (the repo/container owner), running the
+deploy script as plain `keysh` trips git's dubious-ownership guard — use
+`sudo -u ubuntu bash ...`, not plain `sudo bash ...` (which runs as
+`root` and trips the same guard from the other direction).
 
 ## Two-step CNR search/save (Litigation, 2026-09-06)
 
