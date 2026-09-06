@@ -17,6 +17,24 @@ def get_or_create_tracking(matter_id: str, organization_id: str, db: Client) -> 
 
 def update_tracking(matter_id: str, organization_id: str, payload: dict[str, Any], db: Client) -> dict[str, Any]:
     existing = get_or_create_tracking(matter_id, organization_id, db)
+
+    # A CNR change invalidates every prior sync result for THIS row --
+    # without this, the previous CNR's provider_metadata/sync_status/
+    # last_synced_at keep displaying (now mislabeled under the new CNR)
+    # until the next sync happens to succeed. Found by testing two real
+    # CNRs on the same matter: the old case's petitioner/court/FIR data
+    # was still visible under the new, never-yet-synced CNR. Reset
+    # unconditionally on any cnr_number write (including clearing it to
+    # None), not just when the value differs from the current one.
+    if "cnr_number" in payload:
+        payload = {
+            **payload,
+            "sync_status": "idle",
+            "provider_metadata": None,
+            "last_synced_at": None,
+            "last_error": None,
+        }
+
     updated = db.table("court_case_tracking").update(payload).eq("id", existing["id"]).execute()
 
     # matters.cnr_number predates this table (migration 0013) and is

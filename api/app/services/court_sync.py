@@ -142,8 +142,20 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     except CourtDataNotConfiguredError:
         raise
     except CourtDataGatewayError as exc:
+        # provider_metadata is explicitly cleared here, not left as-is: a
+        # matter whose CNR changes and then fails to look up would
+        # otherwise keep serving the PREVIOUS (different) case's cached
+        # data under the new CNR -- found by testing two real CNRs against
+        # the same matter, where the second (failed) lookup left the first
+        # case's petitioner/court/FIR data sitting there mislabeled under
+        # the new, never-successfully-looked-up CNR.
         sc.table("court_case_tracking").update(
-            {"sync_status": "error", "last_error": "Case lookup failed. See sync log for detail.", "last_synced_at": _now_iso()}
+            {
+                "sync_status": "error",
+                "last_error": "Case lookup failed. See sync log for detail.",
+                "last_synced_at": _now_iso(),
+                "provider_metadata": None,
+            }
         ).eq("id", tracking["id"]).execute()
         _log(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, operation="case_lookup", status="error", error_message=str(exc))
         raise
