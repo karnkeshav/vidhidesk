@@ -30,7 +30,12 @@ function timeOfDayGreeting(): string {
   return "Good evening";
 }
 
-export default function DashboardPage() {
+// Rendered strictly inside <AuthedShell> (see DashboardPage below) so that
+// useMatters() resolves against MattersContext's real Provider (mounted by
+// AuthedShell around its own children) instead of the context's default
+// empty value -- see calendar/page.tsx's CalendarContent for the original
+// diagnosis of this bug shape.
+function DashboardContent() {
   // Auth Request Forensics Sprint, item 8: this used to call listMatters()
   // itself, duplicating the identical fetch AuthedShell already makes for
   // its sidebar -- two concurrent GET /api/matters on every dashboard
@@ -88,7 +93,6 @@ export default function DashboardPage() {
   const consultingMatters = matters.filter((m) => m.module === "consulting");
 
   return (
-    <AuthedShell wide>
       <div className="space-y-6">
         {/* Daily Briefing Top Box (Stitch Approved Layout) */}
         <section className="rounded-sm border border-[#E4E2DD] bg-[#F6F3EE] p-4 md:p-5">
@@ -286,6 +290,17 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+  );
+}
+
+// Thin wrapper: mounts AuthedShell (and, inside it, MattersContext.Provider)
+// as a genuine ancestor of DashboardContent, so its useMatters() call
+// resolves against the real, live-fetched values rather than the context's
+// default.
+export default function DashboardPage() {
+  return (
+    <AuthedShell wide>
+      <DashboardContent />
     </AuthedShell>
   );
 }

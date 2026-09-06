@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { createConsultingAnalysis } from "@/lib/api";
 import { MessageSquare, Loader2, Calendar, User } from "lucide-react";
 
-export default function ConsultingPage() {
+// Rendered strictly inside <AuthedShell> (see ConsultingPage below) so that
+// useMatters() resolves against MattersContext's real Provider (mounted by
+// AuthedShell around its own children) instead of the context's default
+// empty value -- see calendar/page.tsx's CalendarContent for the original
+// diagnosis of this bug shape.
+function ConsultingContent() {
   const router = useRouter();
   const { matters, error: mattersError } = useMatters();
 
@@ -48,7 +53,6 @@ export default function ConsultingPage() {
   };
 
   return (
-    <AuthedShell wide>
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-12">
         <section>
           <div className="mb-6">
@@ -179,6 +183,17 @@ export default function ConsultingPage() {
           )}
         </section>
       </div>
+  );
+}
+
+// Thin wrapper: mounts AuthedShell (and, inside it, MattersContext.Provider)
+// as a genuine ancestor of ConsultingContent, so its useMatters() call
+// resolves against the real, live-fetched values rather than the context's
+// default.
+export default function ConsultingPage() {
+  return (
+    <AuthedShell wide>
+      <ConsultingContent />
     </AuthedShell>
   );
 }

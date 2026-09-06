@@ -7,7 +7,12 @@ import { Gavel, Search, Filter, LayoutGrid, List, Plus, X } from "lucide-react";
 import { createMatter, startSession, Matter, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
-export default function LitigationPage() {
+// Rendered strictly inside <AuthedShell> (see LitigationPage below) so that
+// useMatters() resolves against MattersContext's real Provider (mounted by
+// AuthedShell around its own children) instead of the context's default
+// empty value -- see calendar/page.tsx's CalendarContent for the original
+// diagnosis of this bug shape.
+function LitigationContent() {
   const router = useRouter();
   const { matters, error } = useMatters();
   const litigationMatters = matters.filter((m) => m.module === "litigation");
@@ -73,7 +78,6 @@ export default function LitigationPage() {
   }
 
   return (
-    <AuthedShell wide>
       <div className="flex h-full min-h-[80vh]">
         {/* CENTER COLUMN: Litigation Matters List */}
         <main className="flex-1 flex flex-col min-w-0 pr-4">
@@ -286,6 +290,17 @@ export default function LitigationPage() {
           </button>
         )}
       </div>
+  );
+}
+
+// Thin wrapper: mounts AuthedShell (and, inside it, MattersContext.Provider)
+// as a genuine ancestor of LitigationContent, so its useMatters() call
+// resolves against the real, live-fetched values rather than the context's
+// default.
+export default function LitigationPage() {
+  return (
+    <AuthedShell wide>
+      <LitigationContent />
     </AuthedShell>
   );
 }

@@ -6,7 +6,12 @@ import { FileText, AlertTriangle, Map, FolderOpen, ArrowRight } from "lucide-rea
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export default function RERAHubPage() {
+// Rendered strictly inside <AuthedShell> (see RERAHubPage below) so that
+// useMatters() resolves against MattersContext's real Provider (mounted by
+// AuthedShell around its own children) instead of the context's default
+// empty value -- see calendar/page.tsx's CalendarContent for the original
+// diagnosis of this bug shape.
+function RERAHubContent() {
   const { matters, error } = useMatters();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -19,7 +24,6 @@ export default function RERAHubPage() {
   );
 
   return (
-    <AuthedShell wide>
       <div className="flex h-full flex-col bg-[#FBF9F5]">
         {/* HEADER */}
         <header className="shrink-0 border-b border-[#E4E2DD] bg-white px-6 py-8">
@@ -156,6 +160,17 @@ export default function RERAHubPage() {
           </section>
         </main>
       </div>
+  );
+}
+
+// Thin wrapper: mounts AuthedShell (and, inside it, MattersContext.Provider)
+// as a genuine ancestor of RERAHubContent, so its useMatters() call
+// resolves against the real, live-fetched values rather than the context's
+// default.
+export default function RERAHubPage() {
+  return (
+    <AuthedShell wide>
+      <RERAHubContent />
     </AuthedShell>
   );
 }
