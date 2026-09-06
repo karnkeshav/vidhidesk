@@ -21,16 +21,8 @@
 
 FROM python:3.11.10-slim
 
-# Injected at build time by CI (docker build --build-arg GIT_COMMIT_SHA=<sha> .),
-# never hardcoded and never read from .git inside the image (this image does
-# not COPY .git at all -- see GET /version, api/app/routers/version.py, which
-# reads this as a plain env var at runtime and reports "unknown" if unset,
-# rather than guessing).
-ARG GIT_COMMIT_SHA=unknown
-
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
@@ -70,6 +62,24 @@ RUN mkdir -p /app/api/generated_drafts
 # app.main:app is a package inside api/, so uvicorn needs api/ as its
 # working directory to resolve the "app" import.
 WORKDIR /app/api
+
+# Injected at build time by CI (docker build --build-arg GIT_COMMIT_SHA=<sha> .),
+# never hardcoded and never read from .git inside the image (this image does
+# not COPY .git at all -- see GET /version, api/app/routers/version.py, which
+# reads this as a plain env var at runtime and reports "unknown" if unset,
+# rather than guessing). Deliberately placed here, after every expensive
+# COPY/RUN layer above, not up with the other ENV near FROM: GIT_COMMIT_SHA
+# is a different value on literally every single deploy (a new commit each
+# time), and Docker's layer cache invalidates every subsequent layer the
+# moment one layer's content changes -- putting it early meant every deploy
+# was forced into a full cold rebuild of the torch/spacy/sentence-transformers
+# install below, even a deploy that only changed a one-line docstring.
+# Confirmed live (2026-09-06): two consecutive real GCP redeploys, only the
+# second touching non-dependency code, both still re-downloaded and
+# reinstalled the entire dependency set from scratch -- this reorder is the
+# fix, not a preventive guess.
+ARG GIT_COMMIT_SHA=unknown
+ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
 
 EXPOSE 8000
 
