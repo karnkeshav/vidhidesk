@@ -15,11 +15,13 @@ import { CaseAnalysis, listCaseAnalyses } from "@/lib/api";
 import {
   CourtCaseTracking,
   CourtCaseSearchItem,
+  CourtCasePreview,
   CalendarHearing,
   getCourtTracking,
   updateCourtTracking,
   triggerCourtSync,
   searchCourtCases,
+  previewCourtCase,
   listCalendarHearings,
   createCalendarHearing,
 } from "@/lib/api";
@@ -111,6 +113,9 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
   const [forumResult, setForumResult] = useState<ForumResult | null>(null);
   const [courtTracking, setCourtTracking] = useState<CourtCaseTracking | null>(null);
   const [cnrInput, setCnrInput] = useState("");
+  const [cnrPreview, setCnrPreview] = useState<CourtCasePreview | null>(null);
+  const [cnrPreviewBusy, setCnrPreviewBusy] = useState(false);
+  const [cnrPreviewError, setCnrPreviewError] = useState<string | null>(null);
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [trackedHearings, setTrackedHearings] = useState<CalendarHearing[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -228,13 +233,31 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
     }
   }
 
-  async function handleSaveCnr(e: React.FormEvent) {
+  async function handleSearchCnr(e: React.FormEvent) {
     e.preventDefault();
+    if (!cnrInput.trim()) return;
+    setCnrPreviewBusy(true);
+    setCnrPreviewError(null);
+    setCnrPreview(null);
+    try {
+      const preview = await previewCourtCase(cnrInput.trim());
+      setCnrPreview(preview);
+    } catch (err) {
+      setCnrPreviewError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCnrPreviewBusy(false);
+    }
+  }
+
+  async function handleSaveCnr() {
+    if (!cnrPreview) return;
     setTrackingBusy(true);
     setError(null);
     try {
-      const updated = await updateCourtTracking(matterId, { cnr_number: cnrInput || null });
+      const updated = await updateCourtTracking(matterId, { cnr_number: cnrPreview.cnr });
       setCourtTracking(updated);
+      setCnrPreview(null);
+      setCnrPreviewError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -489,26 +512,69 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                       <h4 className="font-semibold uppercase tracking-wider text-[#081534]">Court Tracking</h4>
                     </div>
 
-                    <form onSubmit={handleSaveCnr} className="space-y-2">
+                    <form onSubmit={handleSearchCnr} className="space-y-2">
                       <label className="font-semibold text-[#081534]">CNR Number</label>
                       <div className="flex gap-1.5">
                         <input
                           type="text"
                           placeholder="e.g. DLND020047882015"
                           value={cnrInput}
-                          onChange={(e) => setCnrInput(e.target.value)}
+                          onChange={(e) => {
+                            setCnrInput(e.target.value);
+                            // Typing after a preview invalidates it -- never let a
+                            // stale preview (for a DIFFERENT CNR than what's now in
+                            // the box) be what "Save & Track" ends up saving.
+                            setCnrPreview(null);
+                            setCnrPreviewError(null);
+                          }}
                           className="h-8 w-full rounded-sm border border-[#E4E2DD] bg-white px-2 text-xs text-[#1A1A1A]"
                         />
                         <Button
                           type="submit"
-                          disabled={trackingBusy}
+                          disabled={cnrPreviewBusy || !cnrInput.trim()}
                           size="sm"
-                          className="h-8 shrink-0 rounded-sm bg-[#081534] px-3 font-sans text-[11px] font-semibold text-white hover:bg-[#1E2A4A]"
+                          variant="outline"
+                          className="h-8 shrink-0 rounded-sm border-[#081534] px-3 font-sans text-[11px] font-semibold text-[#081534]"
                         >
-                          Save
+                          {cnrPreviewBusy ? "Searching..." : "Search"}
                         </Button>
                       </div>
                     </form>
+
+                    {cnrPreviewError && (
+                      <p className="font-serif text-[10px] text-[#7A2A2A]">{cnrPreviewError}</p>
+                    )}
+
+                    {cnrPreview && (
+                      <div className="space-y-1.5 rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-2.5">
+                        <p className="font-semibold text-[#081534]">
+                          {[...cnrPreview.petitioners, ...cnrPreview.respondents].join(" vs ") || "Parties unknown"}
+                        </p>
+                        <p className="font-serif text-[10px] text-[#76777F]">
+                          {cnrPreview.court_name || "Court unknown"}
+                          {cnrPreview.status ? ` · ${cnrPreview.status}` : ""}
+                          {cnrPreview.judge ? ` · ${cnrPreview.judge}` : ""}
+                        </p>
+                        <div className="flex gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={trackingBusy}
+                            onClick={handleSaveCnr}
+                            className="h-7 rounded-sm bg-[#081534] px-3 font-sans text-[11px] font-semibold text-white hover:bg-[#1E2A4A]"
+                          >
+                            {trackingBusy ? "Saving..." : "Looks right — Save & Track"}
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => setCnrPreview(null)}
+                            className="font-serif text-[10px] text-[#76777F] underline underline-offset-2"
+                          >
+                            Discard
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     <button
                       type="button"

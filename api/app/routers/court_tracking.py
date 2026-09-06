@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth import CurrentUser, get_current_user
 from app.db import service_client
-from app.models.schemas import CourtCaseSearchResultOut, CourtCaseTrackingOut, CourtCaseTrackingUpdate
+from app.models.schemas import CourtCasePreviewOut, CourtCaseSearchResultOut, CourtCaseTrackingOut, CourtCaseTrackingUpdate
 from app.services import court_sync, court_tracking
 from app.services.court_data_gateway import CourtDataGateway, CourtDataGatewayError, CourtDataNotConfiguredError
 
@@ -81,6 +81,40 @@ def trigger_court_sync(matter_id: str, user: CurrentUser = Depends(get_current_u
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tracking record not found")
     return rows[0]
+
+
+@router.get("/court-lookup-preview", response_model=CourtCasePreviewOut)
+def preview_court_case(cnr: str, user: CurrentUser = Depends(get_current_user)):
+    """Looks up a single CNR the caller already has, to confirm it's the
+    right case BEFORE it's saved to a matter -- not matter-scoped, and
+    persists nothing (same posture as GET /court-search below, just for a
+    known CNR instead of a broad search). The caller still PATCHes
+    .../court-tracking with the confirmed CNR to actually save it; that
+    PATCH is what triggers the real sync and is the only thing that
+    writes to court_case_tracking."""
+    if not cnr.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide a CNR")
+    try:
+        gateway = CourtDataGateway()
+        detail = gateway.case_lookup(cnr.strip())
+    except CourtDataNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="eCourts integration is not configured on this server.",
+        ) from exc
+    except CourtDataGatewayError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not find or reach that CNR on the eCourts provider. Double-check it and try again.",
+        )
+    return {
+        "cnr": detail.cnr,
+        "court_name": detail.court_name,
+        "judge": detail.judge,
+        "status": detail.status,
+        "petitioners": detail.petitioners,
+        "respondents": detail.respondents,
+    }
 
 
 @router.get("/court-search", response_model=CourtCaseSearchResultOut)

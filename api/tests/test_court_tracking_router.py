@@ -15,7 +15,7 @@ from app.auth import CurrentUser, get_current_user
 from app.main import app
 from app.routers import court_tracking as court_tracking_router
 from app.services import court_sync
-from app.services.court_data_gateway import CaseSearchItem, CaseSearchResult, CourtDataGatewayError, CourtDataNotConfiguredError
+from app.services.court_data_gateway import CaseSearchItem, CaseSearchResult, CourtCaseDetail, CourtDataGatewayError, CourtDataNotConfiguredError
 from tests.test_platform import FakeServiceClient, _org
 
 
@@ -318,3 +318,75 @@ def test_search_court_cases_returns_items(monkeypatch):
     assert body["total"] == 1
     assert body["items"][0]["cnr"] == "DLND020047882015"
     assert body["items"][0]["advocates"] == ["Sharma"]
+
+
+def test_preview_court_case_requires_a_cnr():
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-lookup-preview?cnr=", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 400
+
+
+def test_preview_court_case_not_configured_returns_501(monkeypatch):
+    monkeypatch.setattr(
+        court_tracking_router,
+        "CourtDataGateway",
+        lambda: (_ for _ in ()).throw(CourtDataNotConfiguredError("no key")),
+    )
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-lookup-preview?cnr=DLND020047882015", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 501
+
+
+def test_preview_court_case_provider_error_returns_502(monkeypatch):
+    class _ExplodingGateway:
+        def case_lookup(self, _cnr):
+            raise CourtDataGatewayError("secret internal provider detail")
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _ExplodingGateway())
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-lookup-preview?cnr=DLND020047882015", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 502
+    assert "secret internal provider detail" not in resp.text
+
+
+def test_preview_court_case_returns_detail_and_persists_nothing():
+    class _FakeGateway:
+        def case_lookup(self, cnr):
+            assert cnr == "DLHC010163362026"
+            return CourtCaseDetail(
+                cnr=cnr,
+                court_name="Delhi High Court",
+                judge="ANUP JAIRAM BHAMBHANI",
+                status="PENDING",
+                petitioners=["Deepak"],
+                respondents=["State (nct of Delhi)"],
+                raw={},
+            )
+
+    fake_db = FakeDB()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(court_tracking_router, "CourtDataGateway", lambda: _FakeGateway())
+        client = _client_with(fake_db)
+        try:
+            resp = client.get(
+                "/api/court-lookup-preview?cnr=DLHC010163362026", headers={"Authorization": "Bearer x"}
+            )
+        finally:
+            _teardown()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["cnr"] == "DLHC010163362026"
+    assert body["petitioners"] == ["Deepak"]
+    assert body["respondents"] == ["State (nct of Delhi)"]
+    # The whole point of a preview: no court_case_tracking row is
+    # created/touched by looking one up, only by the follow-up PATCH.
+    assert fake_db._tables["court_case_tracking"].rows == []

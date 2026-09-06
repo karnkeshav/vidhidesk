@@ -869,6 +869,20 @@ class CourtCaseTrackingUpdate(BaseModel):
         return v
 
 
+class CourtCasePreviewOut(BaseModel):
+    """A single CNR looked up for confirmation before saving -- persists
+    nothing (see GET /api/court-lookup-preview), same "look before you
+    write" posture as CourtCaseSearchItemOut, just for a CNR the caller
+    already has rather than a broad search."""
+
+    cnr: str
+    court_name: str | None = None
+    judge: str | None = None
+    status: str | None = None
+    petitioners: list[str] = Field(default_factory=list)
+    respondents: list[str] = Field(default_factory=list)
+
+
 class CourtCaseTrackingOut(BaseModel):
     id: str
     matter_id: str

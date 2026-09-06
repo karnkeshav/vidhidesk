@@ -1260,6 +1260,27 @@ export function searchCourtCases(filters: {
   );
 }
 
+export type CourtCasePreview = {
+  cnr: string;
+  court_name: string | null;
+  judge: string | null;
+  status: string | null;
+  petitioners: string[];
+  respondents: string[];
+};
+
+/** Confirms a CNR the caller already has resolves to the right case
+ * BEFORE it's saved to a matter -- not matter-scoped, persists nothing.
+ * Saving still happens via the normal updateCourtTracking() PATCH once
+ * the preview looks right. */
+export function previewCourtCase(cnr: string): Promise<CourtCasePreview> {
+  return authedFetch(
+    `/api/court-lookup-preview?cnr=${encodeURIComponent(cnr)}`,
+    {},
+    { retry: false, timeoutMs: COURT_SYNC_TIMEOUT_MS }
+  );
+}
+
 export type HearingBriefContent = {
   case_record: Array<{ heading: string; content: string; source_refs: string[] }>;
   supported_arguments: Array<{ argument: string; source_refs: string[] }>;
