@@ -69,6 +69,16 @@ jobs:
           key: ${{ secrets.GCP_SSH_KEY }}
           port: ${{ secrets.GCP_SSH_PORT }}
           script_stop: true
+          # appleboy/ssh-action defaults command_timeout to 10m -- too
+          # short for a cold-cache build on this box: a from-scratch
+          # `pip install` of torch + spacy + sentence-transformers alone
+          # measured past 10 minutes when Docker's layer cache didn't
+          # apply (confirmed via a real workflow_dispatch run that hit
+          # exactly this "Run Command Timeout" mid-pip-install, not stuck
+          # -- just slow on a small shared 2-vCPU box). 20m budget on top
+          # of the script's own internal timeouts (60s health-gate,
+          # 600s lock wait) covers a full cold build with margin.
+          command_timeout: 20m
           # The script itself lives in the repo, checked out fresh on the
           # box by its own `git fetch` + `checkout --detach` -- this SSH
           # step only ever invokes it, never pastes deploy logic inline,

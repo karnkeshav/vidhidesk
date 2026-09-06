@@ -73,6 +73,14 @@ jobs:
           key: ${{ secrets.ORACLE_SSH_KEY }}
           port: ${{ secrets.ORACLE_SSH_PORT }}
           script_stop: true
+          # appleboy/ssh-action defaults command_timeout to 10m -- too
+          # short for a cold-cache build (confirmed on the GCP box's
+          # identical pipeline: a from-scratch `pip install` of torch +
+          # spacy + sentence-transformers alone measured past 10 minutes
+          # when Docker's layer cache didn't apply). 20m budget on top of
+          # the script's own internal timeouts (60s health-gate, 600s
+          # lock wait) covers a full cold build with margin.
+          command_timeout: 20m
           # The script itself lives in the repo, checked out fresh on the
           # box by its own `git fetch` + `checkout --detach` -- this SSH
           # step only ever invokes it, never pastes deploy logic inline,
