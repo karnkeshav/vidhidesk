@@ -3,7 +3,7 @@
 > **Status:** Active
 > **Owner:** Keshav
 > **Audience:** Engineers planning upcoming sprints
-> **Last Updated:** 9 August 2026 (Sprint 3.6 Phase 2A — TICKET-25 substantially resolved, TICKET-26 partial note)
+> **Last Updated:** 6 September 2026 (GCP Migration Sprint — TICKET-28/29/30 added)
 > **Canonical Reference:** Yes, for deferred/open engineering tickets
 > **Supersedes:** N/A
 > **Related Documents:** [`30_Implementation/Build_Tracker.md`](Build_Tracker.md), [`20_Engineering/Lessons_Learned.md`](../20_Engineering/Lessons_Learned.md)
@@ -799,3 +799,58 @@ visible, not fixing at the gateway level (the failover behavior itself is
 correct and intentional).
 *Source: same as TICKET-25.*
 *Source: observed across Batches 1-3 (Service Agreement, Consultancy, MoU).*
+
+## Deployment — GCP migration follow-ups (found GCP Migration Sprint, 2026-09-05/06)
+
+**TICKET-28: Five secrets missing, blocking a green CI run and therefore
+every automated GCP deploy.** Classification: **Critical** — complete
+blocker for the automated pipeline, not a code defect. `GEMINI_API_KEY`,
+`GROQ_API_KEY`, `SAMBANOVA_API_KEY`, `CEREBRAS_API_KEY`, and
+`INDIAN_KANOON_API_TOKEN` do not exist as GitHub repo secrets yet, so
+`infrastructure_verification`'s `test_golden_patterns` fails with
+`Illegal header value b'Bearer '` on every CI run (confirmed: latest run
+on `478ca5f` failed for exactly this reason). Because
+`.github/workflows/gcp-deploy.yml` only triggers on a `workflow_run` of
+CI completing with `conclusion: success`, this single gap is why every
+automated deploy run to date shows `skipped` — the GCP box's currently
+running container was deployed by hand over SSH, not by this pipeline.
+Fix: add the five secrets (values already exist in the project's local
+`.env` per `CLAUDE.md`'s environment variable list) via `gh secret set`,
+then push a trivial commit to confirm the full push → CI → deploy chain
+completes automatically end-to-end for the first time.
+*Source: `Deployment.md` "GCP deploy pipeline" section, verified via
+`gh run list --workflow=ci.yml` and `--workflow=gcp-deploy.yml`,
+2026-09-06.*
+
+**TICKET-29: Stray "web" Vercel project should be deleted.** Classification:
+**Minor** (cleanup, not a functional issue — the correct `vidhidesk`
+project is the one actually linked and receiving deploys). Running
+`vercel link` once during the GCP migration created a new, wrong project
+named "web" before the correct `vidhidesk` project link was restored by
+hand-editing `.vercel/project.json`. The stray "web" project was never
+used for anything and should be deleted from the Vercel dashboard once
+someone with account access confirms it holds nothing worth keeping.
+*Source: GCP Migration Sprint, 2026-09-05.*
+
+**TICKET-30: `0019_rera_backend.sql` and `0024_tenant_foundation.sql` fail
+the static migration-idempotency checker.** Classification: **Major**
+(same class of issue as the already-tracked TICKET-12, on two additional
+files). `api/scripts/verify_migrations.py` flags both files for
+`CREATE TABLE`/`CREATE INDEX`/`CREATE POLICY` statements without
+`IF NOT EXISTS`/`DROP POLICY IF EXISTS` guards, despite each file's own
+header comment claiming idempotency. Not fixed this session — both touch
+production schema (multi-tenancy foundation and RERA tables), and a
+blind rewrite risks getting the guard semantics wrong for policies/tables
+that may already exist in different states across environments. Needs a
+careful, deliberate pass (ideally alongside TICKET-12) by someone who can
+verify against the real schema, not a mechanical find-and-guard edit.
+*Source: `api/scripts/verify_migrations.py`, run during GCP Migration
+Sprint doc pass, 2026-09-06.*
+
+**Note — `deploy/gcp_Caddyfile` domain placeholder: already resolved,
+not a backlog item.** An earlier note flagged this file's domain as a
+placeholder needing cleanup; as of this session it already correctly
+references the real `vidhidesk-api.duckdns.org` domain with explanatory
+comments about the mixed-content fix. No action needed — recorded here
+only so it isn't re-flagged as open by a future pass.
+*Source: direct read of `deploy/gcp_Caddyfile`, 2026-09-06.*
