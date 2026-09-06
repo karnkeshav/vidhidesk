@@ -3,7 +3,7 @@
 > **Status:** Active — partial (backend now live on GCP over HTTPS, not Render; CI/deploy pipeline fixed but has not yet completed a successful automated end-to-end run — see remaining gaps below)
 > **Owner:** Keshav
 > **Audience:** Engineers, operations
-> **Last Updated:** 6 September 2026 (GCP Migration Sprint — cutover + CI/CD pipeline fixes + MattersContext bug + manual redeploy)
+> **Last Updated:** 6 September 2026 (GCP Migration Sprint — cutover + CI/CD pipeline fixes + MattersContext bug + manual redeploy + real-CNR e2e verification + case_lookup() field-mapping fix + Dockerfile cache-layer fix)
 > **Canonical Reference:** Yes, for the facts that are documented; explicitly not a complete deployment runbook — see remaining gaps
 > **Supersedes:** N/A
 > **Related Documents:** [`../10_Architecture/Runtime_Architecture.md`](../10_Architecture/Runtime_Architecture.md), [`Local_Development_Setup.md`](Local_Development_Setup.md), [`Deployment_Verification_Guide.md`](Deployment_Verification_Guide.md), [`Infrastructure_Verification.md`](Infrastructure_Verification.md), [`Runtime_Health_Check.md`](Runtime_Health_Check.md)
@@ -298,3 +298,42 @@ right. The frontend (`matter-workspace.tsx`) replaced the single
 input+button with a Search → preview card (parties/court/status) →
 "Looks right — Save & Track" / "Discard" flow; editing the CNR after a
 preview clears it.
+
+**Real-CNR end-to-end verification (2026-09-06), and a second real bug
+it caught.** Testing this feature live against a real CNR
+(`DLHC010163362026`, a genuine pending Delhi HC bail application —
+Deepak v. State (NCT of Delhi), Judge Anup Jairam Bhambhani) surfaced
+that `CourtDataGateway.case_lookup()` was reading `court_name`/`judge`/
+`status`/`petitioners`/`respondents` off the top level of the provider
+response — a shape the module's own docstring already flagged as
+reconstructed from blog posts and unverified. The real response nests
+these under `data["data"]["courtCaseData"]`, `judge` is really a
+`judges` list, and `status` is really `caseStatus`. `court_sync.py`'s
+older full-sync path never surfaced this because it stores
+`case_detail.raw` wholesale into `provider_metadata` and never reads
+the typed fields — `GET /api/court-lookup-preview` was the first real
+caller of them, and returned an all-null preview ("Parties unknown",
+"Court unknown") for a case with real, rich data on record. Neither
+existing test suite caught it: the gateway's own test asserted against
+the same wrong flat shape it used to fake the response, and the
+router's test replaced the whole gateway with a fake already returning
+a correct `CourtCaseDetail` object, never exercising the real JSON
+parsing. Fixed in `case_lookup()` (commit `cb0d429`) to read the
+confirmed real nesting. Re-verified live end-to-end after redeploying:
+Search correctly showed "Deepak vs State (nct of Delhi) — DLHC ·
+PENDING · ANUP JAIRAM BHAMBHANI"; Save & Track persisted
+`cnr_number`/`sync_status: idle` with `provider_metadata: null` (no
+stale data carried over from this matter's previous, unrelated CNR);
+Sync Now then completed with `sync_status: synced` and the same real
+petitioner/respondent/court data.
+
+**Deploy-speed fix found along the way (commit `f288932`):** getting
+this fix live required two full ~15-minute cold GCP rebuilds before it
+was noticed that the Dockerfile's `ARG GIT_COMMIT_SHA`/`ENV
+GIT_COMMIT_SHA` sat before the expensive `pip install` layers —
+since that value differs on every single deploy, it invalidated
+Docker's build cache for every layer after it, every time, regardless
+of whether `requirements.txt` had changed. Moved to just before
+`EXPOSE`, after every expensive `COPY`/`RUN` layer, so a future
+code-only redeploy can actually reuse the cached dependency layers
+instead of paying the full cold-build cost again.

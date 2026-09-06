@@ -3,7 +3,7 @@
 > **Status:** Active
 > **Owner:** Keshav
 > **Audience:** Engineers planning upcoming sprints
-> **Last Updated:** 6 September 2026 (GCP Migration Sprint — TICKET-28/29/30 added; TICKET-31 added and closed same day; TICKET-28 status updated)
+> **Last Updated:** 6 September 2026 (GCP Migration Sprint — TICKET-28/29/30 added; TICKET-31/32 added and closed same day; TICKET-28 status updated; Dockerfile cache-layer note added)
 > **Canonical Reference:** Yes, for deferred/open engineering tickets
 > **Supersedes:** N/A
 > **Related Documents:** [`30_Implementation/Build_Tracker.md`](Build_Tracker.md), [`20_Engineering/Lessons_Learned.md`](../20_Engineering/Lessons_Learned.md)
@@ -888,6 +888,44 @@ live: Litigation list correctly shows all 3 real matters post-deploy.
 testing on the Litigation module — `docs/40_Operations/Deployment.md`'s
 "MattersContext.Provider bug" section has the full diagnosis. Fixed
 same day, commit `b9a4902`.*
+
+**~~TICKET-32: `CourtDataGateway.case_lookup()` read court_name/judge/
+status/petitioners/respondents from the wrong place in the real eCourts
+response, so the new CNR preview always showed "Parties unknown" /
+"Court unknown".~~ — SHIPPED 2026-09-06, fixed same day it was found.**
+Classification: **Major** — the flagship two-step CNR search/save
+feature (see the Deployment.md section above) silently produced an
+empty-looking preview for every real case, even ones with rich data
+already on record. Found via a real, live browser test against a real
+CNR (`DLHC010163362026`, genuine pending Delhi HC bail application),
+not a code-reading hypothesis. Root cause: the real provider response
+nests case fields under `data["data"]["courtCaseData"]`; `case_lookup()`
+read them off the top level instead, per the module's own docstring
+caveat that this shape was reconstructed from blog posts and "RE-VERIFY
+... against a live response before treating any field as guaranteed
+present" — advice that had not yet been followed for this endpoint.
+Also wrong: `judge` is really a `judges` list, `status` is really
+`caseStatus`. Neither existing unit test caught it — both mocked past
+the exact boundary where the real bug lived (one faked the same wrong
+flat JSON shape it was asserting against; the other replaced the whole
+gateway with a fake already returning a correct typed object). Fixed by
+reading the confirmed real nesting; re-verified live end-to-end
+(Search → real preview data → Save & Track → Sync Now, all against the
+real CNR, all correct). See `Deployment.md`'s "Two-step CNR search/save"
+section for the full verification trail.
+*Source: real-CNR browser test, GCP Migration Sprint continuation,
+2026-09-06. Fixed same day, commit `cb0d429`.*
+
+**Note (not a ticket, already fixed same session): Dockerfile layer
+ordering was forcing every GCP redeploy into a full ~15min cold rebuild
+regardless of what changed** — `ARG`/`ENV GIT_COMMIT_SHA` sat before the
+expensive `pip install` layers, and since that value is different on
+every deploy, it invalidated Docker's cache for every layer after it,
+every time. Moved after the install/copy layers (commit `f288932`) so a
+future code-only deploy can reuse the cached dependency layers. Recorded
+here only so a future pass doesn't need to rediscover why redeploys were
+slow; see `Deployment.md`'s "Two-step CNR search/save" section for the
+full diagnosis.
 
 **Note — `deploy/gcp_Caddyfile` domain placeholder: already resolved,
 not a backlog item.** An earlier note flagged this file's domain as a
