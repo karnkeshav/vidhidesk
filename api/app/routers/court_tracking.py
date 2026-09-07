@@ -259,6 +259,20 @@ def preview_court_case(cnr: str, user: CurrentUser = Depends(get_current_user)):
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="eCourts integration is not configured on this server.",
         ) from exc
+    except CourtDataNotFoundError as exc:
+        # Same reasoning as trigger_court_sync's own handling: a 404 means
+        # eCourts doesn't recognize this CNR at all (typo, wrong court
+        # code, or genuinely not on record) -- a client-error 400, not a
+        # server/connectivity problem. Without this, CourtDataNotFoundError
+        # (a CourtDataGatewayError subclass) fell through to the generic
+        # 502 below on every search-step lookup, not just the save-step
+        # sync -- found 2026-09-07 when a real bad-CNR search showed the
+        # same "Could not find or reach" message trigger_court_sync had
+        # already been fixed to stop giving.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CNR not found on eCourts. Double-check the CNR and try again.",
+        ) from exc
     except CourtDataQuotaExceededError as exc:
         # Same reasoning as trigger_court_sync's own handling below.
         raise HTTPException(
@@ -315,6 +329,22 @@ def search_court_cases(
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="eCourts integration is not configured on this server.",
+        ) from exc
+    except CourtDataNotFoundError as exc:
+        # Same gap as preview_court_case had: case_search() shares
+        # CourtDataGateway._request(), so a 404 from the provider (no
+        # matches for these filters) is also a CourtDataGatewayError
+        # subclass and would otherwise fall through to the generic 502
+        # below -- a client-side "no results", not a server/connectivity
+        # problem.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No matching cases found for these filters on eCourts.",
+        ) from exc
+    except CourtDataQuotaExceededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="eCourts API quota/billing issue. Check the eCourts account's plan/billing status.",
         ) from exc
     except CourtDataGatewayError:
         raise HTTPException(

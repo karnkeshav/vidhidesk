@@ -526,6 +526,71 @@ def test_preview_court_case_returns_detail_and_persists_nothing():
     assert fake_db._tables["court_case_tracking"].rows == []
 
 
+def test_preview_court_case_cnr_not_found_returns_400_not_502(monkeypatch):
+    """Same bug class as test_trigger_sync_cnr_not_found_returns_400_not_502,
+    different endpoint: CourtDataNotFoundError is a CourtDataGatewayError
+    subclass, so without its own except clause here it fell through to the
+    generic 502 -- found in production (2026-09-07) via a real search-step
+    lookup that should have been a clean "CNR not found", not an "outage"."""
+    class _NotFoundGateway:
+        def case_lookup(self, _cnr):
+            raise CourtDataNotFoundError("eCourts API returned 404 (request_id=abc)")
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _NotFoundGateway())
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-lookup-preview?cnr=DLND020047882015", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 400
+    assert "not found" in resp.json()["detail"].lower()
+
+
+def test_preview_court_case_quota_exceeded_returns_402_not_502(monkeypatch):
+    class _QuotaExceededGateway:
+        def case_lookup(self, _cnr):
+            raise CourtDataQuotaExceededError("eCourts API returned 402 (request_id=abc)")
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _QuotaExceededGateway())
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-lookup-preview?cnr=DLND020047882015", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 402
+    assert "quota" in resp.json()["detail"].lower()
+
+
+def test_search_court_cases_cnr_not_found_returns_400_not_502(monkeypatch):
+    """Same gap, third endpoint: case_search() shares CourtDataGateway._
+    request() with case_lookup(), so it can raise the same 404/402 subclasses."""
+    class _NotFoundGateway:
+        def case_search(self, **_kwargs):
+            raise CourtDataNotFoundError("eCourts API returned 404 (request_id=abc)")
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _NotFoundGateway())
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-search?query=test", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 400
+
+
+def test_search_court_cases_quota_exceeded_returns_402_not_502(monkeypatch):
+    class _QuotaExceededGateway:
+        def case_search(self, **_kwargs):
+            raise CourtDataQuotaExceededError("eCourts API returned 402 (request_id=abc)")
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _QuotaExceededGateway())
+    client = _client_with(FakeDB())
+    try:
+        resp = client.get("/api/court-search?query=test", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 402
+
+
 def test_preview_uses_cached_data_instead_of_calling_the_live_api(monkeypatch):
     """Cache-first (2026-09-07, real user request): if this exact CNR was
     already synced on one of the caller's own matters, reuse that instead
