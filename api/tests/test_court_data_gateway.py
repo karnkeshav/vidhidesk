@@ -16,6 +16,7 @@ from app.services.court_data_gateway import (
     CourtDataGateway,
     CourtDataGatewayError,
     CourtDataNotConfiguredError,
+    CourtDataNotFoundError,
 )
 
 
@@ -275,14 +276,33 @@ def test_case_search_unrecognized_shape_returns_empty_not_crash(monkeypatch):
     assert result.items == []
 
 
-def test_persistent_error_never_leaks_raw_response_text(monkeypatch):
+def test_404_raises_the_specific_not_found_subclass_never_leaking_raw_text(monkeypatch):
+    """Found in production (2026-09-07): a plain CourtDataGatewayError for
+    a 404 was indistinguishable from a real outage by every caller,
+    surfacing "unable to reach the provider" for what was actually just a
+    CNR typo. CourtDataNotFoundError is a CourtDataGatewayError subclass
+    (so any pre-existing broad `except CourtDataGatewayError` still
+    catches it), but callers that care can now tell the two apart."""
     def fake_request(method, url, headers=None, timeout=None, **kwargs):
         return _FakeResponse(404, {"meta": {"request_id": "req-404"}, "secret_internal_detail": "should never surface"})
 
     monkeypatch.setattr(httpx, "request", fake_request)
     gw = CourtDataGateway(settings=_settings())
 
-    with pytest.raises(CourtDataGatewayError) as exc_info:
+    with pytest.raises(CourtDataNotFoundError) as exc_info:
         gw.case_lookup("CNR1")
+    assert isinstance(exc_info.value, CourtDataGatewayError)
     assert "secret_internal_detail" not in str(exc_info.value)
     assert "req-404" in str(exc_info.value)
+
+
+def test_non_404_persistent_error_raises_base_class_not_not_found(monkeypatch):
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        return _FakeResponse(403, {"meta": {"request_id": "req-403"}})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    gw = CourtDataGateway(settings=_settings())
+
+    with pytest.raises(CourtDataGatewayError) as exc_info:
+        gw.case_lookup("CNR1")
+    assert not isinstance(exc_info.value, CourtDataNotFoundError)

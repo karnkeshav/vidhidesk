@@ -15,7 +15,14 @@ from app.auth import CurrentUser, get_current_user
 from app.main import app
 from app.routers import court_tracking as court_tracking_router
 from app.services import court_sync
-from app.services.court_data_gateway import CaseSearchItem, CaseSearchResult, CourtCaseDetail, CourtDataGatewayError, CourtDataNotConfiguredError
+from app.services.court_data_gateway import (
+    CaseSearchItem,
+    CaseSearchResult,
+    CourtCaseDetail,
+    CourtDataGatewayError,
+    CourtDataNotConfiguredError,
+    CourtDataNotFoundError,
+)
 from tests.test_platform import FakeServiceClient, _org
 
 
@@ -294,6 +301,41 @@ def test_trigger_sync_provider_error_returns_502_without_leaking_detail(monkeypa
         _teardown()
     assert resp.status_code == 502
     assert "secret internal provider detail" not in resp.text
+
+
+def test_trigger_sync_cnr_not_found_returns_400_not_502(monkeypatch):
+    """A 404 from the provider means the CNR itself wasn't found -- a
+    client error, not a connectivity/outage problem. Found in production
+    (2026-09-07): this used to return the same 502 "unable to reach the
+    provider" as a real outage, which is actively wrong for a bad CNR."""
+    db = FakeDB(matters=[_matter_row()])
+    fake_sc = FakeServiceClient(
+        {
+            "court_case_tracking": [
+                {"id": "t1", "matter_id": "m1", "organization_id": "org-1", "cnr_number": "CNR1", "tracking_enabled": True}
+            ],
+            "matters": [_matter_row()],
+            "organizations": [_org("org-1", status="active")],
+        }
+    )
+    monkeypatch.setattr(court_tracking_router, "service_client", lambda: fake_sc)
+
+    class _NotFoundGateway:
+        def case_lookup(self, cnr):
+            raise CourtDataNotFoundError("eCourts API returned 404 (request_id=abc)")
+
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: _NotFoundGateway())
+
+    client = _client_with(db)
+    try:
+        resp = client.post("/api/matters/m1/court-tracking/sync", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 400
+    assert "not found" in resp.json()["detail"].lower()
+
+    tracking_row = fake_sc.table("court_case_tracking").rows[0]
+    assert tracking_row["last_error"] == "CNR not found on eCourts. Double-check the CNR and try again."
 
 
 def test_search_court_cases_requires_a_filter():

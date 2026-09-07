@@ -77,6 +77,16 @@ class CourtDataNotConfiguredError(CourtDataGatewayError):
     """ECOURTS_API_KEY is not set."""
 
 
+class CourtDataNotFoundError(CourtDataGatewayError):
+    """The provider returned 404 for a given CNR -- the CNR doesn't exist
+    (typo, wrong court code, or a case eCourts simply doesn't have on
+    record), NOT a connectivity/outage problem. Found in production
+    (2026-09-07): a real user's genuine CNR typo surfaced as "Unable to
+    reach the eCourts provider right now" -- true for a 5xx/timeout, but
+    actively misleading for a 404, which every caller was previously
+    treating identically to a real outage."""
+
+
 @dataclass
 class InterlocutoryApplicationEntry:
     """One entry from courtCaseData.interlocutoryApplications -- confirmed
@@ -213,6 +223,8 @@ class CourtDataGateway:
                         "court_data_gateway provider error status=%d path=%s request_id=%s",
                         resp.status_code, path, request_id,
                     )
+                    if resp.status_code == 404:
+                        raise CourtDataNotFoundError(f"eCourts API returned 404 (request_id={request_id})")
                     raise CourtDataGatewayError(f"eCourts API returned {resp.status_code} (request_id={request_id})")
                 return resp
             if attempt < _MAX_RETRIES:

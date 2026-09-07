@@ -28,6 +28,7 @@ from app.services.court_data_gateway import (
     CourtDataGateway,
     CourtDataGatewayError,
     CourtDataNotConfiguredError,
+    CourtDataNotFoundError,
 )
 from app.services.notifications import notify_hearing_listed
 
@@ -320,10 +321,22 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
         # the same matter, where the second (failed) lookup left the first
         # case's petitioner/court/FIR data sitting there mislabeled under
         # the new, never-successfully-looked-up CNR.
+        #
+        # A 404 (CourtDataNotFoundError) gets its OWN last_error text --
+        # found in production (2026-09-07): a genuine CNR typo surfaced as
+        # "Case lookup failed" with the router's generic "unable to reach
+        # the provider" 502, which sent the user looking for a
+        # connectivity problem that didn't exist. See that exception's own
+        # docstring.
+        last_error = (
+            "CNR not found on eCourts. Double-check the CNR and try again."
+            if isinstance(exc, CourtDataNotFoundError)
+            else "Case lookup failed. See sync log for detail."
+        )
         sc.table("court_case_tracking").update(
             {
                 "sync_status": "error",
-                "last_error": "Case lookup failed. See sync log for detail.",
+                "last_error": last_error,
                 "last_synced_at": _now_iso(),
                 "provider_metadata": None,
             }

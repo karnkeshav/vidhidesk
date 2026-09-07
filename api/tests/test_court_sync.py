@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import pytest
 
 from app.services import court_sync
-from app.services.court_data_gateway import CourtDataGatewayError
+from app.services.court_data_gateway import CourtDataGatewayError, CourtDataNotFoundError
 from tests.test_platform import FakeServiceClient, _org
 
 
@@ -457,6 +457,23 @@ def test_case_lookup_failure_sets_error_state_and_logs(monkeypatch):
 
     log_rows = fake.table("court_sync_log").rows
     assert any(r["operation"] == "case_lookup" and r["status"] == "error" for r in log_rows)
+
+
+def test_cnr_not_found_sets_distinct_last_error(monkeypatch):
+    """Found in production (2026-09-07): a 404 (bad/nonexistent CNR) was
+    getting the same generic 'Case lookup failed' last_error as a real
+    provider outage, which the router then turned into a misleading
+    'unable to reach the provider' message for a plain CNR typo."""
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(case_lookup_raises=CourtDataNotFoundError("eCourts API returned 404 (request_id=abc)"))
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    with pytest.raises(CourtDataNotFoundError):
+        court_sync.sync_matter_court_data("m1", fake)
+
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert tracking_row["sync_status"] == "error"
+    assert tracking_row["last_error"] == "CNR not found on eCourts. Double-check the CNR and try again."
 
 
 def test_causelist_failure_does_not_invalidate_successful_case_lookup(monkeypatch):

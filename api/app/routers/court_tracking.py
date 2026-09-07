@@ -21,7 +21,12 @@ from app.models.schemas import (
     InterlocutoryApplicationOut,
 )
 from app.services import court_sync, court_tracking
-from app.services.court_data_gateway import CourtDataGateway, CourtDataGatewayError, CourtDataNotConfiguredError
+from app.services.court_data_gateway import (
+    CourtDataGateway,
+    CourtDataGatewayError,
+    CourtDataNotConfiguredError,
+    CourtDataNotFoundError,
+)
 
 router = APIRouter(prefix="/api", tags=["court-tracking"])
 
@@ -76,6 +81,18 @@ def trigger_court_sync(matter_id: str, user: CurrentUser = Depends(get_current_u
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="eCourts integration is not configured on this server.",
+        ) from exc
+    except CourtDataNotFoundError as exc:
+        # Distinct from the generic 502 below: a 404 means eCourts doesn't
+        # recognize this CNR at all (typo, wrong court code, or genuinely
+        # not on record) -- a client-error 400, not a server/connectivity
+        # problem. Conflating the two sent a real user (2026-09-07)
+        # chasing a nonexistent outage over a CNR typo. last_error on the
+        # tracking row already carries the same message (set by
+        # sync_matter_court_data).
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CNR not found on eCourts. Double-check the CNR and try again.",
         ) from exc
     except CourtDataGatewayError:
         # Never echo the raw provider error to the client -- last_error on
