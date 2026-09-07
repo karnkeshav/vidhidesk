@@ -182,6 +182,42 @@ def list_case_advocates(matter_id: str, user: CurrentUser = Depends(get_current_
     ]
 
 
+def _cached_preview_from_tracking(user: CurrentUser, cnr: str) -> dict | None:
+    """Cache-first (added 2026-09-07, real user request after seeing every
+    Search click burn live eCourts quota with zero caching): reuse a
+    prior successful sync's already-verified typed fields for this exact
+    CNR instead of calling the live API again. Queried via user.db, so
+    RLS on court_case_tracking already scopes this to the caller's own
+    organization -- no cross-tenant data exposure. Only a row where
+    provider_metadata is actually populated counts as "cached" -- an
+    idle/never-synced/errored tracking row (provider_metadata null) is
+    not a cache hit and falls through to the live call. Reads only,
+    matching this endpoint's existing "persists nothing" posture."""
+    rows = (
+        user.db.table("court_case_tracking")
+        .select("cnr_number,court_name,judge,case_status,petitioners,respondents,provider_metadata,last_synced_at")
+        .eq("cnr_number", cnr)
+        .execute()
+        .data
+        or []
+    )
+    candidates = [r for r in rows if r.get("provider_metadata")]
+    if not candidates:
+        return None
+    # More than one of the caller's own matters could share a CNR (rare,
+    # but not disallowed) -- the most recently synced one wins.
+    candidates.sort(key=lambda r: r.get("last_synced_at") or "", reverse=True)
+    row = candidates[0]
+    return {
+        "cnr": row["cnr_number"],
+        "court_name": row.get("court_name"),
+        "judge": row.get("judge"),
+        "status": row.get("case_status"),
+        "petitioners": row.get("petitioners") or [],
+        "respondents": row.get("respondents") or [],
+    }
+
+
 @router.get("/court-lookup-preview", response_model=CourtCasePreviewOut)
 def preview_court_case(cnr: str, user: CurrentUser = Depends(get_current_user)):
     """Looks up a single CNR the caller already has, to confirm it's the
@@ -190,12 +226,21 @@ def preview_court_case(cnr: str, user: CurrentUser = Depends(get_current_user)):
     known CNR instead of a broad search). The caller still PATCHes
     .../court-tracking with the confirmed CNR to actually save it; that
     PATCH is what triggers the real sync and is the only thing that
-    writes to court_case_tracking."""
+    writes to court_case_tracking.
+
+    Checks for a cached result (_cached_preview_from_tracking) before
+    ever reaching for the live provider -- see that function's comment."""
     if not cnr.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide a CNR")
+    normalized_cnr = cnr.strip().upper()
+
+    cached = _cached_preview_from_tracking(user, normalized_cnr)
+    if cached:
+        return cached
+
     try:
         gateway = CourtDataGateway()
-        detail = gateway.case_lookup(cnr.strip())
+        detail = gateway.case_lookup(normalized_cnr)
     except CourtDataNotConfiguredError as exc:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,

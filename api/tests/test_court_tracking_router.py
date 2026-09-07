@@ -490,6 +490,69 @@ def test_preview_court_case_returns_detail_and_persists_nothing():
     assert fake_db._tables["court_case_tracking"].rows == []
 
 
+def test_preview_uses_cached_data_instead_of_calling_the_live_api(monkeypatch):
+    """Cache-first (2026-09-07, real user request): if this exact CNR was
+    already synced on one of the caller's own matters, reuse that instead
+    of burning eCourts quota on an identical live call."""
+    cached_row = {
+        "id": "t1", "matter_id": "m1", "cnr_number": "DLHC010163362026",
+        "court_name": "DLHC", "judge": "ANUP JAIRAM BHAMBHANI", "case_status": "PENDING",
+        "petitioners": ["Deepak"], "respondents": ["State (nct of Delhi)"],
+        "provider_metadata": {"cnr": "DLHC010163362026"}, "last_synced_at": "2026-09-07T02:30:00Z",
+    }
+    db = FakeDB(matters=[_matter_row()], tracking=[cached_row])
+
+    def _explode():
+        raise AssertionError("live gateway must not be called on a cache hit")
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", _explode)
+    client = _client_with(db)
+    try:
+        resp = client.get(
+            "/api/court-lookup-preview?cnr=DLHC010163362026", headers={"Authorization": "Bearer x"}
+        )
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["court_name"] == "DLHC"
+    assert body["judge"] == "ANUP JAIRAM BHAMBHANI"
+    assert body["status"] == "PENDING"
+    assert body["petitioners"] == ["Deepak"]
+
+
+def test_preview_ignores_tracking_row_never_actually_synced(monkeypatch):
+    """A tracking row can exist (CNR saved) with provider_metadata still
+    null (never synced, or sync errored) -- that's not a cache hit, and
+    must still fall through to the live API."""
+    unsynced_row = {
+        "id": "t1", "matter_id": "m1", "cnr_number": "DLHC010163362026",
+        "court_name": None, "judge": None, "case_status": None,
+        "petitioners": [], "respondents": [], "provider_metadata": None, "last_synced_at": None,
+    }
+    db = FakeDB(matters=[_matter_row()], tracking=[unsynced_row])
+
+    class _FakeGateway:
+        def case_lookup(self, cnr):
+            return CourtCaseDetail(
+                cnr=cnr, court_name="Delhi High Court", judge="ANUP JAIRAM BHAMBHANI",
+                judges=["ANUP JAIRAM BHAMBHANI"], status="PENDING", petitioners=["Deepak"],
+                respondents=["State (nct of Delhi)"], petitioner_advocates=[], respondent_advocates=[],
+                interlocutory_applications=[], next_hearing_date=None, raw={},
+            )
+
+    monkeypatch.setattr(court_tracking_router, "CourtDataGateway", lambda: _FakeGateway())
+    client = _client_with(db)
+    try:
+        resp = client.get(
+            "/api/court-lookup-preview?cnr=DLHC010163362026", headers={"Authorization": "Bearer x"}
+        )
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    assert resp.json()["court_name"] == "Delhi High Court"  # came from the live call, not the null row
+
+
 def test_list_causelist_returns_rows_newest_first():
     causelist_rows = [
         {
