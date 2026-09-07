@@ -87,6 +87,19 @@ class CourtDataNotFoundError(CourtDataGatewayError):
     treating identically to a real outage."""
 
 
+class CourtDataQuotaExceededError(CourtDataGatewayError):
+    """The provider returned 402 Payment Required -- the eCourts account's
+    plan/quota/billing needs attention, NOT a connectivity/outage problem
+    and NOT anything wrong with the CNR. Found in production (2026-09-07,
+    same day as CourtDataNotFoundError): a real sync attempt for a known-
+    good CNR (one that had succeeded earlier the same day) got a fresh 402
+    from the provider, right after a burst of testing calls -- consistent
+    with the account's quota being exhausted. Every caller was previously
+    lumping this in with the same generic "unable to reach the provider"
+    message as a real 5xx/timeout, which doesn't tell the user (or an
+    account owner) that this needs a billing/plan fix, not a retry."""
+
+
 @dataclass
 class InterlocutoryApplicationEntry:
     """One entry from courtCaseData.interlocutoryApplications -- confirmed
@@ -225,6 +238,8 @@ class CourtDataGateway:
                     )
                     if resp.status_code == 404:
                         raise CourtDataNotFoundError(f"eCourts API returned 404 (request_id={request_id})")
+                    if resp.status_code == 402:
+                        raise CourtDataQuotaExceededError(f"eCourts API returned 402 (request_id={request_id})")
                     raise CourtDataGatewayError(f"eCourts API returned {resp.status_code} (request_id={request_id})")
                 return resp
             if attempt < _MAX_RETRIES:

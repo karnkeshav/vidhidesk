@@ -22,6 +22,7 @@ from app.services.court_data_gateway import (
     CourtDataGatewayError,
     CourtDataNotConfiguredError,
     CourtDataNotFoundError,
+    CourtDataQuotaExceededError,
 )
 from tests.test_platform import FakeServiceClient, _org
 
@@ -336,6 +337,41 @@ def test_trigger_sync_cnr_not_found_returns_400_not_502(monkeypatch):
 
     tracking_row = fake_sc.table("court_case_tracking").rows[0]
     assert tracking_row["last_error"] == "CNR not found on eCourts. Double-check the CNR and try again."
+
+
+def test_trigger_sync_quota_exceeded_returns_402_not_502(monkeypatch):
+    """A 402 from the provider means the eCourts account's own quota/
+    billing needs attention -- found in production (2026-09-07) right
+    after a burst of testing calls exhausted a real account's quota. Same
+    conflation-with-502 bug as the 404 case, different root cause."""
+    db = FakeDB(matters=[_matter_row()])
+    fake_sc = FakeServiceClient(
+        {
+            "court_case_tracking": [
+                {"id": "t1", "matter_id": "m1", "organization_id": "org-1", "cnr_number": "CNR1", "tracking_enabled": True}
+            ],
+            "matters": [_matter_row()],
+            "organizations": [_org("org-1", status="active")],
+        }
+    )
+    monkeypatch.setattr(court_tracking_router, "service_client", lambda: fake_sc)
+
+    class _QuotaExceededGateway:
+        def case_lookup(self, cnr):
+            raise CourtDataQuotaExceededError("eCourts API returned 402 (request_id=abc)")
+
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: _QuotaExceededGateway())
+
+    client = _client_with(db)
+    try:
+        resp = client.post("/api/matters/m1/court-tracking/sync", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 402
+    assert "quota" in resp.json()["detail"].lower()
+
+    tracking_row = fake_sc.table("court_case_tracking").rows[0]
+    assert "quota/billing" in tracking_row["last_error"]
 
 
 def test_search_court_cases_requires_a_filter():

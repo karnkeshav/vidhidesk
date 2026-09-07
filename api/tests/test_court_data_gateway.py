@@ -17,6 +17,7 @@ from app.services.court_data_gateway import (
     CourtDataGatewayError,
     CourtDataNotConfiguredError,
     CourtDataNotFoundError,
+    CourtDataQuotaExceededError,
 )
 
 
@@ -306,3 +307,22 @@ def test_non_404_persistent_error_raises_base_class_not_not_found(monkeypatch):
     with pytest.raises(CourtDataGatewayError) as exc_info:
         gw.case_lookup("CNR1")
     assert not isinstance(exc_info.value, CourtDataNotFoundError)
+
+
+def test_402_raises_the_specific_quota_exceeded_subclass(monkeypatch):
+    """Found in production (2026-09-07): a real sync for a known-good CNR
+    got a fresh 402 from the provider right after a burst of testing
+    calls -- consistent with quota exhaustion, not an outage or a bad
+    CNR. Same reasoning as the 404 fix above: a plain CourtDataGatewayError
+    gave every caller no way to tell "your account needs billing
+    attention" apart from "the provider is briefly down"."""
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        return _FakeResponse(402, {"meta": {"request_id": "req-402"}})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    gw = CourtDataGateway(settings=_settings())
+
+    with pytest.raises(CourtDataQuotaExceededError) as exc_info:
+        gw.case_lookup("CNR1")
+    assert isinstance(exc_info.value, CourtDataGatewayError)
+    assert "req-402" in str(exc_info.value)

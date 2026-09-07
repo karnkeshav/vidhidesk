@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import pytest
 
 from app.services import court_sync
-from app.services.court_data_gateway import CourtDataGatewayError, CourtDataNotFoundError
+from app.services.court_data_gateway import CourtDataGatewayError, CourtDataNotFoundError, CourtDataQuotaExceededError
 from tests.test_platform import FakeServiceClient, _org
 
 
@@ -474,6 +474,22 @@ def test_cnr_not_found_sets_distinct_last_error(monkeypatch):
     tracking_row = fake.table("court_case_tracking").rows[0]
     assert tracking_row["sync_status"] == "error"
     assert tracking_row["last_error"] == "CNR not found on eCourts. Double-check the CNR and try again."
+
+
+def test_quota_exceeded_sets_distinct_last_error(monkeypatch):
+    """Found in production (2026-09-07): a 402 (quota/billing) was getting
+    the same generic 'Case lookup failed' last_error as a real outage --
+    same conflation as the 404 case above, different root cause."""
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(case_lookup_raises=CourtDataQuotaExceededError("eCourts API returned 402 (request_id=abc)"))
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    with pytest.raises(CourtDataQuotaExceededError):
+        court_sync.sync_matter_court_data("m1", fake)
+
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert tracking_row["sync_status"] == "error"
+    assert "quota/billing" in tracking_row["last_error"]
 
 
 def test_causelist_failure_does_not_invalidate_successful_case_lookup(monkeypatch):

@@ -26,6 +26,7 @@ from app.services.court_data_gateway import (
     CourtDataGatewayError,
     CourtDataNotConfiguredError,
     CourtDataNotFoundError,
+    CourtDataQuotaExceededError,
 )
 
 router = APIRouter(prefix="/api", tags=["court-tracking"])
@@ -93,6 +94,18 @@ def trigger_court_sync(matter_id: str, user: CurrentUser = Depends(get_current_u
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="CNR not found on eCourts. Double-check the CNR and try again.",
+        ) from exc
+    except CourtDataQuotaExceededError as exc:
+        # Distinct from the generic 502 below for the same reason as 404
+        # above: 402 means the eCourts account's own quota/billing needs
+        # attention, not a connectivity/outage problem -- found the same
+        # day (2026-09-07) as the 404 case, right after a burst of testing
+        # calls exhausted the account's quota. 402 (not 502/503) mirrors
+        # the provider's own status code, since this genuinely is a
+        # payment-required condition, not a transient server failure.
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="eCourts API quota/billing issue. Check the eCourts account's plan/billing status.",
         ) from exc
     except CourtDataGatewayError:
         # Never echo the raw provider error to the client -- last_error on
@@ -245,6 +258,12 @@ def preview_court_case(cnr: str, user: CurrentUser = Depends(get_current_user)):
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="eCourts integration is not configured on this server.",
+        ) from exc
+    except CourtDataQuotaExceededError as exc:
+        # Same reasoning as trigger_court_sync's own handling below.
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="eCourts API quota/billing issue. Check the eCourts account's plan/billing status.",
         ) from exc
     except CourtDataGatewayError:
         raise HTTPException(
