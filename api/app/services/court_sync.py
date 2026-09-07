@@ -104,6 +104,48 @@ def _upsert_hearing_from_causelist(sc, *, matter: dict[str, Any], entry) -> tupl
     return (inserted[0] if inserted else None), True
 
 
+def _upsert_causelist_row(sc, *, matter: dict[str, Any], cnr: str, entry, judges: list[str]) -> None:
+    """Upserts one row into court_hearings_causelist, keyed by the table's
+    own (matter_id, hearing_date) unique constraint. Deliberately writes
+    ONLY fields CourtDataGateway has already verified against a real
+    provider response: court/bench/list_type/date come from CauselistEntry
+    (verified 2026-08-28), judges comes from this same sync's case_lookup
+    call (verified 2026-09-06, see CourtDataGateway.case_lookup). It never
+    writes court_advocates/case_advocate_links/interlocutory_applications
+    -- those tables' provider field shapes are unverified (see
+    scripts/ecourts_spike.py); guessing them was the cause of the earlier
+    case_lookup envelope bug and is not repeated here."""
+    if not entry.date:
+        return
+
+    existing = (
+        sc.table("court_hearings_causelist")
+        .select("*")
+        .eq("matter_id", matter["id"])
+        .eq("hearing_date", entry.date)
+        .execute()
+        .data
+        or []
+    )
+
+    payload = {
+        "organization_id": matter["organization_id"],
+        "matter_id": matter["id"],
+        "cnr_number": cnr,
+        "hearing_date": entry.date,
+        "bench_number": entry.bench,
+        "judge_names": judges or None,
+        "court_location": entry.court,
+        "causelist_type": entry.list_type,
+        "fetched_at": _now_iso(),
+    }
+
+    if existing:
+        sc.table("court_hearings_causelist").update(payload).eq("id", existing[0]["id"]).execute()
+    else:
+        sc.table("court_hearings_causelist").insert(payload).execute()
+
+
 def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     """Full sync for one matter. `sc` is a service_client() instance --
     the caller (scheduler script) is responsible for supplying it; this
@@ -162,12 +204,20 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
 
     hearing_created = False
     hearing_row: dict[str, Any] | None = None
+    # 'nextListing'.date, straight from causelist_batch (see
+    # CourtDataGateway.causelist_batch) -- exactly what this column means.
+    # Was never actually written before this fix, despite existing since
+    # 0025 (court_case_tracking.next_hearing_date), found while wiring up
+    # the case-details UI.
+    next_hearing_date: str | None = None
     try:
         causelist = gateway.causelist_batch([cnr])
         entry = causelist.get(cnr)
         _log(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, operation="causelist_batch", status="success")
         if entry and entry.has_causelist:
             hearing_row, hearing_created = _upsert_hearing_from_causelist(sc, matter=matter, entry=entry)
+            _upsert_causelist_row(sc, matter=matter, cnr=cnr, entry=entry, judges=case_detail.judges)
+            next_hearing_date = entry.date
     except CourtDataGatewayError as exc:
         # A causelist failure does not invalidate the case_lookup we
         # already have -- log it, keep going, surface a partial success.
@@ -179,6 +229,16 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
             "last_error": None,
             "last_synced_at": _now_iso(),
             "provider_metadata": case_detail.raw,
+            # Same already-verified fields case_detail carries -- stored
+            # separately so a caller (case-details UI) never has to parse
+            # provider_metadata's raw envelope itself, see 0028's migration
+            # note.
+            "court_name": case_detail.court_name,
+            "judge": case_detail.judge,
+            "case_status": case_detail.status,
+            "petitioners": case_detail.petitioners,
+            "respondents": case_detail.respondents,
+            "next_hearing_date": next_hearing_date,
         }
     ).eq("id", tracking["id"]).execute()
 

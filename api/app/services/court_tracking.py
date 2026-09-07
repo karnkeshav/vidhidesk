@@ -33,6 +33,15 @@ def update_tracking(matter_id: str, organization_id: str, payload: dict[str, Any
             "provider_metadata": None,
             "last_synced_at": None,
             "last_error": None,
+            # Same staleness bug provider_metadata's reset above guards
+            # against (see comment) -- these typed mirrors (0028) would
+            # otherwise keep showing the PREVIOUS CNR's court/judge/status/
+            # parties under the new, not-yet-synced CNR.
+            "court_name": None,
+            "judge": None,
+            "case_status": None,
+            "petitioners": [],
+            "respondents": [],
         }
 
     updated = db.table("court_case_tracking").update(payload).eq("id", existing["id"]).execute()

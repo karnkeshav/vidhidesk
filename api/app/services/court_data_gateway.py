@@ -82,6 +82,7 @@ class CourtCaseDetail:
     cnr: str
     court_name: str | None
     judge: str | None
+    judges: list[str]
     status: str | None
     petitioners: list[str]
     respondents: list[str]
@@ -206,6 +207,7 @@ class CourtDataGateway:
             cnr=case_data.get("cnr", cnr),
             court_name=case_data.get("courtName"),
             judge=", ".join(judges) if judges else None,
+            judges=list(judges),
             status=case_data.get("caseStatus"),
             petitioners=list(case_data.get("petitioners") or []),
             respondents=list(case_data.get("respondents") or []),

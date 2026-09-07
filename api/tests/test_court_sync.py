@@ -19,12 +19,14 @@ class _FakeCaseDetail:
     cnr: str
     court_name: str | None = "Test Court"
     judge: str | None = "J. Test"
+    judges: list = None
     status: str | None = "Pending"
     petitioners: list = None
     respondents: list = None
     raw: dict = None
 
     def __post_init__(self):
+        self.judges = self.judges if self.judges is not None else (["J. Test"] if self.judge else [])
         self.petitioners = self.petitioners or []
         self.respondents = self.respondents or []
         self.raw = self.raw if self.raw is not None else {"cnr": self.cnr}
@@ -86,6 +88,7 @@ def _base_fake(*, org_status="active", access_enabled=True, tracking=None, matte
             "hearings": list(hearings or []),
             "court_sync_log": [],
             "notifications": [],
+            "court_hearings_causelist": [],
         }
     )
 
@@ -148,6 +151,10 @@ def test_successful_sync_creates_hearing_and_notification(monkeypatch):
     assert tracking_row["sync_status"] == "synced"
     assert tracking_row["last_error"] is None
     assert tracking_row["provider_metadata"] == {"cnr": "CNR1", "status": "Pending"}
+    assert tracking_row["court_name"] == "Test Court"
+    assert tracking_row["judge"] == "J. Test"
+    assert tracking_row["case_status"] == "Pending"
+    assert tracking_row["next_hearing_date"] == "2026-08-28"
 
     hearings = fake.table("hearings").rows
     assert len(hearings) == 1
@@ -159,6 +166,47 @@ def test_successful_sync_creates_hearing_and_notification(monkeypatch):
     notifications = fake.table("notifications").rows
     assert len(notifications) == 1
     assert notifications[0]["type"] == "hearing_listed"
+
+    causelist_rows = fake.table("court_hearings_causelist").rows
+    assert len(causelist_rows) == 1
+    assert causelist_rows[0]["matter_id"] == "m1"
+    assert causelist_rows[0]["hearing_date"] == "2026-08-28"
+    assert causelist_rows[0]["bench_number"] == "Bench A"
+    assert causelist_rows[0]["court_location"] == "Court Hall 4"
+    assert causelist_rows[0]["judge_names"] == ["J. Test"]
+
+
+def test_repeat_sync_updates_same_causelist_row_no_duplicate(monkeypatch):
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(cnr="CNR1", judges=["J. First"]),
+        causelist={"CNR1": _FakeCauselistEntry(cnr="CNR1", has_causelist=True, court="Court A", bench="Bench A")},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+    court_sync.sync_matter_court_data("m1", fake)
+
+    gateway2 = _FakeGateway(
+        case_detail=_FakeCaseDetail(cnr="CNR1", judges=["J. Second"]),
+        causelist={"CNR1": _FakeCauselistEntry(cnr="CNR1", has_causelist=True, court="Court B", bench="Bench B")},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway2)
+    court_sync.sync_matter_court_data("m1", fake)
+
+    causelist_rows = fake.table("court_hearings_causelist").rows
+    assert len(causelist_rows) == 1  # never duplicated
+    assert causelist_rows[0]["court_location"] == "Court B"
+    assert causelist_rows[0]["bench_number"] == "Bench B"
+    assert causelist_rows[0]["judge_names"] == ["J. Second"]
+
+
+def test_no_causelist_entry_no_causelist_row(monkeypatch):
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(case_detail=_FakeCaseDetail(cnr="CNR1"), causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    court_sync.sync_matter_court_data("m1", fake)
+    assert fake.table("court_hearings_causelist").rows == []
+    assert fake.table("court_case_tracking").rows[0]["next_hearing_date"] is None
 
 
 def test_repeat_sync_updates_same_hearing_no_duplicate(monkeypatch):

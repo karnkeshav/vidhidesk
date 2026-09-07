@@ -30,9 +30,19 @@ class _FakeQuery:
         self.op = op
         self.payload = payload
         self.filters: dict = {}
+        self._in_filters: dict[str, list] = {}
+        self._order_col = None
 
     def eq(self, col, val):
         self.filters[col] = val
+        return self
+
+    def in_(self, col, vals):
+        self._in_filters[col] = list(vals)
+        return self
+
+    def order(self, col, desc=False):
+        self._order_col = (col, desc)
         return self
 
     def limit(self, _n):
@@ -43,7 +53,15 @@ class _FakeQuery:
 
     def execute(self):
         if self.op == "select":
-            matches = [r for r in self.table.rows if all(r.get(k) == v for k, v in self.filters.items())]
+            matches = [
+                r
+                for r in self.table.rows
+                if all(r.get(k) == v for k, v in self.filters.items())
+                and all(r.get(k) in v for k, v in self._in_filters.items())
+            ]
+            if self._order_col:
+                col, desc = self._order_col
+                matches = sorted(matches, key=lambda r: r[col], reverse=desc)
             return _FakeResponse(matches)
         if self.op == "insert":
             row = dict(self.payload)
@@ -83,11 +101,13 @@ class _FakeTable:
 
 
 class FakeDB:
-    def __init__(self, matters=None, tracking=None):
+    def __init__(self, matters=None, tracking=None, **extra_tables):
         self._tables = {
             "matters": _FakeTable("matters", matters or []),
             "court_case_tracking": _FakeTable("court_case_tracking", tracking or []),
         }
+        for name, rows in extra_tables.items():
+            self._tables[name] = _FakeTable(name, rows)
 
     def table(self, name):
         return self._tables.setdefault(name, _FakeTable(name))
@@ -146,6 +166,36 @@ def test_update_tracking_sets_cnr_and_enables():
     body = resp.json()
     assert body["cnr_number"] == "DLND020047882015"  # trimmed + uppercased server-side
     assert body["tracking_enabled"] is True
+
+
+def test_update_tracking_cnr_change_clears_stale_typed_fields():
+    existing_tracking = {
+        "id": "t1", "matter_id": "m1", "cnr_number": "OLDCNR", "tracking_enabled": True,
+        "sync_status": "synced", "last_error": None, "last_synced_at": "2026-08-01T00:00:00Z",
+        "next_hearing_date": None, "provider_metadata": {"cnr": "OLDCNR"},
+        "court_name": "Old Court", "judge": "J. Old", "case_status": "Pending",
+        "petitioners": ["Old Petitioner"], "respondents": ["Old Respondent"],
+        "created_at": "2026-08-01T00:00:00Z", "updated_at": "2026-08-01T00:00:00Z",
+    }
+    db = FakeDB(matters=[_matter_row()], tracking=[existing_tracking])
+    client = _client_with(db)
+    try:
+        resp = client.patch(
+            "/api/matters/m1/court-tracking",
+            json={"cnr_number": "NEWCNR123"},
+            headers={"Authorization": "Bearer x"},
+        )
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["cnr_number"] == "NEWCNR123"
+    assert body["court_name"] is None
+    assert body["judge"] is None
+    assert body["case_status"] is None
+    assert body["petitioners"] == []
+    assert body["respondents"] == []
+    assert body["provider_metadata"] is None
 
 
 def test_update_tracking_empty_body_400s():
@@ -366,6 +416,7 @@ def test_preview_court_case_returns_detail_and_persists_nothing():
                 cnr=cnr,
                 court_name="Delhi High Court",
                 judge="ANUP JAIRAM BHAMBHANI",
+                judges=["ANUP JAIRAM BHAMBHANI"],
                 status="PENDING",
                 petitioners=["Deepak"],
                 respondents=["State (nct of Delhi)"],
@@ -390,3 +441,81 @@ def test_preview_court_case_returns_detail_and_persists_nothing():
     # The whole point of a preview: no court_case_tracking row is
     # created/touched by looking one up, only by the follow-up PATCH.
     assert fake_db._tables["court_case_tracking"].rows == []
+
+
+def test_list_causelist_returns_rows_newest_first():
+    causelist_rows = [
+        {
+            "id": "c1", "matter_id": "m1", "cnr_number": "CNR1", "hearing_date": "2026-08-20",
+            "hearing_time": None, "bench_number": "Bench A", "judge_names": ["J. Test"],
+            "court_location": "Court Hall 4", "causelist_type": None, "fetched_at": "2026-08-20T00:00:00Z",
+        },
+        {
+            "id": "c2", "matter_id": "m1", "cnr_number": "CNR1", "hearing_date": "2026-09-08",
+            "hearing_time": None, "bench_number": "Bench B", "judge_names": None,
+            "court_location": "Court Hall 4", "causelist_type": None, "fetched_at": "2026-09-01T00:00:00Z",
+        },
+    ]
+    db = FakeDB(matters=[_matter_row()], court_hearings_causelist=causelist_rows)
+    client = _client_with(db)
+    try:
+        resp = client.get("/api/matters/m1/causelist", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [row["id"] for row in body] == ["c2", "c1"]  # newest hearing_date first
+
+
+def test_list_causelist_404s_for_unknown_matter():
+    db = FakeDB(matters=[])
+    client = _client_with(db)
+    try:
+        resp = client.get("/api/matters/missing/causelist", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 404
+
+
+def test_list_interlocutory_applications_empty_by_default():
+    db = FakeDB(matters=[_matter_row()])
+    client = _client_with(db)
+    try:
+        resp = client.get("/api/matters/m1/interlocutory-applications", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_list_case_advocates_joins_links_to_advocates():
+    links = [
+        {"id": "l1", "matter_id": "m1", "advocate_id": "a1", "role": "PETITIONER_COUNSEL",
+         "first_appeared": "2026-01-01", "last_appeared": "2026-06-01"},
+    ]
+    advocates = [
+        {"id": "a1", "name": "R. Sharma", "bar_council_id": "D/1234/2010", "phone": "9999999999",
+         "email": None, "office_address": None},
+    ]
+    db = FakeDB(matters=[_matter_row()], case_advocate_links=links, court_advocates=advocates)
+    client = _client_with(db)
+    try:
+        resp = client.get("/api/matters/m1/case-advocates", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["name"] == "R. Sharma"
+    assert body[0]["role"] == "PETITIONER_COUNSEL"
+
+
+def test_list_case_advocates_empty_by_default():
+    db = FakeDB(matters=[_matter_row()])
+    client = _client_with(db)
+    try:
+        resp = client.get("/api/matters/m1/case-advocates", headers={"Authorization": "Bearer x"})
+    finally:
+        _teardown()
+    assert resp.status_code == 200
+    assert resp.json() == []

@@ -893,6 +893,14 @@ class CourtCaseTrackingOut(BaseModel):
     sync_status: str
     last_error: str | None = None
     provider_metadata: dict | None = None
+    # Typed mirrors of provider_metadata's already-verified fields (see
+    # 0028_court_case_tracking_typed_fields.sql) -- populated once the
+    # first successful sync runs, null/empty before that.
+    court_name: str | None = None
+    judge: str | None = None
+    case_status: str | None = None
+    petitioners: list[str] = Field(default_factory=list)
+    respondents: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -916,6 +924,60 @@ class CourtCaseSearchResultOut(BaseModel):
     items: list[CourtCaseSearchItemOut]
     total: int | None = None
     has_next_page: bool | None = None
+
+
+class CauselistEntryOut(BaseModel):
+    """One court_hearings_causelist row -- populated by
+    app/services/court_sync.py from fields CourtDataGateway has verified
+    against a real provider response (see that function's own docstring)."""
+
+    id: str
+    matter_id: str
+    cnr_number: str | None = None
+    hearing_date: str
+    hearing_time: str | None = None
+    bench_number: str | None = None
+    judge_names: list[str] | None = None
+    court_location: str | None = None
+    causelist_type: str | None = None
+    fetched_at: datetime
+
+
+class InterlocutoryApplicationOut(BaseModel):
+    """One interlocutory_applications (CM APPL) row. No sync path writes
+    this table yet -- IA field names have never been confirmed against a
+    live eCourts response (see scripts/ecourts_spike.py) -- so this is
+    currently always an empty list for every matter."""
+
+    id: str
+    matter_id: str
+    cnr_number: str | None = None
+    application_number: str
+    filed_by: str
+    filing_date: str
+    current_status: str
+    relief_sought: str | None = None
+    last_update_date: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CaseAdvocateOut(BaseModel):
+    """One advocate linked to a matter (court_advocates joined through
+    case_advocate_links). No sync path writes these tables yet -- advocate
+    field names have never been confirmed against a live eCourts response
+    (see scripts/ecourts_spike.py) -- so this is currently always an empty
+    list for every matter."""
+
+    advocate_id: str
+    name: str
+    bar_council_id: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    office_address: str | None = None
+    role: str
+    first_appeared: str | None = None
+    last_appeared: str | None = None
 
 
 class HearingBriefCaseRecordEntry(BaseModel):

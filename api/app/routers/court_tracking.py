@@ -11,7 +11,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth import CurrentUser, get_current_user
 from app.db import service_client
-from app.models.schemas import CourtCasePreviewOut, CourtCaseSearchResultOut, CourtCaseTrackingOut, CourtCaseTrackingUpdate
+from app.models.schemas import (
+    CaseAdvocateOut,
+    CauselistEntryOut,
+    CourtCasePreviewOut,
+    CourtCaseSearchResultOut,
+    CourtCaseTrackingOut,
+    CourtCaseTrackingUpdate,
+    InterlocutoryApplicationOut,
+)
 from app.services import court_sync, court_tracking
 from app.services.court_data_gateway import CourtDataGateway, CourtDataGatewayError, CourtDataNotConfiguredError
 
@@ -81,6 +89,80 @@ def trigger_court_sync(matter_id: str, user: CurrentUser = Depends(get_current_u
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tracking record not found")
     return rows[0]
+
+
+@router.get("/matters/{matter_id}/causelist", response_model=list[CauselistEntryOut])
+def list_causelist(matter_id: str, user: CurrentUser = Depends(get_current_user)):
+    """The cached causelist entries court_sync.py has written for this
+    matter, most recent hearing_date first. RLS (case_advocate_links_org_
+    member_all's sibling, causelist_org_member_all) already scopes this to
+    the caller's own organization; the matter-ownership check below just
+    turns "not yours" into a clean 404 instead of an empty list that looks
+    identical to "no causelist yet"."""
+    _get_matter_or_404(user, matter_id)
+    resp = (
+        user.db.table("court_hearings_causelist")
+        .select("*")
+        .eq("matter_id", matter_id)
+        .order("hearing_date", desc=True)
+        .execute()
+    )
+    return resp.data
+
+
+@router.get("/matters/{matter_id}/interlocutory-applications", response_model=list[InterlocutoryApplicationOut])
+def list_interlocutory_applications(matter_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Always empty today -- no sync path writes interlocutory_applications
+    yet (see InterlocutoryApplicationOut's docstring). The endpoint exists
+    now so the case-details UI has a real, stable contract to call rather
+    than a placeholder that would need a breaking change later."""
+    _get_matter_or_404(user, matter_id)
+    resp = (
+        user.db.table("interlocutory_applications")
+        .select("*")
+        .eq("matter_id", matter_id)
+        .order("filing_date", desc=True)
+        .execute()
+    )
+    return resp.data
+
+
+@router.get("/matters/{matter_id}/case-advocates", response_model=list[CaseAdvocateOut])
+def list_case_advocates(matter_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Always empty today -- no sync path writes court_advocates/
+    case_advocate_links yet (see CaseAdvocateOut's docstring). court_advocates
+    has no organization_id (it's a shared cross-org directory, see
+    0026/0027's migration notes), so the join and the tenant-ownership
+    check both happen here rather than relying on RLS on court_advocates
+    alone."""
+    matter = _get_matter_or_404(user, matter_id)
+    links_resp = (
+        user.db.table("case_advocate_links")
+        .select("*")
+        .eq("matter_id", matter_id)
+        .execute()
+    )
+    links = links_resp.data or []
+    if not links:
+        return []
+    advocate_ids = [link["advocate_id"] for link in links]
+    advocates_resp = user.db.table("court_advocates").select("*").in_("id", advocate_ids).execute()
+    advocates_by_id = {a["id"]: a for a in (advocates_resp.data or [])}
+    return [
+        {
+            "advocate_id": link["advocate_id"],
+            "name": advocates_by_id.get(link["advocate_id"], {}).get("name", "Unknown"),
+            "bar_council_id": advocates_by_id.get(link["advocate_id"], {}).get("bar_council_id"),
+            "phone": advocates_by_id.get(link["advocate_id"], {}).get("phone"),
+            "email": advocates_by_id.get(link["advocate_id"], {}).get("email"),
+            "office_address": advocates_by_id.get(link["advocate_id"], {}).get("office_address"),
+            "role": link["role"],
+            "first_appeared": link.get("first_appeared"),
+            "last_appeared": link.get("last_appeared"),
+        }
+        for link in links
+        if link["advocate_id"] in advocates_by_id
+    ]
 
 
 @router.get("/court-lookup-preview", response_model=CourtCasePreviewOut)
