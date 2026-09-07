@@ -9,10 +9,13 @@ const ROLE_LABELS: Record<CaseAdvocate["role"], string> = {
 };
 
 /** Advocates linked to this matter (court_advocates joined through
- * case_advocate_links). Real backend/endpoint, but nothing populates it
- * automatically yet -- same unverified-provider-shape reason as
- * ApplicationsTracker; see that component's comment. Always empty until
- * that extraction is written. */
+ * case_advocate_links) -- populated by app/services/court_sync.py from
+ * real, confirmed eCourts fields (petitionerAdvocates/
+ * respondentAdvocates). Only names are ever populated this way -- bar
+ * council ID/phone/email/office address are not in the confirmed
+ * response and stay null until entered by other means. Empty either
+ * because the matter hasn't been synced yet or genuinely has no
+ * advocates on record. */
 export function PartiesAndCounsel({ advocates }: { advocates: CaseAdvocate[] }) {
   return (
     <div className="rounded-sm border border-[#E4E2DD] bg-white p-5 space-y-3 font-sans text-xs">
@@ -22,8 +25,8 @@ export function PartiesAndCounsel({ advocates }: { advocates: CaseAdvocate[] }) 
 
       {advocates.length === 0 ? (
         <p className="font-serif text-xs text-[#76777F]">
-          No advocate contact details on record for this matter. Automatic extraction from eCourts isn&apos;t wired
-          up yet for this data — this list will stay empty until that&apos;s built.
+          No advocate contact details on record for this matter. Run a Court Tracking sync to pull the latest from
+          eCourts.
         </p>
       ) : (
         <div className="divide-y divide-[#E4E2DD]">

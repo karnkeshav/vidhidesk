@@ -3,12 +3,10 @@
 import { InterlocutoryApplication } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-/** Interlocutory applications (CM APPLs) for this matter. The backend
- * table and endpoint are real (GET /matters/{id}/interlocutory-applications),
- * but nothing populates it automatically yet -- eCourts' IA field shape
- * has never been confirmed against a live response (see
- * api/scripts/ecourts_spike.py). This always renders empty until that
- * extraction is written; it deliberately does not fabricate rows. */
+/** Interlocutory applications (CM APPLs) for this matter -- populated by
+ * app/services/court_sync.py from a real, confirmed eCourts field
+ * (courtCaseData.interlocutoryApplications). Empty either because the
+ * matter hasn't been synced yet or genuinely has none on record. */
 export function ApplicationsTracker({ applications }: { applications: InterlocutoryApplication[] }) {
   return (
     <div className="rounded-sm border border-[#E4E2DD] bg-white p-5 space-y-3 font-sans text-xs">
@@ -18,8 +16,7 @@ export function ApplicationsTracker({ applications }: { applications: Interlocut
 
       {applications.length === 0 ? (
         <p className="font-serif text-xs text-[#76777F]">
-          No pending applications on record. Automatic extraction from eCourts isn&apos;t wired up yet for this
-          data — this list will stay empty until that&apos;s built.
+          No pending applications on record. Run a Court Tracking sync to pull the latest from eCourts.
         </p>
       ) : (
         <div className="divide-y divide-[#E4E2DD]">

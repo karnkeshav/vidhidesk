@@ -30,9 +30,8 @@ import {
 /** Case Intelligence workspace for one matter -- consolidates everything
  * court_sync.py and the manual data-entry paths have recorded for a
  * matter's CNR: next hearing, timeline, orders, applications, and
- * counsel. Everything rendered here is real data from real endpoints;
- * ApplicationsTracker/PartiesAndCounsel show an honest empty state where
- * no extraction code exists yet (see those components' own comments). */
+ * counsel. Everything rendered here is real data from real endpoints,
+ * populated on each Court Tracking sync. */
 export default function CaseDetailsPage() {
   const params = useParams<{ matterId: string }>();
   const matterId = params.matterId;

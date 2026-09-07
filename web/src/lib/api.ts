@@ -1309,11 +1309,10 @@ export function listCauselist(matterId: string): Promise<CauselistEntry[]> {
   return authedFetch(`/api/matters/${matterId}/causelist`);
 }
 
-// No sync path writes this table yet -- interlocutory_applications' field
-// shape has never been confirmed against a live eCourts response (see
-// api/scripts/ecourts_spike.py) -- so listInterlocutoryApplications()
-// always returns [] today. The type and endpoint exist so the UI has a
-// stable contract once that extraction is written.
+// Populated by app/services/court_sync.py from courtCaseData.
+// interlocutoryApplications (confirmed against a real response
+// 2026-09-07) -- relief_sought/last_update_date are always null, see
+// InterlocutoryApplicationOut's own comment for why.
 export type InterlocutoryApplication = {
   id: string;
   matter_id: string;
@@ -1332,9 +1331,10 @@ export function listInterlocutoryApplications(matterId: string): Promise<Interlo
   return authedFetch(`/api/matters/${matterId}/interlocutory-applications`);
 }
 
-// Same posture as InterlocutoryApplication above -- court_advocates/
-// case_advocate_links have no sync path writing them yet, so this is
-// always [] today.
+// Populated by app/services/court_sync.py from courtCaseData.
+// petitionerAdvocates/respondentAdvocates (confirmed against a real
+// response 2026-09-07) -- bar_council_id/phone/email/office_address are
+// always null, the confirmed response only carries plain name strings.
 export type CaseAdvocate = {
   advocate_id: string;
   name: string;
