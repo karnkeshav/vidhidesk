@@ -68,6 +68,36 @@ def test_phone_number_is_masked():
     assert "PHONE_" in masked
 
 
+def test_cnr_glued_to_court_code_is_not_mistaken_for_aadhaar():
+    """Found in production (2026-09-07): CNR DLHC010163362026 (a 4-letter
+    court code with no separator before its 12 digits) had its digit tail
+    masked as an Aadhaar number, corrupting the CNR into
+    "DLHCAADHAAR_1" in an LLM-generated hearing brief. A CNR is a public
+    case identifier, not PII, and must pass through mask_text() verbatim
+    -- letter-glued digit runs are a different token, not a standalone
+    Aadhaar number, even though they're 12 digits long."""
+    mm = MaskMap(matter_id="m1")
+    text = "CNR: DLHC010163362026, Delhi High Court."
+
+    masked = mask_text(text, mm)
+
+    assert "DLHC010163362026" in masked
+    assert "AADHAAR_" not in masked
+
+
+def test_case_number_glued_to_letters_is_not_mistaken_for_phone():
+    """Same bug class as the CNR/Aadhaar case above, for the phone
+    pattern's boundary -- a 10-digit run directly following a letter (no
+    separator) must not be masked as a phone number."""
+    mm = MaskMap(matter_id="m1")
+    text = "Filing number FN9876543210 recorded."
+
+    masked = mask_text(text, mm)
+
+    assert "FN9876543210" in masked
+    assert "PHONE_" not in masked
+
+
 def test_email_is_masked():
     mm = MaskMap(matter_id="m1")
     text = "Send the draft to ramesh.kumar@example.com for review."

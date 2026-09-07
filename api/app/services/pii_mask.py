@@ -39,8 +39,24 @@ _timing_logger = logging.getLogger("vidhidesk.timing")
 PAN_RE = re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b")
 # 10 digits, first digit 6-9, optionally grouped 5+5 with one space/hyphen,
 # optionally prefixed with +91 (with or without its own separator).
-PHONE_RE = re.compile(r"(?<!\d)(?:\+91[-\s]?)?[6-9]\d{4}[-\s]?\d{5}(?!\d)")
-AADHAAR_RE = re.compile(r"(?<!\d)\d{4}[ -]?\d{4}[ -]?\d{4}(?!\d)")
+#
+# Boundaries are (?<!\w)/(?!\w) -- NOT plain \d exclusion, and NOT \b.
+# Found in production (2026-09-07): a CNR ("DLHC010163362026" -- a
+# 4-letter court code glued directly to 12 digits, no separator) had its
+# digit tail masked as an Aadhaar number, corrupting it into
+# "DLHCAADHAAR_1" in an LLM-generated hearing brief. The old (?<!\d)
+# lookbehind only rejects a digit immediately before the match, not a
+# LETTER, so "C" directly touching "0" (letter -> digit) was accepted.
+# Plain \b doesn't fix this either: \b only fires at a word/non-word
+# transition, and both a letter and a digit are \w, so there's still no
+# boundary between "C" and "0" -- this is exactly why \b was NOT used
+# here originally, but (?<!\d) alone wasn't the right fix for it either.
+# (?<!\w)/(?!\w) is the actual fix: it rejects a letter-or-digit
+# immediately adjacent, which is what "this 10-or-12-digit run is its
+# own standalone token, not the tail of some other alphanumeric ID"
+# actually requires.
+PHONE_RE = re.compile(r"(?<!\w)(?:\+91[-\s]?)?[6-9]\d{4}[-\s]?\d{5}(?!\w)")
+AADHAAR_RE = re.compile(r"(?<!\w)\d{4}[ -]?\d{4}[ -]?\d{4}(?!\w)")
 EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 
 # (kind, regex) — checked in this order for every mask() call.
