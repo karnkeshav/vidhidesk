@@ -363,6 +363,7 @@ CREATE POLICY hearings_org_member_all ON public.hearings
 
 -- messages
 DROP POLICY IF EXISTS messages_owner_all ON public.messages;
+DROP POLICY IF EXISTS messages_org_member_all ON public.messages;
 CREATE POLICY messages_org_member_all ON public.messages
     FOR ALL USING (
         EXISTS (
@@ -380,6 +381,7 @@ CREATE POLICY messages_org_member_all ON public.messages
 
 -- draft_versions
 DROP POLICY IF EXISTS draft_versions_owner_all ON public.draft_versions;
+DROP POLICY IF EXISTS draft_versions_org_member_all ON public.draft_versions;
 CREATE POLICY draft_versions_org_member_all ON public.draft_versions
     FOR ALL USING (
         EXISTS (
@@ -397,6 +399,7 @@ CREATE POLICY draft_versions_org_member_all ON public.draft_versions
 
 -- draft_clause_fills (via draft_versions -> matters)
 DROP POLICY IF EXISTS draft_clause_fills_owner_all ON public.draft_clause_fills;
+DROP POLICY IF EXISTS draft_clause_fills_org_member_all ON public.draft_clause_fills;
 CREATE POLICY draft_clause_fills_org_member_all ON public.draft_clause_fills
     FOR ALL USING (
         EXISTS (
@@ -419,6 +422,7 @@ DROP POLICY IF EXISTS litigation_parties_select_owner ON public.litigation_parti
 DROP POLICY IF EXISTS litigation_parties_insert_owner ON public.litigation_parties;
 DROP POLICY IF EXISTS litigation_parties_update_owner ON public.litigation_parties;
 DROP POLICY IF EXISTS litigation_parties_delete_owner ON public.litigation_parties;
+DROP POLICY IF EXISTS litigation_parties_org_member_all ON public.litigation_parties;
 CREATE POLICY litigation_parties_org_member_all ON public.litigation_parties
     FOR ALL USING (
         EXISTS (
@@ -439,6 +443,7 @@ DROP POLICY IF EXISTS litigation_facts_select_owner ON public.litigation_facts_e
 DROP POLICY IF EXISTS litigation_facts_insert_owner ON public.litigation_facts_evidence;
 DROP POLICY IF EXISTS litigation_facts_update_owner ON public.litigation_facts_evidence;
 DROP POLICY IF EXISTS litigation_facts_delete_owner ON public.litigation_facts_evidence;
+DROP POLICY IF EXISTS litigation_facts_org_member_all ON public.litigation_facts_evidence;
 CREATE POLICY litigation_facts_org_member_all ON public.litigation_facts_evidence
     FOR ALL USING (
         EXISTS (
@@ -460,6 +465,7 @@ DROP POLICY IF EXISTS litigation_hearings_select_owner ON public.litigation_hear
 DROP POLICY IF EXISTS litigation_hearings_insert_owner ON public.litigation_hearings;
 DROP POLICY IF EXISTS litigation_hearings_update_owner ON public.litigation_hearings;
 DROP POLICY IF EXISTS litigation_hearings_delete_owner ON public.litigation_hearings;
+DROP POLICY IF EXISTS litigation_hearings_org_member_all ON public.litigation_hearings;
 CREATE POLICY litigation_hearings_org_member_all ON public.litigation_hearings
     FOR ALL USING (
         EXISTS (
@@ -478,6 +484,7 @@ CREATE POLICY litigation_hearings_org_member_all ON public.litigation_hearings
 -- litigation_case_analyses (select + insert only -- immutable versions)
 DROP POLICY IF EXISTS litigation_case_analyses_select_owner ON public.litigation_case_analyses;
 DROP POLICY IF EXISTS litigation_case_analyses_insert_owner ON public.litigation_case_analyses;
+DROP POLICY IF EXISTS litigation_case_analyses_select_org_member ON public.litigation_case_analyses;
 CREATE POLICY litigation_case_analyses_select_org_member ON public.litigation_case_analyses
     FOR SELECT USING (
         EXISTS (
@@ -486,6 +493,7 @@ CREATE POLICY litigation_case_analyses_select_org_member ON public.litigation_ca
             WHERE m.id = litigation_case_analyses.matter_id AND mm.user_id = auth.uid()
         )
     );
+DROP POLICY IF EXISTS litigation_case_analyses_insert_org_member ON public.litigation_case_analyses;
 CREATE POLICY litigation_case_analyses_insert_org_member ON public.litigation_case_analyses
     FOR INSERT WITH CHECK (
         EXISTS (
@@ -498,6 +506,7 @@ CREATE POLICY litigation_case_analyses_insert_org_member ON public.litigation_ca
 -- litigation_pleading_outlines (select + insert only)
 DROP POLICY IF EXISTS litigation_pleading_outlines_select_owner ON public.litigation_pleading_outlines;
 DROP POLICY IF EXISTS litigation_pleading_outlines_insert_owner ON public.litigation_pleading_outlines;
+DROP POLICY IF EXISTS litigation_pleading_outlines_select_org_member ON public.litigation_pleading_outlines;
 CREATE POLICY litigation_pleading_outlines_select_org_member ON public.litigation_pleading_outlines
     FOR SELECT USING (
         EXISTS (
@@ -506,6 +515,7 @@ CREATE POLICY litigation_pleading_outlines_select_org_member ON public.litigatio
             WHERE m.id = litigation_pleading_outlines.matter_id AND mm.user_id = auth.uid()
         )
     );
+DROP POLICY IF EXISTS litigation_pleading_outlines_insert_org_member ON public.litigation_pleading_outlines;
 CREATE POLICY litigation_pleading_outlines_insert_org_member ON public.litigation_pleading_outlines
     FOR INSERT WITH CHECK (
         EXISTS (
@@ -519,6 +529,7 @@ CREATE POLICY litigation_pleading_outlines_insert_org_member ON public.litigatio
 DROP POLICY IF EXISTS litigation_pleading_clauses_select_owner ON public.litigation_pleading_clauses;
 DROP POLICY IF EXISTS litigation_pleading_clauses_insert_owner ON public.litigation_pleading_clauses;
 DROP POLICY IF EXISTS litigation_pleading_clauses_update_owner ON public.litigation_pleading_clauses;
+DROP POLICY IF EXISTS litigation_pleading_clauses_select_org_member ON public.litigation_pleading_clauses;
 CREATE POLICY litigation_pleading_clauses_select_org_member ON public.litigation_pleading_clauses
     FOR SELECT USING (
         EXISTS (
@@ -527,6 +538,7 @@ CREATE POLICY litigation_pleading_clauses_select_org_member ON public.litigation
             WHERE m.id = litigation_pleading_clauses.matter_id AND mm.user_id = auth.uid()
         )
     );
+DROP POLICY IF EXISTS litigation_pleading_clauses_insert_org_member ON public.litigation_pleading_clauses;
 CREATE POLICY litigation_pleading_clauses_insert_org_member ON public.litigation_pleading_clauses
     FOR INSERT WITH CHECK (
         EXISTS (
@@ -535,6 +547,7 @@ CREATE POLICY litigation_pleading_clauses_insert_org_member ON public.litigation
             WHERE m.id = litigation_pleading_clauses.matter_id AND mm.user_id = auth.uid()
         )
     );
+DROP POLICY IF EXISTS litigation_pleading_clauses_update_org_member ON public.litigation_pleading_clauses;
 CREATE POLICY litigation_pleading_clauses_update_org_member ON public.litigation_pleading_clauses
     FOR UPDATE USING (
         EXISTS (
@@ -547,6 +560,7 @@ CREATE POLICY litigation_pleading_clauses_update_org_member ON public.litigation
 -- litigation_pleading_drafts (select + insert only -- immutable compositions)
 DROP POLICY IF EXISTS litigation_pleading_drafts_select_owner ON public.litigation_pleading_drafts;
 DROP POLICY IF EXISTS litigation_pleading_drafts_insert_owner ON public.litigation_pleading_drafts;
+DROP POLICY IF EXISTS litigation_pleading_drafts_select_org_member ON public.litigation_pleading_drafts;
 CREATE POLICY litigation_pleading_drafts_select_org_member ON public.litigation_pleading_drafts
     FOR SELECT USING (
         EXISTS (
@@ -555,6 +569,7 @@ CREATE POLICY litigation_pleading_drafts_select_org_member ON public.litigation_
             WHERE m.id = litigation_pleading_drafts.matter_id AND mm.user_id = auth.uid()
         )
     );
+DROP POLICY IF EXISTS litigation_pleading_drafts_insert_org_member ON public.litigation_pleading_drafts;
 CREATE POLICY litigation_pleading_drafts_insert_org_member ON public.litigation_pleading_drafts
     FOR INSERT WITH CHECK (
         EXISTS (
@@ -567,6 +582,7 @@ CREATE POLICY litigation_pleading_drafts_insert_org_member ON public.litigation_
 -- consulting_analyses (select + insert only)
 DROP POLICY IF EXISTS consulting_analyses_select_owner ON public.consulting_analyses;
 DROP POLICY IF EXISTS consulting_analyses_insert_owner ON public.consulting_analyses;
+DROP POLICY IF EXISTS consulting_analyses_select_org_member ON public.consulting_analyses;
 CREATE POLICY consulting_analyses_select_org_member ON public.consulting_analyses
     FOR SELECT USING (
         EXISTS (
@@ -575,6 +591,7 @@ CREATE POLICY consulting_analyses_select_org_member ON public.consulting_analyse
             WHERE m.id = consulting_analyses.matter_id AND mm.user_id = auth.uid()
         )
     );
+DROP POLICY IF EXISTS consulting_analyses_insert_org_member ON public.consulting_analyses;
 CREATE POLICY consulting_analyses_insert_org_member ON public.consulting_analyses
     FOR INSERT WITH CHECK (
         EXISTS (

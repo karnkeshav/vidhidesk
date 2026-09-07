@@ -65,10 +65,23 @@ jobs:
     # Wiring the same real secrets infrastructure_verification already
     # uses is the pragmatic fix here, not retrofitting mocks into 32 tests
     # across 9 files in the same pass as unblocking the deploy pipeline.
+    #
+    # Same reasoning extends to the LLM provider keys: tests/test_golden.py
+    # deliberately calls the real llm_gateway.generate() (see that file's
+    # module docstring -- it's a golden/integration suite, not a unit test,
+    # that exercises real completions on purpose). Without a real key the
+    # gateway sends "Authorization: Bearer " with an empty token, which
+    # httpcore rejects outright as an illegal header value before any
+    # provider is even reached -- found 2026-09-07, same missing-secret
+    # class of failure as the Supabase case above.
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

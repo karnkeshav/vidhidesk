@@ -36,10 +36,23 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 
 _NUMBER_RE = re.compile(r"^(\d{4})_")
 _BARE_CREATE_TABLE_RE = re.compile(r"create\s+table\s+(?!if\s+not\s+exists)", re.IGNORECASE)
-_BARE_CREATE_INDEX_RE = re.compile(r"create\s+(?:unique\s+)?index\s+(?!if\s+not\s+exists)", re.IGNORECASE)
+_CREATE_INDEX_RE = re.compile(r"create\s+(?:unique\s+)?index\s+(?:if\s+not\s+exists\s+)?(\S+)", re.IGNORECASE)
+_DROP_INDEX_RE = re.compile(r"drop\s+index\s+if\s+exists\s+(\S+)", re.IGNORECASE)
 _BARE_ALTER_ADD_COLUMN_RE = re.compile(r"add\s+column\s+(?!if\s+not\s+exists)", re.IGNORECASE)
 _CREATE_POLICY_RE = re.compile(r"create\s+policy\s+(\S+)", re.IGNORECASE)
 _DROP_POLICY_RE = re.compile(r"drop\s+policy\s+if\s+exists\s+(\S+)", re.IGNORECASE)
+
+
+def _strip_comment_lines(sql: str) -> str:
+    """Drop full-line `--` comments before running any structural regex
+    below. Without this, prose in a header comment describing the file's
+    own idempotency convention (e.g. "CREATE TABLE IF\\n-- NOT EXISTS...",
+    wrapped across a line break) can itself match a bare-CREATE pattern —
+    a false positive on the comment, not the SQL. Found 2026-09-07 via
+    0019_rera_backend.sql, which is actually idempotent throughout but
+    got flagged because its own header text describing that fact was
+    misread as code."""
+    return "\n".join(line for line in sql.splitlines() if not line.strip().startswith("--"))
 # The project's real header convention (confirmed across 0001-0009) is a
 # line matching "-- Idempotent: ...". A bare substring search for the
 # word "idempotent" anywhere in the file is NOT the same check — 0011
@@ -88,14 +101,13 @@ def run() -> VerificationResult:
 
     # --- Per-file idempotency structural check -----------------------------
     for f in files:
-        sql = f.read_text()
-        claims_idempotent = bool(_IDEMPOTENT_HEADER_RE.search(sql))
+        raw_sql = f.read_text()
+        sql = _strip_comment_lines(raw_sql)
+        claims_idempotent = bool(_IDEMPOTENT_HEADER_RE.search(raw_sql))
         issues: list[str] = []
 
         if _BARE_CREATE_TABLE_RE.search(sql):
             issues.append("CREATE TABLE without IF NOT EXISTS")
-        if _BARE_CREATE_INDEX_RE.search(sql):
-            issues.append("CREATE INDEX without IF NOT EXISTS")
         if _BARE_ALTER_ADD_COLUMN_RE.search(sql):
             issues.append("ADD COLUMN without IF NOT EXISTS")
 
@@ -104,6 +116,26 @@ def run() -> VerificationResult:
         undropped_policies = created_policies - dropped_policies
         if undropped_policies:
             issues.append(f"CREATE POLICY without a matching DROP POLICY IF EXISTS first (re-run would fail): {', '.join(sorted(undropped_policies))}")
+
+        # Same shape as the CREATE POLICY check above: a bare `CREATE
+        # [UNIQUE] INDEX name` is fine on re-run as long as either it says
+        # IF NOT EXISTS itself, or a `DROP INDEX IF EXISTS name` for that
+        # same name appears earlier in the file (the project's other
+        # established idempotent-index idiom, used throughout 0019).
+        # DROP INDEX (unlike DROP/CREATE POLICY, which are always followed
+        # by "ON <table>") has nothing after the name but a semicolon, so
+        # \S+ on that regex swallows it into the captured name -- stripped
+        # here so it compares equal to the same index's CREATE-side name.
+        created_indexes = {}
+        for m in _CREATE_INDEX_RE.finditer(sql):
+            has_if_not_exists = sql[m.start():m.end()].lower().find("if not exists") != -1
+            created_indexes.setdefault(m.group(1).rstrip(";"), has_if_not_exists)
+        dropped_indexes = {name.rstrip(";") for name in _DROP_INDEX_RE.findall(sql)}
+        bare_indexes = sorted(
+            name for name, has_ine in created_indexes.items() if not has_ine and name not in dropped_indexes
+        )
+        if bare_indexes:
+            issues.append(f"CREATE INDEX without IF NOT EXISTS and no matching DROP INDEX IF EXISTS first: {', '.join(bare_indexes)}")
 
         label = f"Idempotency: {f.name}"
         if not claims_idempotent and not issues:
