@@ -507,9 +507,17 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                       extends this existing screen rather than a new one, per the
                       "reuse before creating" rule; CNR belongs to the Matter. */}
                   <div className="rounded-sm border border-[#E4E2DD] bg-white p-5 space-y-3 font-sans text-xs">
-                    <div className="flex items-center gap-2 border-b border-[#E4E2DD] pb-2">
-                      <Radar className="h-4 w-4 text-[#081534]" />
-                      <h4 className="font-semibold uppercase tracking-wider text-[#081534]">Court Tracking</h4>
+                    <div className="flex items-center justify-between border-b border-[#E4E2DD] pb-2">
+                      <div className="flex items-center gap-2">
+                        <Radar className="h-4 w-4 text-[#081534]" />
+                        <h4 className="font-semibold uppercase tracking-wider text-[#081534]">Court Tracking</h4>
+                      </div>
+                      <a
+                        href={`/litigation/${matterId}/case-details`}
+                        className="font-serif text-[10px] text-[#081534] underline underline-offset-2"
+                      >
+                        Case Intelligence &rarr;
+                      </a>
                     </div>
 
                     <form onSubmit={handleSearchCnr} className="space-y-2">

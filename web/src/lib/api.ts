@@ -1197,6 +1197,14 @@ export type CourtCaseTracking = {
   sync_status: "idle" | "syncing" | "synced" | "error";
   last_error: string | null;
   provider_metadata: Record<string, unknown> | null;
+  // Typed mirrors of provider_metadata's already-verified fields (see
+  // api/migrations/0028_court_case_tracking_typed_fields.sql) -- read
+  // these instead of parsing provider_metadata directly.
+  court_name: string | null;
+  judge: string | null;
+  case_status: string | null;
+  petitioners: string[];
+  respondents: string[];
   created_at: string;
   updated_at: string;
 };
@@ -1279,6 +1287,68 @@ export function previewCourtCase(cnr: string): Promise<CourtCasePreview> {
     {},
     { retry: false, timeoutMs: COURT_SYNC_TIMEOUT_MS }
   );
+}
+
+// Populated by app/services/court_sync.py from already-verified
+// CauselistEntry fields (see that function's own docstring) -- real data,
+// not a placeholder.
+export type CauselistEntry = {
+  id: string;
+  matter_id: string;
+  cnr_number: string | null;
+  hearing_date: string;
+  hearing_time: string | null;
+  bench_number: string | null;
+  judge_names: string[] | null;
+  court_location: string | null;
+  causelist_type: string | null;
+  fetched_at: string;
+};
+
+export function listCauselist(matterId: string): Promise<CauselistEntry[]> {
+  return authedFetch(`/api/matters/${matterId}/causelist`);
+}
+
+// No sync path writes this table yet -- interlocutory_applications' field
+// shape has never been confirmed against a live eCourts response (see
+// api/scripts/ecourts_spike.py) -- so listInterlocutoryApplications()
+// always returns [] today. The type and endpoint exist so the UI has a
+// stable contract once that extraction is written.
+export type InterlocutoryApplication = {
+  id: string;
+  matter_id: string;
+  cnr_number: string | null;
+  application_number: string;
+  filed_by: string;
+  filing_date: string;
+  current_status: "PENDING" | "GRANTED" | "REJECTED" | "WITHDRAWN";
+  relief_sought: string | null;
+  last_update_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export function listInterlocutoryApplications(matterId: string): Promise<InterlocutoryApplication[]> {
+  return authedFetch(`/api/matters/${matterId}/interlocutory-applications`);
+}
+
+// Same posture as InterlocutoryApplication above -- court_advocates/
+// case_advocate_links have no sync path writing them yet, so this is
+// always [] today.
+export type CaseAdvocate = {
+  advocate_id: string;
+  name: string;
+  bar_council_id: string | null;
+  phone: string | null;
+  email: string | null;
+  office_address: string | null;
+  role: "PETITIONER_COUNSEL" | "RESPONDENT_COUNSEL" | "UNKNOWN";
+  first_appeared: string | null;
+  last_appeared: string | null;
+};
+
+export function listCaseAdvocates(matterId: string): Promise<CaseAdvocate[]> {
+  return authedFetch(`/api/matters/${matterId}/case-advocates`);
 }
 
 export type HearingBriefContent = {
