@@ -110,6 +110,13 @@ class CourtCaseDetail:
     petitioner_advocates: list[str]
     respondent_advocates: list[str]
     interlocutory_applications: list[InterlocutoryApplicationEntry]
+    # courtCaseData.nextHearingDate -- confirmed against the same real
+    # response as the fields above (2026-09-07). This is the case's own
+    # scheduled next hearing, distinct from causelist_batch's "next
+    # listing" (CauselistEntry.date, which is what's on an imminent
+    # causelist specifically); court_sync.py uses causelist's date when
+    # present and falls back to this one otherwise.
+    next_hearing_date: str | None
     raw: dict[str, Any]
 
 
@@ -264,6 +271,7 @@ class CourtDataGateway:
             petitioner_advocates=list(case_data.get("petitionerAdvocates") or []),
             respondent_advocates=list(case_data.get("respondentAdvocates") or []),
             interlocutory_applications=ia_entries,
+            next_hearing_date=case_data.get("nextHearingDate"),
             raw=data,
         )
 

@@ -333,12 +333,17 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
 
     hearing_created = False
     hearing_row: dict[str, Any] | None = None
-    # 'nextListing'.date, straight from causelist_batch (see
-    # CourtDataGateway.causelist_batch) -- exactly what this column means.
-    # Was never actually written before this fix, despite existing since
-    # 0025 (court_case_tracking.next_hearing_date), found while wiring up
-    # the case-details UI.
-    next_hearing_date: str | None = None
+    # Prefer causelist_batch's 'nextListing'.date (an imminent, actually-
+    # listed hearing) over case_detail.next_hearing_date (the case's own
+    # scheduled next-hearing field, courtCaseData.nextHearingDate) -- both
+    # confirmed fields, see their own dataclasses' comments. Was never
+    # actually written before this fix, despite existing since 0025
+    # (court_case_tracking.next_hearing_date), found while wiring up the
+    # case-details UI -- and a real end-to-end run (2026-09-07) surfaced
+    # that causelist alone leaves it null far more often than not (a case
+    # only shows up on causelist_batch right around the listing itself),
+    # which is why the case_detail fallback was added the same day.
+    next_hearing_date: str | None = case_detail.next_hearing_date
     try:
         causelist = gateway.causelist_batch([cnr])
         entry = causelist.get(cnr)
@@ -346,7 +351,8 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
         if entry and entry.has_causelist:
             hearing_row, hearing_created = _upsert_hearing_from_causelist(sc, matter=matter, entry=entry)
             _upsert_causelist_row(sc, matter=matter, cnr=cnr, entry=entry, judges=case_detail.judges)
-            next_hearing_date = entry.date
+            if entry.date:
+                next_hearing_date = entry.date
     except CourtDataGatewayError as exc:
         # A causelist failure does not invalidate the case_lookup we
         # already have -- log it, keep going, surface a partial success.

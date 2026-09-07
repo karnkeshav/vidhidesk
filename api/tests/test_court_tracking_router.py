@@ -172,7 +172,7 @@ def test_update_tracking_cnr_change_clears_stale_typed_fields():
     existing_tracking = {
         "id": "t1", "matter_id": "m1", "cnr_number": "OLDCNR", "tracking_enabled": True,
         "sync_status": "synced", "last_error": None, "last_synced_at": "2026-08-01T00:00:00Z",
-        "next_hearing_date": None, "provider_metadata": {"cnr": "OLDCNR"},
+        "next_hearing_date": "2026-08-12", "provider_metadata": {"cnr": "OLDCNR"},
         "court_name": "Old Court", "judge": "J. Old", "case_status": "Pending",
         "petitioners": ["Old Petitioner"], "respondents": ["Old Respondent"],
         "created_at": "2026-08-01T00:00:00Z", "updated_at": "2026-08-01T00:00:00Z",
@@ -196,6 +196,7 @@ def test_update_tracking_cnr_change_clears_stale_typed_fields():
     assert body["petitioners"] == []
     assert body["respondents"] == []
     assert body["provider_metadata"] is None
+    assert body["next_hearing_date"] is None
 
 
 def test_update_tracking_empty_body_400s():
@@ -423,6 +424,7 @@ def test_preview_court_case_returns_detail_and_persists_nothing():
                 petitioner_advocates=["AJAY KUMAR YADAV"],
                 respondent_advocates=[],
                 interlocutory_applications=[],
+                next_hearing_date=None,
                 raw={},
             )
 

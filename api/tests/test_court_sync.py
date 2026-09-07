@@ -26,6 +26,7 @@ class _FakeCaseDetail:
     petitioner_advocates: list = None
     respondent_advocates: list = None
     interlocutory_applications: list = None
+    next_hearing_date: str | None = None
     raw: dict = None
 
     def __post_init__(self):
@@ -228,6 +229,33 @@ def test_no_causelist_entry_no_causelist_row(monkeypatch):
     court_sync.sync_matter_court_data("m1", fake)
     assert fake.table("court_hearings_causelist").rows == []
     assert fake.table("court_case_tracking").rows[0]["next_hearing_date"] is None
+
+
+def test_next_hearing_date_falls_back_to_case_detail_when_no_causelist_listing(monkeypatch):
+    """A real end-to-end run (2026-09-07) showed causelist_batch returns
+    hasCauselist=false far more often than not -- courtCaseData's own
+    nextHearingDate is what keeps this column populated in that common case."""
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(cnr="CNR1", next_hearing_date="2026-08-12"),
+        causelist={"CNR1": _FakeCauselistEntry(cnr="CNR1", has_causelist=False, date=None)},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    court_sync.sync_matter_court_data("m1", fake)
+    assert fake.table("court_case_tracking").rows[0]["next_hearing_date"] == "2026-08-12"
+
+
+def test_next_hearing_date_prefers_causelist_over_case_detail(monkeypatch):
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(cnr="CNR1", next_hearing_date="2026-08-12"),
+        causelist={"CNR1": _FakeCauselistEntry(cnr="CNR1", has_causelist=True, date="2026-09-01")},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    court_sync.sync_matter_court_data("m1", fake)
+    assert fake.table("court_case_tracking").rows[0]["next_hearing_date"] == "2026-09-01"
 
 
 def test_sync_creates_advocates_and_links(monkeypatch):

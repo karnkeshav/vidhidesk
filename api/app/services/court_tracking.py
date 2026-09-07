@@ -42,6 +42,7 @@ def update_tracking(matter_id: str, organization_id: str, payload: dict[str, Any
             "case_status": None,
             "petitioners": [],
             "respondents": [],
+            "next_hearing_date": None,
         }
 
     updated = db.table("court_case_tracking").update(payload).eq("id", existing["id"]).execute()
