@@ -112,10 +112,9 @@ def list_causelist(matter_id: str, user: CurrentUser = Depends(get_current_user)
 
 @router.get("/matters/{matter_id}/interlocutory-applications", response_model=list[InterlocutoryApplicationOut])
 def list_interlocutory_applications(matter_id: str, user: CurrentUser = Depends(get_current_user)):
-    """Always empty today -- no sync path writes interlocutory_applications
-    yet (see InterlocutoryApplicationOut's docstring). The endpoint exists
-    now so the case-details UI has a real, stable contract to call rather
-    than a placeholder that would need a breaking change later."""
+    """Populated by app/services/court_sync.py on each successful sync
+    (see InterlocutoryApplicationOut's docstring) -- empty only when the
+    matter hasn't synced yet or genuinely has no IAs on record."""
     _get_matter_or_404(user, matter_id)
     resp = (
         user.db.table("interlocutory_applications")
@@ -129,8 +128,9 @@ def list_interlocutory_applications(matter_id: str, user: CurrentUser = Depends(
 
 @router.get("/matters/{matter_id}/case-advocates", response_model=list[CaseAdvocateOut])
 def list_case_advocates(matter_id: str, user: CurrentUser = Depends(get_current_user)):
-    """Always empty today -- no sync path writes court_advocates/
-    case_advocate_links yet (see CaseAdvocateOut's docstring). court_advocates
+    """Populated by app/services/court_sync.py on each successful sync
+    (see CaseAdvocateOut's docstring) -- empty only when the matter hasn't
+    synced yet or genuinely has no advocates on record. court_advocates
     has no organization_id (it's a shared cross-org directory, see
     0026/0027's migration notes), so the join and the tenant-ownership
     check both happen here rather than relying on RLS on court_advocates

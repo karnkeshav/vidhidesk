@@ -78,6 +78,23 @@ class CourtDataNotConfiguredError(CourtDataGatewayError):
 
 
 @dataclass
+class InterlocutoryApplicationEntry:
+    """One entry from courtCaseData.interlocutoryApplications -- confirmed
+    against a real response (CNR DLHC010163362026, see
+    scripts/ecourts_spike.py output, 2026-09-07): {regNo, remark, filedBy,
+    filingDate, status}. `remark` is NOT surfaced here -- in the one
+    confirmed sample its value was itself a date string ("20-04-2026"),
+    not a description, so its actual meaning is unverified; callers must
+    not guess it means "relief sought" or anything else."""
+
+    application_number: str
+    filed_by: str
+    filing_date: str
+    status_raw: str
+    raw: dict[str, Any]
+
+
+@dataclass
 class CourtCaseDetail:
     cnr: str
     court_name: str | None
@@ -86,6 +103,13 @@ class CourtCaseDetail:
     status: str | None
     petitioners: list[str]
     respondents: list[str]
+    # Confirmed against the same real response as judges/petitioners/
+    # respondents above (petitionerAdvocates/respondentAdvocates,
+    # 2026-09-07) -- plain advocate name strings, no bar_council_id/
+    # phone/email in this response.
+    petitioner_advocates: list[str]
+    respondent_advocates: list[str]
+    interlocutory_applications: list[InterlocutoryApplicationEntry]
     raw: dict[str, Any]
 
 
@@ -203,6 +227,32 @@ class CourtDataGateway:
         # rich data on record.
         case_data = (data.get("data") or {}).get("courtCaseData") or {}
         judges = case_data.get("judges") or []
+
+        ia_entries: list[InterlocutoryApplicationEntry] = []
+        for item in case_data.get("interlocutoryApplications") or []:
+            if not isinstance(item, dict):
+                continue
+            reg_no = item.get("regNo")
+            filed_by = item.get("filedBy")
+            filing_date = item.get("filingDate")
+            status = item.get("status")
+            # All four required by the DB (interlocutory_applications has
+            # NOT NULL application_number/filed_by/filing_date/
+            # current_status) -- an entry missing any of them is dropped
+            # rather than written with a fabricated placeholder.
+            if not (reg_no and filed_by and filing_date and status):
+                logger.warning("court_data_gateway case_lookup: dropping incomplete interlocutoryApplications entry for cnr=%s", cnr)
+                continue
+            ia_entries.append(
+                InterlocutoryApplicationEntry(
+                    application_number=str(reg_no).strip(),
+                    filed_by=str(filed_by).strip(),
+                    filing_date=str(filing_date),
+                    status_raw=str(status),
+                    raw=item,
+                )
+            )
+
         return CourtCaseDetail(
             cnr=case_data.get("cnr", cnr),
             court_name=case_data.get("courtName"),
@@ -211,6 +261,9 @@ class CourtDataGateway:
             status=case_data.get("caseStatus"),
             petitioners=list(case_data.get("petitioners") or []),
             respondents=list(case_data.get("respondents") or []),
+            petitioner_advocates=list(case_data.get("petitionerAdvocates") or []),
+            respondent_advocates=list(case_data.get("respondentAdvocates") or []),
+            interlocutory_applications=ia_entries,
             raw=data,
         )
 

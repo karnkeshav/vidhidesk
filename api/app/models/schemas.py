@@ -944,10 +944,15 @@ class CauselistEntryOut(BaseModel):
 
 
 class InterlocutoryApplicationOut(BaseModel):
-    """One interlocutory_applications (CM APPL) row. No sync path writes
-    this table yet -- IA field names have never been confirmed against a
-    live eCourts response (see scripts/ecourts_spike.py) -- so this is
-    currently always an empty list for every matter."""
+    """One interlocutory_applications (CM APPL) row, populated by
+    app/services/court_sync.py from courtCaseData.interlocutoryApplications
+    -- confirmed against a real response 2026-09-07, see
+    scripts/ecourts_spike.py output and CourtDataGateway.case_lookup's own
+    comment. relief_sought/last_update_date are always null -- the raw
+    response's only other field ('remark') was itself a date string in
+    the confirmed sample, so its meaning is unverified and it's not
+    mapped to either. Empty only when a matter hasn't synced yet or genuinely
+    has no IAs on record."""
 
     id: str
     matter_id: str
@@ -964,10 +969,13 @@ class InterlocutoryApplicationOut(BaseModel):
 
 class CaseAdvocateOut(BaseModel):
     """One advocate linked to a matter (court_advocates joined through
-    case_advocate_links). No sync path writes these tables yet -- advocate
-    field names have never been confirmed against a live eCourts response
-    (see scripts/ecourts_spike.py) -- so this is currently always an empty
-    list for every matter."""
+    case_advocate_links), populated by app/services/court_sync.py from
+    courtCaseData.petitionerAdvocates/respondentAdvocates -- confirmed
+    against a real response 2026-09-07, see scripts/ecourts_spike.py
+    output. bar_council_id/phone/email/office_address are always null --
+    the confirmed response carries only plain advocate name strings, no
+    contact details. Empty only when a matter hasn't synced yet or
+    genuinely has no advocates on record."""
 
     advocate_id: str
     name: str

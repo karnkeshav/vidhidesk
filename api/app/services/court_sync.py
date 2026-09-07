@@ -146,6 +146,126 @@ def _upsert_causelist_row(sc, *, matter: dict[str, Any], cnr: str, entry, judges
         sc.table("court_hearings_causelist").insert(payload).execute()
 
 
+_IA_STATUS_MAP = {
+    "PENDING": "PENDING",
+    "GRANTED": "GRANTED",
+    "ALLOWED": "GRANTED",
+    "REJECTED": "REJECTED",
+    "DISMISSED": "REJECTED",
+    "WITHDRAWN": "WITHDRAWN",
+}
+
+
+def _normalize_ia_status(status_raw: str) -> str:
+    """Only 'Pending' has been seen in a real response (see
+    scripts/ecourts_spike.py output, 2026-09-07); the others are the
+    plainest-possible guesses at what a resolved IA's status text might
+    read, kept deliberately narrow. An unrecognized value defaults to
+    PENDING (never crashes the whole sync over one status string) and is
+    logged so a real example can correct this mapping later."""
+    normalized = _IA_STATUS_MAP.get(status_raw.strip().upper())
+    if normalized is None:
+        logger.warning("court_sync: unrecognized interlocutory_applications status %r, defaulting to PENDING", status_raw)
+        return "PENDING"
+    return normalized
+
+
+def _upsert_case_advocates(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
+    """Finds-or-creates a court_advocates row per unique name (global
+    directory, see 0026's migration note), then upserts the matter-scoped
+    case_advocate_links row -- built from petitioner_advocates/
+    respondent_advocates, confirmed against a real response (see
+    CourtDataGateway.case_lookup's own comment)."""
+    today = _now_iso()[:10]
+    pairs = [(name, "PETITIONER_COUNSEL") for name in case_detail.petitioner_advocates]
+    pairs += [(name, "RESPONDENT_COUNSEL") for name in case_detail.respondent_advocates]
+
+    for raw_name, role in pairs:
+        name = raw_name.strip()
+        if not name:
+            continue
+
+        existing_advocates = sc.table("court_advocates").select("*").eq("name", name).execute().data or []
+        if existing_advocates:
+            advocate = existing_advocates[0]
+            advocate_id = advocate["id"]
+            sc.table("court_advocates").update(
+                {"case_count": advocate.get("case_count", 1) + 1, "last_seen_date": today}
+            ).eq("id", advocate_id).execute()
+        else:
+            inserted = (
+                sc.table("court_advocates")
+                .insert({"name": name, "case_count": 1, "first_seen_in_case": today, "last_seen_date": today})
+                .execute()
+                .data
+            )
+            advocate_id = inserted[0]["id"] if inserted else None
+        if not advocate_id:
+            continue
+
+        existing_links = (
+            sc.table("case_advocate_links")
+            .select("*")
+            .eq("advocate_id", advocate_id)
+            .eq("matter_id", matter["id"])
+            .execute()
+            .data
+            or []
+        )
+        if existing_links:
+            sc.table("case_advocate_links").update(
+                {"cnr_number": cnr, "role": role, "last_appeared": today}
+            ).eq("id", existing_links[0]["id"]).execute()
+        else:
+            sc.table("case_advocate_links").insert(
+                {
+                    "organization_id": matter["organization_id"],
+                    "advocate_id": advocate_id,
+                    "matter_id": matter["id"],
+                    "cnr_number": cnr,
+                    "role": role,
+                    "first_appeared": today,
+                    "last_appeared": today,
+                }
+            ).execute()
+
+
+def _upsert_interlocutory_applications(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
+    """Upserts interlocutory_applications rows keyed by the table's own
+    (matter_id, application_number) unique constraint, from entries
+    CourtDataGateway.case_lookup already confirmed and validated (see
+    InterlocutoryApplicationEntry). Deliberately leaves relief_sought/
+    last_update_date null -- see that dataclass's own comment on why
+    'remark' isn't mapped to either."""
+    for entry in case_detail.interlocutory_applications:
+        existing = (
+            sc.table("interlocutory_applications")
+            .select("*")
+            .eq("matter_id", matter["id"])
+            .eq("application_number", entry.application_number)
+            .execute()
+            .data
+            or []
+        )
+        payload = {
+            "cnr_number": cnr,
+            "filed_by": entry.filed_by,
+            "filing_date": entry.filing_date,
+            "current_status": _normalize_ia_status(entry.status_raw),
+        }
+        if existing:
+            sc.table("interlocutory_applications").update(payload).eq("id", existing[0]["id"]).execute()
+        else:
+            sc.table("interlocutory_applications").insert(
+                {
+                    "organization_id": matter["organization_id"],
+                    "matter_id": matter["id"],
+                    "application_number": entry.application_number,
+                    **payload,
+                }
+            ).execute()
+
+
 def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     """Full sync for one matter. `sc` is a service_client() instance --
     the caller (scheduler script) is responsible for supplying it; this
@@ -181,6 +301,15 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     try:
         case_detail = gateway.case_lookup(cnr)
         _log(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, operation="case_lookup", status="success")
+        try:
+            _upsert_case_advocates(sc, matter=matter, cnr=cnr, case_detail=case_detail)
+            _upsert_interlocutory_applications(sc, matter=matter, cnr=cnr, case_detail=case_detail)
+        except Exception:
+            # Same partial-success posture as the causelist_batch failure
+            # below: advocate/IA persistence failing must never discard
+            # the case_lookup result we already have, or block the rest of
+            # sync (hearing/causelist upserts, tracking row update).
+            logger.exception("court_sync: failed to persist advocates/interlocutory_applications for matter_id=%s", matter_id)
     except CourtDataNotConfiguredError:
         raise
     except CourtDataGatewayError as exc:

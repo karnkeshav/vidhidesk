@@ -420,6 +420,9 @@ def test_preview_court_case_returns_detail_and_persists_nothing():
                 status="PENDING",
                 petitioners=["Deepak"],
                 respondents=["State (nct of Delhi)"],
+                petitioner_advocates=["AJAY KUMAR YADAV"],
+                respondent_advocates=[],
+                interlocutory_applications=[],
                 raw={},
             )
 

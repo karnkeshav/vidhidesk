@@ -23,13 +23,31 @@ class _FakeCaseDetail:
     status: str | None = "Pending"
     petitioners: list = None
     respondents: list = None
+    petitioner_advocates: list = None
+    respondent_advocates: list = None
+    interlocutory_applications: list = None
     raw: dict = None
 
     def __post_init__(self):
         self.judges = self.judges if self.judges is not None else (["J. Test"] if self.judge else [])
         self.petitioners = self.petitioners or []
         self.respondents = self.respondents or []
+        self.petitioner_advocates = self.petitioner_advocates or []
+        self.respondent_advocates = self.respondent_advocates or []
+        self.interlocutory_applications = self.interlocutory_applications or []
         self.raw = self.raw if self.raw is not None else {"cnr": self.cnr}
+
+
+@dataclass
+class _FakeIAEntry:
+    application_number: str
+    filed_by: str
+    filing_date: str
+    status_raw: str
+    raw: dict = None
+
+    def __post_init__(self):
+        self.raw = self.raw if self.raw is not None else {}
 
 
 @dataclass
@@ -89,6 +107,9 @@ def _base_fake(*, org_status="active", access_enabled=True, tracking=None, matte
             "court_sync_log": [],
             "notifications": [],
             "court_hearings_causelist": [],
+            "court_advocates": [],
+            "case_advocate_links": [],
+            "interlocutory_applications": [],
         }
     )
 
@@ -207,6 +228,144 @@ def test_no_causelist_entry_no_causelist_row(monkeypatch):
     court_sync.sync_matter_court_data("m1", fake)
     assert fake.table("court_hearings_causelist").rows == []
     assert fake.table("court_case_tracking").rows[0]["next_hearing_date"] is None
+
+
+def test_sync_creates_advocates_and_links(monkeypatch):
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(
+            cnr="CNR1",
+            petitioner_advocates=["Ajay Kumar Yadav"],
+            respondent_advocates=["State Counsel"],
+        ),
+        causelist={},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    court_sync.sync_matter_court_data("m1", fake)
+
+    advocates = fake.table("court_advocates").rows
+    assert {a["name"] for a in advocates} == {"Ajay Kumar Yadav", "State Counsel"}
+    assert all(a["case_count"] == 1 for a in advocates)
+
+    links = fake.table("case_advocate_links").rows
+    assert len(links) == 2
+    roles_by_name = {
+        next(a["name"] for a in advocates if a["id"] == link["advocate_id"]): link["role"] for link in links
+    }
+    assert roles_by_name == {"Ajay Kumar Yadav": "PETITIONER_COUNSEL", "State Counsel": "RESPONDENT_COUNSEL"}
+
+
+def test_sync_reuses_existing_advocate_and_increments_case_count(monkeypatch):
+    existing_advocate = {"id": "adv-1", "name": "Ajay Kumar Yadav", "case_count": 3}
+    fake = _base_fake(tracking=_tracking())
+    fake.table("court_advocates").rows.append(existing_advocate)
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(cnr="CNR1", petitioner_advocates=["Ajay Kumar Yadav"]),
+        causelist={},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    court_sync.sync_matter_court_data("m1", fake)
+
+    advocates = fake.table("court_advocates").rows
+    assert len(advocates) == 1  # never duplicated
+    assert advocates[0]["case_count"] == 4
+
+    links = fake.table("case_advocate_links").rows
+    assert len(links) == 1
+    assert links[0]["advocate_id"] == "adv-1"
+
+
+def test_sync_creates_interlocutory_applications(monkeypatch):
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(
+            cnr="CNR1",
+            interlocutory_applications=[
+                _FakeIAEntry(application_number="CRL.M.A. 12140/2026", filed_by="Deepak", filing_date="2026-04-18", status_raw="Pending"),
+            ],
+        ),
+        causelist={},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    court_sync.sync_matter_court_data("m1", fake)
+
+    ias = fake.table("interlocutory_applications").rows
+    assert len(ias) == 1
+    assert ias[0]["application_number"] == "CRL.M.A. 12140/2026"
+    assert ias[0]["filed_by"] == "Deepak"
+    assert ias[0]["current_status"] == "PENDING"
+
+
+def test_sync_updates_existing_ia_no_duplicate(monkeypatch):
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(
+            cnr="CNR1",
+            interlocutory_applications=[
+                _FakeIAEntry(application_number="IA/1/2026", filed_by="Deepak", filing_date="2026-04-18", status_raw="Pending"),
+            ],
+        ),
+        causelist={},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+    court_sync.sync_matter_court_data("m1", fake)
+
+    gateway2 = _FakeGateway(
+        case_detail=_FakeCaseDetail(
+            cnr="CNR1",
+            interlocutory_applications=[
+                _FakeIAEntry(application_number="IA/1/2026", filed_by="Deepak", filing_date="2026-04-18", status_raw="Allowed"),
+            ],
+        ),
+        causelist={},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway2)
+    court_sync.sync_matter_court_data("m1", fake)
+
+    ias = fake.table("interlocutory_applications").rows
+    assert len(ias) == 1
+    assert ias[0]["current_status"] == "GRANTED"
+
+
+def test_unrecognized_ia_status_defaults_to_pending(monkeypatch):
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(
+            cnr="CNR1",
+            interlocutory_applications=[
+                _FakeIAEntry(application_number="IA/2/2026", filed_by="Deepak", filing_date="2026-04-18", status_raw="Some Unseen Status"),
+            ],
+        ),
+        causelist={},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+    court_sync.sync_matter_court_data("m1", fake)
+    assert fake.table("interlocutory_applications").rows[0]["current_status"] == "PENDING"
+
+
+def test_advocate_persistence_failure_does_not_break_sync(monkeypatch):
+    """A failure writing advocates/IAs must not discard the case_lookup
+    result or block the rest of sync -- same partial-success posture as a
+    causelist_batch failure."""
+    fake = _base_fake(tracking=_tracking())
+    gateway = _FakeGateway(
+        case_detail=_FakeCaseDetail(cnr="CNR1", petitioner_advocates=["Someone"]),
+        causelist={"CNR1": _FakeCauselistEntry(cnr="CNR1", has_causelist=True)},
+    )
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+    monkeypatch.setattr(
+        court_sync,
+        "_upsert_case_advocates",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert tracking_row["sync_status"] == "synced"
 
 
 def test_repeat_sync_updates_same_hearing_no_duplicate(monkeypatch):

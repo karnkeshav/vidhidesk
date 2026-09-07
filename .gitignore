@@ -38,3 +38,7 @@ yarn-debug.log*
 
 # Generated contract drafts (runtime output, not source)
 /api/generated_drafts/
+
+# scripts/ecourts_spike.py output -- real, live case data (party names,
+# advocate names) pulled with a real ECOURTS_API_KEY. Never commit this.
+/api/scripts/_ecourts_spike_output/
