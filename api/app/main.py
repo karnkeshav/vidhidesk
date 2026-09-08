@@ -125,8 +125,16 @@ def _warm_up_ml_models() -> None:
 raw_origins = settings.cors_origins if isinstance(settings.cors_origins, list) else [settings.cors_origins]
 cors_origins = [str(o).strip().rstrip("/") for o in raw_origins if o and str(o).strip() != "*"]
 
-# Ensure default production and local origins are present
-default_origins = ["http://localhost:3000", "https://vidhidesk.vercel.app"]
+# Ensure default production and local origins are present. The Vercel
+# project backing the frontend is named "web", not "vidhidesk" -- its
+# real stable production domain is web-three-phi-94.vercel.app (confirmed
+# via `vercel domains ls`/`project ls`, 2026-09-08), which the regex below
+# does not match since it only matches hosts containing "vidhidesk".
+default_origins = [
+    "http://localhost:3000",
+    "https://vidhidesk.vercel.app",
+    "https://web-three-phi-94.vercel.app",
+]
 for default_origin in default_origins:
     if default_origin not in cors_origins:
         cors_origins.append(default_origin)

@@ -2,7 +2,7 @@ from functools import lru_cache
 import json
 
 from dotenv import find_dotenv, load_dotenv
-from pydantic import field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Repo layout: env vars live in the monorepo-root .env, not /api/.env.
@@ -49,31 +49,51 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_key: str = ""
 
-    cors_origins: list[str] = [
+    # "https://vidhidesk.vercel.app" is aspirational -- the actual Vercel
+    # project is named "web" (not "vidhidesk"), so its real stable
+    # production domain is "https://web-three-phi-94.vercel.app" (confirmed
+    # via `vercel domains ls`/`project ls`, 2026-09-08). Both are kept here:
+    # the vidhidesk.vercel.app entry costs nothing to keep in case that
+    # domain is ever claimed, and removing it isn't this fix's job.
+    #
+    # Stored as a plain str field (validation_alias keeps it reading from
+    # the same CORS_ORIGINS env var), NOT list[str]: pydantic-settings
+    # attempts its own JSON-decode of any list[str]-typed field sourced
+    # from an env var BEFORE a model_validator/field_validator ever runs,
+    # raising a hard SettingsError that crashes the whole app at startup
+    # for an ordinary comma-separated value like "http://a,http://b" --
+    # even though parsing logic for exactly that shape already existed
+    # below. `Annotated[list[str], NoDecode]` is pydantic-settings' own
+    # fix for this, but that requires >=2.7; this box runs 2.6.1, where
+    # NoDecode does not exist. Verified live: setting CORS_ORIGINS as a
+    # comma-separated string in production crash-looped the container with
+    # `pydantic_settings.exceptions.SettingsError: error parsing value for
+    # field "cors_origins" from source "EnvSettingsSource"`. Parsing into
+    # a list now happens explicitly in the cors_origins property below,
+    # safely after Settings() has already been constructed.
+    cors_origins_raw: str = Field(default="", validation_alias="CORS_ORIGINS")
+
+    _CORS_DEFAULTS = [
         "http://localhost:3000",
         "https://vidhidesk.vercel.app",
+        "https://web-three-phi-94.vercel.app",
     ]
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: str | list[str] | None) -> list[str]:
-        if v is None:
-            return ["http://localhost:3000", "https://vidhidesk.vercel.app"]
-        if isinstance(v, str):
-            v_str = v.strip()
-            if not v_str:
-                return ["http://localhost:3000", "https://vidhidesk.vercel.app"]
-            if v_str.startswith("[") and v_str.endswith("]"):
-                try:
-                    parsed = json.loads(v_str)
-                    if isinstance(parsed, list):
-                        return [str(item).strip() for item in parsed if item]
-                except Exception:
-                    pass
-            if "," in v_str:
-                return [item.strip() for item in v_str.split(",") if item.strip()]
-            return [v_str]
-        return v
+    @property
+    def cors_origins(self) -> list[str]:
+        v_str = (self.cors_origins_raw or "").strip()
+        if not v_str:
+            return self._CORS_DEFAULTS
+        if v_str.startswith("[") and v_str.endswith("]"):
+            try:
+                parsed = json.loads(v_str)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if item]
+            except Exception:
+                pass
+        if "," in v_str:
+            return [item.strip() for item in v_str.split(",") if item.strip()]
+        return [v_str]
 
 
 @lru_cache
