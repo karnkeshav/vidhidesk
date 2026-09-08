@@ -1,8 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { CourtCaseTracking } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 export function FiledDocuments({ tracking }: { tracking: CourtCaseTracking | null }) {
   if (!tracking?.filed_documents || tracking.filed_documents.length === 0) {
