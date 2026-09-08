@@ -26,6 +26,8 @@ class _FakeCaseDetail:
     petitioner_advocates: list = None
     respondent_advocates: list = None
     interlocutory_applications: list = None
+    interim_orders: list = None
+    filed_documents: list = None
     next_hearing_date: str | None = None
     raw: dict = None
 
@@ -36,6 +38,8 @@ class _FakeCaseDetail:
         self.petitioner_advocates = self.petitioner_advocates or []
         self.respondent_advocates = self.respondent_advocates or []
         self.interlocutory_applications = self.interlocutory_applications or []
+        self.interim_orders = self.interim_orders or []
+        self.filed_documents = self.filed_documents or []
         self.raw = self.raw if self.raw is not None else {"cnr": self.cnr}
 
 
@@ -520,3 +524,40 @@ def test_no_causelist_entry_no_hearing_created(monkeypatch):
     result = court_sync.sync_matter_court_data("m1", fake)
     assert result["hearing_id"] is None
     assert fake.table("hearings").rows == []
+
+
+def test_sync_persists_ecourts_orders_and_files(monkeypatch):
+    """Verifies that interim orders from eCourts JSON are saved into the `orders` table
+    and `court_case_tracking` table."""
+    fake = _base_fake(tracking=_tracking())
+    case_detail = _FakeCaseDetail(
+        cnr="CNR1",
+        court_name="Delhi High Court",
+        interim_orders=[
+            {
+                "order_date": "2026-04-20",
+                "description": "View ORDER",
+                "order_url": "order-1.pdf",
+            }
+        ],
+        filed_documents=[{"doc_id": "doc123", "name": "Bail Application"}],
+    )
+    gateway = _FakeGateway(case_detail=case_detail, causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+
+    # Orders table check
+    order_rows = fake.table("orders").rows
+    assert len(order_rows) == 1
+    assert order_rows[0]["order_date"] == "2026-04-20"
+    assert order_rows[0]["file_url"] == "order-1.pdf"
+    assert order_rows[0]["source"] == "ecourts"
+    assert order_rows[0]["court"] == "Delhi High Court"
+
+    # Tracking table check
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert len(tracking_row.get("interim_orders", [])) == 1
+    assert tracking_row["interim_orders"][0]["order_url"] == "order-1.pdf"
+

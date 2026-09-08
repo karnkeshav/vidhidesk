@@ -57,6 +57,24 @@ export function CaseMetadata({ matter, tracking }: { matter: Matter | null; trac
               <p className="font-serif text-[11px] text-[#45464E]">{tracking.respondents.join(", ")}</p>
             </div>
           )}
+          {tracking?.interim_orders && tracking.interim_orders.length > 0 && (
+            <div className="sm:col-span-2">
+              <p className="font-semibold text-[#081534]">eCourts Orders & Files ({tracking.interim_orders.length})</p>
+              <div className="mt-1 space-y-1">
+                {tracking.interim_orders.map((io, idx) => (
+                  <div key={idx} className="flex items-center gap-2 font-serif text-[11px] text-[#45464E]">
+                    <span className="font-sans font-semibold text-[#081534]">{io.order_date || "Undated"}:</span>
+                    <span>{io.description || "Order"}</span>
+                    {io.order_url && (
+                      <span className="rounded-xs border border-[#E4E2DD] bg-[#FBF9F4] px-1 font-mono text-[9px]">
+                        {io.order_url}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {tracking?.last_error && (
             <div className="sm:col-span-2">
               <p className="font-semibold text-[#7A2A2A]">Last Sync Error</p>

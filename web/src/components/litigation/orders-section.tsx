@@ -120,6 +120,13 @@ export function OrdersSection({
                 </span>
               </div>
               {o.court && <p className="font-serif text-[11px] text-[#45464E]">{o.court}</p>}
+              {o.file_url && (
+                <div className="flex items-center gap-1.5 py-0.5">
+                  <span className="inline-flex items-center gap-1 rounded-xs border border-[#E4E2DD] bg-[#FBF9F4] px-1.5 py-0.5 font-mono text-[10px] text-[#081534]">
+                    📄 File: {o.file_url}
+                  </span>
+                </div>
+              )}
               {o.raw_text && <p className="font-serif text-[11px] text-[#76777F] whitespace-pre-wrap">{o.raw_text}</p>}
               {o.ai_extracted_directions.length > 0 && (
                 <ul className="ml-4 list-disc font-serif text-[11px] text-[#45464E]">

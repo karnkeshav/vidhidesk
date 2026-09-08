@@ -881,6 +881,8 @@ class CourtCasePreviewOut(BaseModel):
     status: str | None = None
     petitioners: list[str] = Field(default_factory=list)
     respondents: list[str] = Field(default_factory=list)
+    interim_orders: list[dict] = Field(default_factory=list)
+    filed_documents: list[dict] = Field(default_factory=list)
 
 
 class CourtCaseTrackingOut(BaseModel):
@@ -894,13 +896,15 @@ class CourtCaseTrackingOut(BaseModel):
     last_error: str | None = None
     provider_metadata: dict | None = None
     # Typed mirrors of provider_metadata's already-verified fields (see
-    # 0028_court_case_tracking_typed_fields.sql) -- populated once the
+    # 0028_court_case_tracking_typed_fields.sql and 0029) -- populated once the
     # first successful sync runs, null/empty before that.
     court_name: str | None = None
     judge: str | None = None
     case_status: str | None = None
     petitioners: list[str] = Field(default_factory=list)
     respondents: list[str] = Field(default_factory=list)
+    interim_orders: list[dict] = Field(default_factory=list)
+    filed_documents: list[dict] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

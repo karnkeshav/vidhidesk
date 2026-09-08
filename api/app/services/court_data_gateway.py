@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
@@ -120,27 +120,29 @@ class InterlocutoryApplicationEntry:
 @dataclass
 class CourtCaseDetail:
     cnr: str
-    court_name: str | None
-    judge: str | None
-    judges: list[str]
-    status: str | None
-    petitioners: list[str]
-    respondents: list[str]
+    court_name: str | None = None
+    judge: str | None = None
+    judges: list[str] = field(default_factory=list)
+    status: str | None = None
+    petitioners: list[str] = field(default_factory=list)
+    respondents: list[str] = field(default_factory=list)
     # Confirmed against the same real response as judges/petitioners/
     # respondents above (petitionerAdvocates/respondentAdvocates,
     # 2026-09-07) -- plain advocate name strings, no bar_council_id/
     # phone/email in this response.
-    petitioner_advocates: list[str]
-    respondent_advocates: list[str]
-    interlocutory_applications: list[InterlocutoryApplicationEntry]
+    petitioner_advocates: list[str] = field(default_factory=list)
+    respondent_advocates: list[str] = field(default_factory=list)
+    interlocutory_applications: list[InterlocutoryApplicationEntry] = field(default_factory=list)
+    interim_orders: list[dict[str, Any]] = field(default_factory=list)
+    filed_documents: list[dict[str, Any]] = field(default_factory=list)
     # courtCaseData.nextHearingDate -- confirmed against the same real
     # response as the fields above (2026-09-07). This is the case's own
     # scheduled next hearing, distinct from causelist_batch's "next
     # listing" (CauselistEntry.date, which is what's on an imminent
     # causelist specifically); court_sync.py uses causelist's date when
     # present and falls back to this one otherwise.
-    next_hearing_date: str | None
-    raw: dict[str, Any]
+    next_hearing_date: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -287,6 +289,22 @@ class CourtDataGateway:
                 )
             )
 
+        interim_orders: list[dict[str, Any]] = []
+        for o in case_data.get("interimOrders") or []:
+            if isinstance(o, dict):
+                interim_orders.append(
+                    {
+                        "order_date": o.get("orderDate"),
+                        "description": o.get("description"),
+                        "order_url": o.get("orderUrl"),
+                    }
+                )
+
+        filed_docs: list[dict[str, Any]] = []
+        for d in case_data.get("filedDocuments") or []:
+            if isinstance(d, dict):
+                filed_docs.append(d)
+
         return CourtCaseDetail(
             cnr=case_data.get("cnr", cnr),
             court_name=case_data.get("courtName"),
@@ -298,6 +316,8 @@ class CourtDataGateway:
             petitioner_advocates=list(case_data.get("petitionerAdvocates") or []),
             respondent_advocates=list(case_data.get("respondentAdvocates") or []),
             interlocutory_applications=ia_entries,
+            interim_orders=interim_orders,
+            filed_documents=filed_docs,
             next_hearing_date=case_data.get("nextHearingDate"),
             raw=data,
         )

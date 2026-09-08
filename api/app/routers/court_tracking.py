@@ -221,6 +221,20 @@ def _cached_preview_from_tracking(user: CurrentUser, cnr: str) -> dict | None:
     # but not disallowed) -- the most recently synced one wins.
     candidates.sort(key=lambda r: r.get("last_synced_at") or "", reverse=True)
     row = candidates[0]
+    pm = row.get("provider_metadata") or {}
+    case_data = (pm.get("data") or {}).get("courtCaseData") or {}
+    interim_orders = []
+    for o in case_data.get("interimOrders") or []:
+        if isinstance(o, dict):
+            interim_orders.append(
+                {
+                    "order_date": o.get("orderDate"),
+                    "description": o.get("description"),
+                    "order_url": o.get("orderUrl"),
+                }
+            )
+    filed_docs = [d for d in case_data.get("filedDocuments") or [] if isinstance(d, dict)]
+
     return {
         "cnr": row["cnr_number"],
         "court_name": row.get("court_name"),
@@ -228,6 +242,8 @@ def _cached_preview_from_tracking(user: CurrentUser, cnr: str) -> dict | None:
         "status": row.get("case_status"),
         "petitioners": row.get("petitioners") or [],
         "respondents": row.get("respondents") or [],
+        "interim_orders": row.get("interim_orders") or interim_orders,
+        "filed_documents": row.get("filed_documents") or filed_docs,
     }
 
 
@@ -291,6 +307,8 @@ def preview_court_case(cnr: str, user: CurrentUser = Depends(get_current_user)):
         "status": detail.status,
         "petitioners": detail.petitioners,
         "respondents": detail.respondents,
+        "interim_orders": detail.interim_orders,
+        "filed_documents": detail.filed_documents,
     }
 
 

@@ -268,6 +268,50 @@ def _upsert_interlocutory_applications(sc, *, matter: dict[str, Any], cnr: str, 
             ).execute()
 
 
+def _upsert_ecourts_orders(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
+    """Upserts eCourts interim orders into the `orders` table (migration 0025).
+    Keyed by (matter_id, file_url) or (matter_id, order_date, source='ecourts'),
+    avoiding duplicating orders across repeated syncs."""
+    for order in case_detail.interim_orders:
+        order_url = order.get("order_url") or order.get("orderUrl")
+        order_date = order.get("order_date") or order.get("orderDate")
+        description = order.get("description") or "eCourts Interim Order"
+        if not order_url and not order_date:
+            continue
+
+        existing_orders = (
+            sc.table("orders")
+            .select("*")
+            .eq("matter_id", matter["id"])
+            .execute()
+            .data
+            or []
+        )
+        match = next(
+            (
+                o
+                for o in existing_orders
+                if (order_url and o.get("file_url") == order_url)
+                or (order_date and o.get("order_date") == order_date and o.get("source") == "ecourts")
+            ),
+            None,
+        )
+        payload = {
+            "organization_id": matter["organization_id"],
+            "matter_id": matter["id"],
+            "order_date": order_date,
+            "court": case_detail.court_name,
+            "raw_text": description,
+            "file_url": order_url,
+            "source": "ecourts",
+            "status": "active",
+        }
+        if match:
+            sc.table("orders").update(payload).eq("id", match["id"]).execute()
+        else:
+            sc.table("orders").insert(payload).execute()
+
+
 def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     """Full sync for one matter. `sc` is a service_client() instance --
     the caller (scheduler script) is responsible for supplying it; this
@@ -306,12 +350,13 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
         try:
             _upsert_case_advocates(sc, matter=matter, cnr=cnr, case_detail=case_detail)
             _upsert_interlocutory_applications(sc, matter=matter, cnr=cnr, case_detail=case_detail)
+            _upsert_ecourts_orders(sc, matter=matter, cnr=cnr, case_detail=case_detail)
         except Exception:
             # Same partial-success posture as the causelist_batch failure
-            # below: advocate/IA persistence failing must never discard
+            # below: advocate/IA/order persistence failing must never discard
             # the case_lookup result we already have, or block the rest of
             # sync (hearing/causelist upserts, tracking row update).
-            logger.exception("court_sync: failed to persist advocates/interlocutory_applications for matter_id=%s", matter_id)
+            logger.exception("court_sync: failed to persist advocates/interlocutory_applications/orders for matter_id=%s", matter_id)
     except CourtDataNotConfiguredError:
         raise
     except CourtDataGatewayError as exc:
@@ -374,24 +419,32 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
         # already have -- log it, keep going, surface a partial success.
         _log(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, operation="causelist_batch", status="error", error_message=str(exc))
 
-    sc.table("court_case_tracking").update(
-        {
-            "sync_status": "synced",
-            "last_error": None,
-            "last_synced_at": _now_iso(),
-            "provider_metadata": case_detail.raw,
-            # Same already-verified fields case_detail carries -- stored
-            # separately so a caller (case-details UI) never has to parse
-            # provider_metadata's raw envelope itself, see 0028's migration
-            # note.
-            "court_name": case_detail.court_name,
-            "judge": case_detail.judge,
-            "case_status": case_detail.status,
-            "petitioners": case_detail.petitioners,
-            "respondents": case_detail.respondents,
-            "next_hearing_date": next_hearing_date,
-        }
-    ).eq("id", tracking["id"]).execute()
+    tracking_payload = {
+        "sync_status": "synced",
+        "last_error": None,
+        "last_synced_at": _now_iso(),
+        "provider_metadata": case_detail.raw,
+        # Same already-verified fields case_detail carries -- stored
+        # separately so a caller (case-details UI) never has to parse
+        # provider_metadata's raw envelope itself, see 0028's migration
+        # note.
+        "court_name": case_detail.court_name,
+        "judge": case_detail.judge,
+        "case_status": case_detail.status,
+        "petitioners": case_detail.petitioners,
+        "respondents": case_detail.respondents,
+        "next_hearing_date": next_hearing_date,
+    }
+    try:
+        sc.table("court_case_tracking").update(
+            {
+                **tracking_payload,
+                "interim_orders": case_detail.interim_orders,
+                "filed_documents": case_detail.filed_documents,
+            }
+        ).eq("id", tracking["id"]).execute()
+    except Exception:
+        sc.table("court_case_tracking").update(tracking_payload).eq("id", tracking["id"]).execute()
 
     if hearing_row:
         notify_hearing_listed(
