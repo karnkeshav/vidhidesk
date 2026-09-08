@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+// Strip BOM and whitespace from environment variables (Vercel build may add these)
+const API_URL = process.env.NEXT_PUBLIC_API_URL!.replace(/^﻿/, "").trim();
 
 // TEMP DEBUG (Auth Request Forensics Sprint, 2026-08-11): traces the exact
 // lifecycle of an authedFetch call so a live repro can show where a
@@ -1198,13 +1199,15 @@ export type CourtCaseTracking = {
   last_error: string | null;
   provider_metadata: Record<string, unknown> | null;
   // Typed mirrors of provider_metadata's already-verified fields (see
-  // api/migrations/0028_court_case_tracking_typed_fields.sql) -- read
+  // api/migrations/0028_court_case_tracking_typed_fields.sql and 0029) -- read
   // these instead of parsing provider_metadata directly.
   court_name: string | null;
   judge: string | null;
   case_status: string | null;
   petitioners: string[];
   respondents: string[];
+  interim_orders?: Array<{ order_date?: string; description?: string; order_url?: string }>;
+  filed_documents?: Array<Record<string, unknown>>;
   created_at: string;
   updated_at: string;
 };
@@ -1275,6 +1278,8 @@ export type CourtCasePreview = {
   status: string | null;
   petitioners: string[];
   respondents: string[];
+  interim_orders?: Array<{ order_date?: string; description?: string; order_url?: string }>;
+  filed_documents?: Array<Record<string, unknown>>;
 };
 
 /** Confirms a CNR the caller already has resolves to the right case
