@@ -29,7 +29,9 @@ sys.path.insert(0, str(API_ROOT))
 # Buckets referenced in application code:
 #   api/app/routers/profile.py::upload_avatar   -> "avatars"
 #   api/app/routers/litigation.py::upload_evidence -> "evidence"
-EXPECTED_BUCKETS = ["avatars", "evidence"]
+#   api/app/services/court_sync.py::_cache_ecourts_file -> "ecourts-documents"
+#     (provisioned via scripts/create_ecourts_bucket.py, 2026-09-08)
+EXPECTED_BUCKETS = ["avatars", "evidence", "ecourts-documents"]
 
 _TEST_OBJECT_PREFIX = "verify-storage-smoketest"
 _TEST_CONTENT = b"VidhiDesk verify_storage.py smoke test object - safe to delete."

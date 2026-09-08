@@ -21,8 +21,11 @@ blindly inserted -- a repeat sync on the same day updates the same row.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
+
+import httpx
 
 from app.services.court_data_gateway import (
     CourtDataGateway,
@@ -268,6 +271,92 @@ def _upsert_interlocutory_applications(sc, *, matter: dict[str, Any], cnr: str, 
             ).execute()
 
 
+_ABSOLUTE_URL_RE = re.compile(r"^https?://", re.IGNORECASE)
+_ECOURTS_STORAGE_BUCKET = "ecourts-documents"
+
+
+def _cache_ecourts_file(sc, *, organization_id: str, matter_id: str, cnr: str, url: str) -> str | None:
+    """Downloads an eCourts-hosted file once and caches it in Supabase
+    Storage, so that repeat views (and repeat test/dev syncs against the
+    same CNR) never re-hit the live provider for a file already fetched.
+
+    Only attempts this for a genuine absolute URL (scheme http/https).
+    Real eCourts responses have also been observed to return a bare
+    filename with no host at all (e.g. "order-1.pdf", CNR
+    DLHC010163362026, 2026-09-08) -- not a real fetchable link. This is
+    silently skipped rather than "fixed" by guessing a base URL that was
+    never confirmed (see court_data_gateway.py's own header comment on
+    unverified response shapes); the frontend separately only renders a
+    document/order link when the value is an absolute URL, so a skipped
+    entry here just correctly shows as non-clickable instead of a dead
+    link.
+
+    Best-effort throughout: any failure (network, storage) logs and
+    returns None rather than raising -- callers must keep the original
+    value in that case, never lose the reference entirely."""
+    if not url or not _ABSOLUTE_URL_RE.match(url):
+        return None
+
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", url.rsplit("/", 1)[-1].split("?")[0]) or "file"
+    dir_path = f"{organization_id}/{matter_id}/{cnr}"
+    storage_path = f"{dir_path}/{safe_name}"
+
+    try:
+        existing = sc.storage.from_(_ECOURTS_STORAGE_BUCKET).list(dir_path)
+        for entry in existing or []:
+            name = entry.get("name") if isinstance(entry, dict) else getattr(entry, "name", None)
+            if name == safe_name:
+                # Already cached from a previous sync -- reuse it rather
+                # than re-downloading from eCourts or re-uploading.
+                return sc.storage.from_(_ECOURTS_STORAGE_BUCKET).get_public_url(storage_path)
+    except Exception as exc:
+        logger.warning("court_sync: could not list cached eCourts files at %s: %s", dir_path, exc)
+        # Fall through and attempt a fresh download/upload below.
+
+    try:
+        resp = httpx.get(url, timeout=20.0, follow_redirects=True)
+        resp.raise_for_status()
+        content = resp.content
+        content_type = resp.headers.get("content-type", "application/octet-stream")
+    except Exception as exc:
+        logger.warning("court_sync: failed to download eCourts file url=%s cnr=%s: %s", url, cnr, exc)
+        return None
+
+    try:
+        sc.storage.from_(_ECOURTS_STORAGE_BUCKET).upload(
+            path=storage_path, file=content, file_options={"content-type": content_type}
+        )
+        return sc.storage.from_(_ECOURTS_STORAGE_BUCKET).get_public_url(storage_path)
+    except Exception as exc:
+        logger.warning("court_sync: failed to cache eCourts file to storage path=%s: %s", storage_path, exc)
+        return None
+
+
+def _cache_ecourts_files_for_case(sc, *, organization_id: str, matter_id: str, cnr: str, case_detail) -> None:
+    """Mutates case_detail.interim_orders/filed_documents IN PLACE,
+    replacing any absolute-URL file reference with its cached Supabase
+    Storage URL. Called once per sync, before any persistence, so both
+    the court_case_tracking columns and the `orders` table
+    (_upsert_ecourts_orders, below) end up pointing at the cached copy.
+    filed_documents entries are freeform dicts (no confirmed shared
+    schema across eCourts responses yet -- see court_data_gateway.py) so
+    every string value in each dict is checked, not just one known key."""
+    for order in case_detail.interim_orders:
+        url = order.get("order_url") or order.get("orderUrl")
+        cached = _cache_ecourts_file(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, url=url)
+        if cached:
+            order["order_url"] = cached
+
+    for doc in case_detail.filed_documents:
+        if not isinstance(doc, dict):
+            continue
+        for key, value in list(doc.items()):
+            if isinstance(value, str) and _ABSOLUTE_URL_RE.match(value):
+                cached = _cache_ecourts_file(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, url=value)
+                if cached:
+                    doc[key] = cached
+
+
 def _upsert_ecourts_orders(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
     """Upserts eCourts interim orders into the `orders` table (migration 0025).
     Keyed by (matter_id, file_url) or (matter_id, order_date, source='ecourts'),
@@ -347,6 +436,12 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     try:
         case_detail = gateway.case_lookup(cnr)
         _log(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, operation="case_lookup", status="success")
+        try:
+            _cache_ecourts_files_for_case(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, case_detail=case_detail)
+        except Exception:
+            # File caching is a pure optimization -- never block persisting
+            # the case_lookup result we already have if it fails.
+            logger.exception("court_sync: failed to cache eCourts files for matter_id=%s", matter_id)
         try:
             _upsert_case_advocates(sc, matter=matter, cnr=cnr, case_detail=case_detail)
             _upsert_interlocutory_applications(sc, matter=matter, cnr=cnr, case_detail=case_detail)

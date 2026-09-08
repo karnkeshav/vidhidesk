@@ -65,9 +65,19 @@ export function CaseMetadata({ matter, tracking }: { matter: Matter | null; trac
                   <div key={idx} className="flex items-center gap-2 font-serif text-[11px] text-[#45464E]">
                     <span className="font-sans font-semibold text-[#081534]">{io.order_date || "Undated"}:</span>
                     <span>{io.description || "Order"}</span>
-                    {io.order_url && (
-                      <span className="rounded-xs border border-[#E4E2DD] bg-[#FBF9F4] px-1 font-mono text-[9px]">
-                        {io.order_url}
+                    {io.order_url && isAbsoluteUrl(io.order_url) && (
+                      <a
+                        href={io.order_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-xs border border-[#E4E2DD] bg-[#FBF9F4] px-1 font-mono text-[9px] hover:bg-[#F0EEE9]"
+                      >
+                        View File
+                      </a>
+                    )}
+                    {io.order_url && !isAbsoluteUrl(io.order_url) && (
+                      <span className="rounded-xs border border-[#E4E2DD] bg-[#FBF9F4] px-1 font-mono text-[9px] text-[#76777F]">
+                        {io.order_url} (not downloadable yet)
                       </span>
                     )}
                   </div>
@@ -85,6 +95,14 @@ export function CaseMetadata({ matter, tracking }: { matter: Matter | null; trac
       )}
     </div>
   );
+}
+
+// eCourts responses have been observed to return a bare filename (e.g.
+// "order-1.pdf") with no host at all instead of a real link -- rendering
+// that as an <a href> produces a dead link resolving against this app's
+// own domain. Only ever link out for a genuine absolute http(s) URL.
+function isAbsoluteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
 }
 
 function Field({ label, value }: { label: string; value: ReactNode }) {

@@ -65,10 +65,10 @@ function DocumentRow({ doc }: { doc: Record<string, unknown> }) {
         </p>
       )}
 
-      {documentUrl && (
+      {documentUrl && isAbsoluteUrl(documentUrl) && (
         <div className="flex items-center gap-1.5 py-0.5">
           <a
-            href={String(documentUrl)}
+            href={documentUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 rounded-xs border border-[#E4E2DD] bg-[#FBF9F4] px-1.5 py-0.5 font-mono text-[10px] text-[#081534] hover:bg-[#F0EEE9]"
@@ -76,6 +76,11 @@ function DocumentRow({ doc }: { doc: Record<string, unknown> }) {
             📎 View Document
           </a>
         </div>
+      )}
+      {documentUrl && !isAbsoluteUrl(documentUrl) && (
+        <p className="font-serif text-[11px] text-[#76777F]">
+          File reference: {documentUrl} (not yet available for download from the court&apos;s system)
+        </p>
       )}
     </div>
   );
@@ -93,4 +98,12 @@ function getString(value: unknown): string | null {
   if (typeof value === "string") return value || null;
   if (typeof value === "number") return String(value);
   return null;
+}
+
+// eCourts responses have been observed to return a bare filename (e.g.
+// "order-1.pdf") with no host at all instead of a real link -- rendering
+// that as an <a href> produces a dead link resolving against this app's
+// own domain. Only ever link out for a genuine absolute http(s) URL.
+function isAbsoluteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
 }

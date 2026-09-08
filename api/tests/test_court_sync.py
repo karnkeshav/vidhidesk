@@ -102,8 +102,48 @@ def _tracking(matter_id="m1", cnr="CNR1", enabled=True):
     return {"id": "track-1", "matter_id": matter_id, "cnr_number": cnr, "tracking_enabled": enabled}
 
 
+class _FakeStorageBucket:
+    """Minimal fake of a Supabase Storage bucket client, just enough to
+    exercise court_sync.py::_cache_ecourts_file: tracks uploaded (path ->
+    (bytes, content_type)) in memory, list() reports direct children of a
+    prefix the same shape the real client returns ([{"name": ...}, ...]),
+    get_public_url() returns a deterministic fake URL."""
+
+    def __init__(self, name: str):
+        self.name = name
+        self.uploaded: dict[str, tuple[bytes, str | None]] = {}
+
+    def list(self, path: str):
+        prefix = path.rstrip("/") + "/"
+        names = {full[len(prefix):] for full in self.uploaded if full.startswith(prefix) and "/" not in full[len(prefix):]}
+        return [{"name": n} for n in names]
+
+    def upload(self, path: str, file: bytes, file_options: dict | None = None):
+        self.uploaded[path] = (file, (file_options or {}).get("content-type"))
+
+    def get_public_url(self, path: str) -> str:
+        return f"https://fake-supabase.test/storage/v1/object/public/{self.name}/{path}"
+
+
+class _FakeStorage:
+    def __init__(self):
+        self._buckets: dict[str, _FakeStorageBucket] = {}
+
+    def from_(self, name: str) -> _FakeStorageBucket:
+        return self._buckets.setdefault(name, _FakeStorageBucket(name))
+
+
+class _FakeHttpResponse:
+    def __init__(self, content: bytes = b"PDF-BYTES", content_type: str = "application/pdf"):
+        self.content = content
+        self.headers = {"content-type": content_type}
+
+    def raise_for_status(self):
+        pass
+
+
 def _base_fake(*, org_status="active", access_enabled=True, tracking=None, matter=None, hearings=None):
-    return FakeServiceClient(
+    fake = FakeServiceClient(
         {
             "court_case_tracking": [tracking] if tracking else [],
             "matters": [matter] if matter else [_matter()],
@@ -117,6 +157,8 @@ def _base_fake(*, org_status="active", access_enabled=True, tracking=None, matte
             "interlocutory_applications": [],
         }
     )
+    fake.storage = _FakeStorage()
+    return fake
 
 
 def test_tracking_not_enabled_raises_skipped(monkeypatch):
@@ -560,4 +602,152 @@ def test_sync_persists_ecourts_orders_and_files(monkeypatch):
     tracking_row = fake.table("court_case_tracking").rows[0]
     assert len(tracking_row.get("interim_orders", [])) == 1
     assert tracking_row["interim_orders"][0]["order_url"] == "order-1.pdf"
+
+
+def test_sync_caches_absolute_url_file_to_supabase_storage(monkeypatch):
+    """A real eCourts-hosted file (genuine http(s) URL) is downloaded once
+    and cached in Supabase Storage; every persisted copy of the URL
+    (orders table AND the court_case_tracking column) points at the
+    cached copy, not the original provider URL."""
+    fake = _base_fake(tracking=_tracking())
+    case_detail = _FakeCaseDetail(
+        cnr="CNR1",
+        interim_orders=[
+            {
+                "order_date": "2026-04-20",
+                "description": "View ORDER",
+                "order_url": "https://provider.example/files/order-1.pdf",
+            }
+        ],
+    )
+    gateway = _FakeGateway(case_detail=case_detail, causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+    monkeypatch.setattr(court_sync.httpx, "get", lambda *a, **k: _FakeHttpResponse())
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+
+    cached_url = "https://fake-supabase.test/storage/v1/object/public/ecourts-documents/org-1/m1/CNR1/order-1.pdf"
+
+    order_rows = fake.table("orders").rows
+    assert order_rows[0]["file_url"] == cached_url
+
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert tracking_row["interim_orders"][0]["order_url"] == cached_url
+
+    uploaded = fake.storage.from_("ecourts-documents").uploaded
+    assert uploaded["org-1/m1/CNR1/order-1.pdf"][0] == b"PDF-BYTES"
+
+
+def test_sync_reuses_already_cached_file_without_redownloading(monkeypatch):
+    """The whole point of caching: a file already fetched on a previous
+    sync must never be re-downloaded from the live provider on a repeat
+    sync of the same CNR."""
+    fake = _base_fake(tracking=_tracking())
+    fake.storage.from_("ecourts-documents").uploaded["org-1/m1/CNR1/order-1.pdf"] = (b"OLD-BYTES", "application/pdf")
+
+    case_detail = _FakeCaseDetail(
+        cnr="CNR1",
+        interim_orders=[
+            {
+                "order_date": "2026-04-20",
+                "description": "View ORDER",
+                "order_url": "https://provider.example/files/order-1.pdf",
+            }
+        ],
+    )
+    gateway = _FakeGateway(case_detail=case_detail, causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("must not re-download an already-cached file")
+
+    monkeypatch.setattr(court_sync.httpx, "get", _fail_if_called)
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+
+    cached_url = "https://fake-supabase.test/storage/v1/object/public/ecourts-documents/org-1/m1/CNR1/order-1.pdf"
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert tracking_row["interim_orders"][0]["order_url"] == cached_url
+
+
+def test_sync_leaves_bare_filename_untouched_no_download_attempted(monkeypatch):
+    """A bare filename with no scheme (real observed eCourts shape, e.g.
+    CNR DLHC010163362026, 2026-09-08) is not a fetchable URL -- must be
+    left exactly as-is, with no attempt to "fix" it by guessing a base
+    URL, and no wasted download attempt."""
+    fake = _base_fake(tracking=_tracking())
+    case_detail = _FakeCaseDetail(
+        cnr="CNR1",
+        interim_orders=[{"order_date": "2026-04-20", "description": "View ORDER", "order_url": "order-1.pdf"}],
+    )
+    gateway = _FakeGateway(case_detail=case_detail, causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("must not attempt to download a bare filename")
+
+    monkeypatch.setattr(court_sync.httpx, "get", _fail_if_called)
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert tracking_row["interim_orders"][0]["order_url"] == "order-1.pdf"
+    assert fake.storage.from_("ecourts-documents").uploaded == {}
+
+
+def test_sync_caches_filed_document_urls_generically(monkeypatch):
+    """filed_documents entries are freeform dicts with no confirmed shared
+    URL field name -- every absolute-URL string value in each dict must
+    be cached and rewritten, whatever key it's under."""
+    fake = _base_fake(tracking=_tracking())
+    case_detail = _FakeCaseDetail(
+        cnr="CNR1",
+        filed_documents=[
+            {"doc_id": "doc123", "name": "Bail Application", "documentUrl": "https://provider.example/docs/bail.pdf"}
+        ],
+    )
+    gateway = _FakeGateway(case_detail=case_detail, causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+    monkeypatch.setattr(court_sync.httpx, "get", lambda *a, **k: _FakeHttpResponse())
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    doc = tracking_row["filed_documents"][0]
+    assert doc["documentUrl"] == "https://fake-supabase.test/storage/v1/object/public/ecourts-documents/org-1/m1/CNR1/bail.pdf"
+    assert doc["doc_id"] == "doc123"  # non-URL fields untouched
+    assert doc["name"] == "Bail Application"
+
+
+def test_file_caching_failure_does_not_break_sync(monkeypatch):
+    """A download/storage failure while caching a file must never break
+    the rest of the sync -- the original URL is kept as a fallback."""
+    fake = _base_fake(tracking=_tracking())
+    case_detail = _FakeCaseDetail(
+        cnr="CNR1",
+        interim_orders=[
+            {
+                "order_date": "2026-04-20",
+                "description": "View ORDER",
+                "order_url": "https://provider.example/files/order-1.pdf",
+            }
+        ],
+    )
+    gateway = _FakeGateway(case_detail=case_detail, causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+
+    def _raise(*a, **k):
+        raise RuntimeError("network unreachable")
+
+    monkeypatch.setattr(court_sync.httpx, "get", _raise)
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+
+    tracking_row = fake.table("court_case_tracking").rows[0]
+    assert tracking_row["interim_orders"][0]["order_url"] == "https://provider.example/files/order-1.pdf"
 
