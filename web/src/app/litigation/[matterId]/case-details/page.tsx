@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { AuthedShell } from "@/components/authed-shell";
 import { NextHearingAlert } from "@/components/litigation/next-hearing-alert";
 import { CaseMetadata } from "@/components/litigation/case-metadata";
+import { FiledDocuments } from "@/components/litigation/filed-documents";
 import { RawProviderData } from "@/components/litigation/raw-provider-data";
 import { TimelineView } from "@/components/litigation/timeline-view";
 import { OrdersSection } from "@/components/litigation/orders-section";
@@ -122,6 +123,7 @@ export default function CaseDetailsPage() {
               <div className="space-y-4 md:col-span-8">
                 <TimelineView hearings={hearings} orders={orders} causelist={causelist} />
                 <OrdersSection orders={orders} onAddOrder={handleAddOrder} />
+                <FiledDocuments tracking={tracking} />
               </div>
               <div className="space-y-4 md:col-span-4">
                 <CaseMetadata matter={matter} tracking={tracking} />
