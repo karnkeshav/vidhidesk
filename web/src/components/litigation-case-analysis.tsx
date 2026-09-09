@@ -30,6 +30,7 @@ interface LitigationCaseAnalysisProps {
   hasFacts: boolean;
   limitationSnapshot: LimitationSnapshot | null;
   forumSnapshot: ForumSnapshot | null;
+  onAnalysisGenerated?: (analysis: CaseAnalysis) => void;
 }
 
 function SectionCard({
@@ -113,6 +114,7 @@ export function LitigationCaseAnalysis({
   hasFacts,
   limitationSnapshot,
   forumSnapshot,
+  onAnalysisGenerated,
 }: LitigationCaseAnalysisProps) {
   const [versions, setVersions] = useState<CaseAnalysis[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -128,6 +130,9 @@ export function LitigationCaseAnalysis({
         if (!cancelled) {
           setVersions(list);
           setSelectedIdx(0);
+          if (list.length > 0 && onAnalysisGenerated) {
+            onAnalysisGenerated(list[0]);
+          }
         }
       })
       .catch(() => {
@@ -154,6 +159,9 @@ export function LitigationCaseAnalysis({
       });
       setVersions((prev) => [result, ...prev]);
       setSelectedIdx(0);
+      if (onAnalysisGenerated) {
+        onAnalysisGenerated(result);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

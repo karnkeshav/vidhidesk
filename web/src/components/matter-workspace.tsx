@@ -1091,17 +1091,23 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
 
             {/* Tab 4: AI Case Analysis */}
             {activeTab === "analysis" && (
-              <LitigationCaseAnalysis
-                matterId={matterId}
-                hasParties={parties.length > 0}
-                hasFacts={facts.length > 0}
-                limitationSnapshot={limResult}
-                forumSnapshot={
-                  forumResult
-                    ? { recommended_forum: forumResult.recommended_forum, is_unambiguous: forumResult.is_unambiguous }
-                    : null
-                }
-              />
+                <LitigationCaseAnalysis
+                  matterId={matterId}
+                  hasParties={parties.length > 0}
+                  hasFacts={facts.length > 0}
+                  limitationSnapshot={limResult}
+                  forumSnapshot={
+                    forumResult
+                      ? { recommended_forum: forumResult.recommended_forum, is_unambiguous: forumResult.is_unambiguous }
+                      : null
+                  }
+                  onAnalysisGenerated={(newAnalysis) => {
+                    setAnalyses((prev) => {
+                      const filtered = prev.filter((item) => item.id !== newAnalysis.id);
+                      return [newAnalysis, ...filtered];
+                    });
+                  }}
+                />
             )}
 
             {/* Tab 5: AI Research Chat */}

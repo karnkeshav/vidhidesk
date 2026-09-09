@@ -7,6 +7,7 @@ import {
   PleadingClause,
   PleadingDraft,
   CaseAnalysis,
+  listCaseAnalyses,
   ClauseGround,
   generatePleadingOutline,
   listPleadingOutlines,
@@ -99,6 +100,7 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
   const [outline, setOutline] = useState<PleadingOutline | null>(null);
   const [clauses, setClauses] = useState<PleadingClause[]>([]);
   const [drafts, setDrafts] = useState<PleadingDraft[]>([]);
+  const [fetchedAnalysis, setFetchedAnalysis] = useState<CaseAnalysis | null>(null);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [isGeneratingClause, setIsGeneratingClause] = useState<string | null>(null);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
@@ -115,9 +117,17 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
   // 1: Outline, 2: Clauses/Review, 3: Preview/Export
   const [workflowStage, setWorkflowStage] = useState(1);
 
+  const activeAnalysis = latestCaseAnalysis || fetchedAnalysis;
+
   async function loadData() {
     try {
-      const outlines = await listPleadingOutlines(matterId);
+      const [outlines, analysesList] = await Promise.all([
+        listPleadingOutlines(matterId).catch(() => []),
+        listCaseAnalyses(matterId).catch(() => []),
+      ]);
+      if (analysesList.length > 0) {
+        setFetchedAnalysis(analysesList[0]);
+      }
       if (outlines.length > 0) {
         setOutline(outlines[0]);
         setWorkflowStage(2);
@@ -139,17 +149,17 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matterId]);
+  }, [matterId, latestCaseAnalysis?.id]);
 
   async function handleGenerateOutline() {
-    if (!latestCaseAnalysis) {
+    if (!activeAnalysis) {
       setError("A Case Analysis is required before generating a pleading outline.");
       return;
     }
     setIsGeneratingOutline(true);
     setError(null);
     try {
-      const out = await generatePleadingOutline(matterId, { case_analysis_id: latestCaseAnalysis.id });
+      const out = await generatePleadingOutline(matterId, { case_analysis_id: activeAnalysis.id });
       setOutline(out);
       setWorkflowStage(2);
       const cls = await listClauses(matterId, out.id);
@@ -334,7 +344,7 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
           </div>
           <Button
             onClick={handleGenerateOutline}
-            disabled={isGeneratingOutline || !latestCaseAnalysis}
+            disabled={isGeneratingOutline || !activeAnalysis}
             className="bg-[#081534] text-white font-sans text-xs font-semibold hover:bg-[#1E2A4A] h-10 px-8 mt-2"
           >
             {isGeneratingOutline ? (
@@ -347,7 +357,7 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
               </>
             )}
           </Button>
-          {!latestCaseAnalysis && (
+          {!activeAnalysis && (
             <p className="text-[#7A2A2A] font-sans text-xs mt-2">
               Generate an AI Case Analysis first before creating a pleading outline.
             </p>
