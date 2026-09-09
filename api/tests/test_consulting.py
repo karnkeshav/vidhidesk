@@ -20,7 +20,15 @@ from app.services import consulting
 from app.services.citations import CitationRecord
 from app.services.llm_gateway import GenerationResult, ProviderError
 from app.services.retrieval import RetrievedChunk
+import pytest
 from tests.test_case_analysis import DummyDBClient
+
+
+@pytest.fixture(autouse=True)
+def _mock_service_client(monkeypatch):
+    dummy = DummyDBClient()
+    monkeypatch.setattr(consulting, "service_client", lambda: dummy)
+    return dummy
 
 
 def get_mock_user(user_id: str = "user-123"):

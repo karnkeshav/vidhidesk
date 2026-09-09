@@ -72,7 +72,7 @@ def _next_version_no(matter_id: str, db) -> int:
 
 def _statute_context(chunks: list[RetrievedChunk]) -> str:
     if not chunks:
-        return "No statutory provisions were retrieved for this question."
+        return "No specific local database statute excerpts were retrieved for this query. Analyze based on standard Indian statutory framework and governing enactments."
     return "\n".join(
         f"- {c.act} Section {c.section_no}: {c.chunk_text[:400]}" for c in chunks
     )

@@ -85,6 +85,69 @@ ACT_CONFIG: dict[str, dict] = {
         "act": "Commercial Courts Act, 2015",
         "year": 2015,
     },
+    # --- Family & Succession Acts --------------------------------------
+    "hindu_succession_act_1956.pdf": {
+        "act": "Hindu Succession Act, 1956",
+        "year": 1956,
+    },
+    "indian_succession_act_1925.pdf": {
+        "act": "Indian Succession Act, 1925",
+        "year": 1925,
+    },
+    "hindu_marriage_act_1955.pdf": {
+        "act": "Hindu Marriage Act, 1955",
+        "year": 1955,
+    },
+    "special_marriage_act_1954.pdf": {
+        "act": "Special Marriage Act, 1954",
+        "year": 1954,
+    },
+    "guardians_and_wards_act_1890.pdf": {
+        "act": "Guardians and Wards Act, 1890",
+        "year": 1890,
+    },
+    # --- Commercial, Arbitration & Corporate Acts ----------------------
+    "arbitration_and_conciliation_act_1996.pdf": {
+        "act": "Arbitration and Conciliation Act, 1996",
+        "year": 1996,
+    },
+    "negotiable_instruments_act_1881.pdf": {
+        "act": "Negotiable Instruments Act, 1881",
+        "year": 1881,
+    },
+    "companies_act_2013.pdf": {
+        "act": "Companies Act, 2013",
+        "year": 2013,
+    },
+    "insolvency_and_bankruptcy_code_2016.pdf": {
+        "act": "Insolvency and Bankruptcy Code, 2016",
+        "year": 2016,
+    },
+    # --- Criminal & Evidence Laws --------------------------------------
+    "bharatiya_nyaya_sanhita_2023.pdf": {
+        "act": "Bharatiya Nyaya Sanhita, 2023",
+        "year": 2023,
+    },
+    "bharatiya_nagarik_suraksha_sanhita_2023.pdf": {
+        "act": "Bharatiya Nagarik Suraksha Sanhita, 2023",
+        "year": 2023,
+    },
+    "bharatiya_sakshya_adhiniyam_2023.pdf": {
+        "act": "Bharatiya Sakshya Adhiniyam, 2023",
+        "year": 2023,
+    },
+    "indian_penal_code_1860.pdf": {
+        "act": "Indian Penal Code, 1860",
+        "year": 1860,
+    },
+    "code_of_criminal_procedure_1973.pdf": {
+        "act": "Code of Criminal Procedure, 1973",
+        "year": 1973,
+    },
+    "indian_evidence_act_1872.pdf": {
+        "act": "Indian Evidence Act, 1872",
+        "year": 1872,
+    },
 }
 
 
