@@ -259,7 +259,12 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
       }
       setExportSuccess(`Successfully downloaded ${format.toUpperCase()}`);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : "Failed to export document");
+      const msg = err instanceof Error ? err.message : "Failed to export document";
+      if (msg.includes("501") || msg.includes("LibreOffice") || msg.includes("soffice")) {
+        setExportError("PDF export requires LibreOffice on the server. Please export as DOCX.");
+      } else {
+        setExportError(msg);
+      }
     } finally {
       setIsExporting(null);
     }

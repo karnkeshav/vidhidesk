@@ -24,6 +24,11 @@ FROM python:3.11.10-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# Install headless LibreOffice Writer for .docx -> .pdf export (TRD §3.4)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-writer-nogui \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install dependencies first (separate from the app-code COPY below) so
