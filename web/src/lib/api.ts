@@ -597,7 +597,7 @@ export function sendMessage(
       method: "POST",
       body: JSON.stringify({ content }),
     },
-    { retry: false }
+    { retry: false, timeoutMs: LLM_GENERATION_TIMEOUT_MS }
   );
 }
 

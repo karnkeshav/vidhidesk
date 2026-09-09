@@ -1114,11 +1114,16 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
             {activeTab === "chat" && (
               <div className="flex h-[60vh] flex-col rounded-sm border border-[#E4E2DD] bg-white p-4">
                 <div className="flex-1 space-y-3 overflow-y-auto p-2">
+                  {messages.length === 0 && (
+                    <div className="text-center py-8 text-xs font-sans text-[#76777F]">
+                      Ask the AI Research Assistant about statutory provisions, court procedures, limitation periods, or legal grounds relevant to this matter.
+                    </div>
+                  )}
                   {messages.map((m) => (
                     <div
                       key={m.id}
                       className={cn(
-                        "max-w-[80%] rounded-sm px-3 py-2 text-xs font-sans",
+                        "max-w-[80%] rounded-sm px-3 py-2 text-xs font-sans whitespace-pre-wrap leading-relaxed",
                         m.role === "user"
                           ? "ml-auto bg-[#081534] text-white"
                           : "bg-[#F0EEE9] text-[#1A1A1A]"
@@ -1127,6 +1132,12 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                       <div>{m.content}</div>
                     </div>
                   ))}
+                  {busy && (
+                    <div className="max-w-[80%] rounded-sm px-3 py-2 text-xs font-sans bg-[#F0EEE9] text-[#76777F] animate-pulse flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5 animate-spin text-[#081534]" />
+                      <span>AI Assistant is researching and drafting response...</span>
+                    </div>
+                  )}
                   <div ref={bottomRef} />
                 </div>
                 <form onSubmit={handleSend} className="mt-3 flex gap-2">
@@ -1135,8 +1146,9 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                     onChange={(e) => setDraft(e.target.value)}
                     placeholder="Ask AI litigation assistant statutory or procedural questions..."
                     className="flex-1 rounded-sm border border-[#E4E2DD] px-3 text-xs"
+                    disabled={busy}
                   />
-                  <Button type="submit" disabled={busy} className="h-9 bg-[#081534] text-xs font-semibold text-white">
+                  <Button type="submit" disabled={busy || !draft.trim()} className="h-9 bg-[#081534] text-xs font-semibold text-white">
                     <Send className="h-3.5 w-3.5" />
                   </Button>
                 </form>

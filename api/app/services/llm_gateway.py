@@ -263,6 +263,50 @@ _retry_transient = retry(
 )
 
 
+def _normalize_gemini_turns(turns: list[tuple[str, str]]) -> list[dict[str, Any]]:
+    """Normalize turns for Gemini API requirements:
+    1. Filter out empty contents.
+    2. Ensure roles alternate between 'user' and 'model' by combining consecutive same-role turns.
+    3. Ensure sequence begins with 'user'.
+    """
+    valid = [(role, content) for role, content in turns if content and content.strip()]
+    if not valid:
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for role, content in valid:
+        gemini_role = "user" if role == "user" else "model"
+        if not normalized:
+            if gemini_role != "user":
+                continue
+            normalized.append({"role": "user", "parts": [{"text": content}]})
+        else:
+            if normalized[-1]["role"] == gemini_role:
+                normalized[-1]["parts"][0]["text"] += f"\n\n{content}"
+            else:
+                normalized.append({"role": gemini_role, "parts": [{"text": content}]})
+    return normalized
+
+
+def _normalize_openai_turns(turns: list[tuple[str, str]]) -> list[dict[str, str]]:
+    """Normalize turns for OpenAI-compatible APIs (Groq, SambaNova, Cerebras):
+    1. Filter out empty contents.
+    2. Combine consecutive same-role turns.
+    """
+    valid = [(role, content) for role, content in turns if content and content.strip()]
+    if not valid:
+        return []
+
+    normalized: list[dict[str, str]] = []
+    for role, content in valid:
+        api_role = "assistant" if role in ("assistant", "model") else "user"
+        if normalized and normalized[-1]["role"] == api_role:
+            normalized[-1]["content"] += f"\n\n{content}"
+        else:
+            normalized.append({"role": api_role, "content": content})
+    return normalized
+
+
 @_retry_transient
 def _call_gemini(
     settings: Settings, model: str, system_prompt: str, turns: list[tuple[str, str]], json_mode: bool = False
@@ -271,11 +315,9 @@ def _call_gemini(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         f"?key={settings.gemini_api_key}"
     )
-    # Gemini uses "model" where OpenAI-style APIs use "assistant".
-    contents = [
-        {"role": "user" if role == "user" else "model", "parts": [{"text": content}]}
-        for role, content in turns
-    ]
+    contents = _normalize_gemini_turns(turns)
+    if not contents:
+        contents = [{"role": "user", "parts": [{"text": "Hello"}]}]
     body: dict[str, Any] = {
         "systemInstruction": {"parts": [{"text": system_prompt}]},
         "contents": contents,
@@ -314,7 +356,7 @@ def _call_openai_compatible(
     json_mode: bool = False,
 ) -> tuple[str, str]:
     messages = [{"role": "system", "content": system_prompt}]
-    messages += [{"role": role, "content": content} for role, content in turns]
+    messages += _normalize_openai_turns(turns)
     body: dict[str, Any] = {"model": model, "messages": messages}
     if json_mode:
         # Same structural fix as _call_gemini's generationConfig above, via the
