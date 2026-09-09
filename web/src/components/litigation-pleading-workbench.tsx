@@ -21,10 +21,8 @@ import {
 import {
   FileText,
   Layers,
-  CheckCircle,
   Eye,
   Download,
-  AlertCircle,
   Sparkles,
   ExternalLink,
   ShieldCheck,
