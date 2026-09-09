@@ -326,3 +326,30 @@ def test_402_raises_the_specific_quota_exceeded_subclass(monkeypatch):
         gw.case_lookup("CNR1")
     assert isinstance(exc_info.value, CourtDataGatewayError)
     assert "req-402" in str(exc_info.value)
+
+
+def test_download_order_success(monkeypatch):
+    captured = {}
+
+    def fake_request(method, url, headers=None, timeout=None, **kwargs):
+        captured["method"] = method
+        captured["url"] = url
+        captured["headers"] = headers
+        resp = _FakeResponse(200, {})
+        resp.content = b"%PDF-1.5 test order bytes"
+        return resp
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    gw = CourtDataGateway(settings=_settings("test-key"))
+    pdf_bytes = gw.download_order("DLHC010163362026", "order-1.pdf")
+
+    assert pdf_bytes == b"%PDF-1.5 test order bytes"
+    assert captured["method"] == "GET"
+    assert captured["url"] == "https://webapi.ecourtsindia.com/api/partner/case/DLHC010163362026/order/order-1.pdf"
+    assert captured["headers"]["Authorization"] == "Bearer test-key"
+
+
+def test_download_order_requires_api_key():
+    gw = CourtDataGateway(settings=_settings(""))
+    with pytest.raises(CourtDataNotConfiguredError):
+        gw.download_order("CNR1", "order-1.pdf")

@@ -284,8 +284,14 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
     try {
       const updated = await triggerCourtSync(matterId);
       setCourtTracking(updated);
-      const hList = await listCalendarHearings({ matter_id: matterId }).catch(() => []);
+      const [hList, pList, fList] = await Promise.all([
+        listCalendarHearings({ matter_id: matterId }).catch(() => []),
+        listParties(matterId).catch(() => []),
+        listEvidence(matterId).catch(() => []),
+      ]);
       setTrackedHearings(hList);
+      setParties(pList);
+      setFacts(fList);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

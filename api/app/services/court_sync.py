@@ -275,26 +275,29 @@ _ABSOLUTE_URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 _ECOURTS_STORAGE_BUCKET = "ecourts-documents"
 
 
-def _cache_ecourts_file(sc, *, organization_id: str, matter_id: str, cnr: str, url: str) -> str | None:
+def _cache_ecourts_file(
+    sc,
+    *,
+    organization_id: str,
+    matter_id: str,
+    cnr: str,
+    url: str,
+    gateway: CourtDataGateway | None = None,
+) -> str | None:
     """Downloads an eCourts-hosted file once and caches it in Supabase
     Storage, so that repeat views (and repeat test/dev syncs against the
     same CNR) never re-hit the live provider for a file already fetched.
 
-    Only attempts this for a genuine absolute URL (scheme http/https).
-    Real eCourts responses have also been observed to return a bare
-    filename with no host at all (e.g. "order-1.pdf", CNR
-    DLHC010163362026, 2026-09-08) -- not a real fetchable link. This is
-    silently skipped rather than "fixed" by guessing a base URL that was
-    never confirmed (see court_data_gateway.py's own header comment on
-    unverified response shapes); the frontend separately only renders a
-    document/order link when the value is an absolute URL, so a skipped
-    entry here just correctly shows as non-clickable instead of a dead
-    link.
+    Handles:
+      1. Absolute URLs (scheme http/https) -- fetched directly via HTTP GET.
+      2. Bare order filenames returned by eCourts (e.g. "order-1.pdf", CNR
+         DLHC010163362026) -- fetched via the confirmed partner API endpoint
+         GET /api/partner/case/{cnr}/order/{filename} with Bearer auth.
 
     Best-effort throughout: any failure (network, storage) logs and
     returns None rather than raising -- callers must keep the original
     value in that case, never lose the reference entirely."""
-    if not url or not _ABSOLUTE_URL_RE.match(url):
+    if not url:
         return None
 
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", url.rsplit("/", 1)[-1].split("?")[0]) or "file"
@@ -313,13 +316,27 @@ def _cache_ecourts_file(sc, *, organization_id: str, matter_id: str, cnr: str, u
         logger.warning("court_sync: could not list cached eCourts files at %s: %s", dir_path, exc)
         # Fall through and attempt a fresh download/upload below.
 
-    try:
-        resp = httpx.get(url, timeout=20.0, follow_redirects=True)
-        resp.raise_for_status()
-        content = resp.content
-        content_type = resp.headers.get("content-type", "application/octet-stream")
-    except Exception as exc:
-        logger.warning("court_sync: failed to download eCourts file url=%s cnr=%s: %s", url, cnr, exc)
+    content: bytes | None = None
+    content_type = "application/pdf"
+
+    if _ABSOLUTE_URL_RE.match(url):
+        try:
+            resp = httpx.get(url, timeout=20.0, follow_redirects=True)
+            resp.raise_for_status()
+            content = resp.content
+            content_type = resp.headers.get("content-type", "application/octet-stream")
+        except Exception as exc:
+            logger.warning("court_sync: failed to download eCourts file url=%s cnr=%s: %s", url, cnr, exc)
+            return None
+    else:
+        gw = gateway or CourtDataGateway()
+        try:
+            content = gw.download_order(cnr, safe_name)
+        except Exception as exc:
+            logger.warning("court_sync: failed to download eCourts order bare file=%s cnr=%s: %s", url, cnr, exc)
+            return None
+
+    if not content:
         return None
 
     try:
@@ -332,18 +349,26 @@ def _cache_ecourts_file(sc, *, organization_id: str, matter_id: str, cnr: str, u
         return None
 
 
-def _cache_ecourts_files_for_case(sc, *, organization_id: str, matter_id: str, cnr: str, case_detail) -> None:
+def _cache_ecourts_files_for_case(
+    sc,
+    *,
+    organization_id: str,
+    matter_id: str,
+    cnr: str,
+    case_detail,
+    gateway: CourtDataGateway | None = None,
+) -> None:
     """Mutates case_detail.interim_orders/filed_documents IN PLACE,
-    replacing any absolute-URL file reference with its cached Supabase
-    Storage URL. Called once per sync, before any persistence, so both
-    the court_case_tracking columns and the `orders` table
-    (_upsert_ecourts_orders, below) end up pointing at the cached copy.
-    filed_documents entries are freeform dicts (no confirmed shared
-    schema across eCourts responses yet -- see court_data_gateway.py) so
-    every string value in each dict is checked, not just one known key."""
+    replacing any file reference (absolute URL or eCourts partner order
+    filename) with its cached Supabase Storage URL. Called once per sync,
+    before any persistence, so both the court_case_tracking columns and
+    the `orders` table (_upsert_ecourts_orders, below) end up pointing
+    at the cached copy."""
     for order in case_detail.interim_orders:
         url = order.get("order_url") or order.get("orderUrl")
-        cached = _cache_ecourts_file(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, url=url)
+        cached = _cache_ecourts_file(
+            sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, url=url, gateway=gateway
+        )
         if cached:
             order["order_url"] = cached
 
@@ -352,7 +377,9 @@ def _cache_ecourts_files_for_case(sc, *, organization_id: str, matter_id: str, c
             continue
         for key, value in list(doc.items()):
             if isinstance(value, str) and _ABSOLUTE_URL_RE.match(value):
-                cached = _cache_ecourts_file(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, url=value)
+                cached = _cache_ecourts_file(
+                    sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, url=value, gateway=gateway
+                )
                 if cached:
                     doc[key] = cached
 
@@ -401,6 +428,247 @@ def _upsert_ecourts_orders(sc, *, matter: dict[str, Any], cnr: str, case_detail)
             sc.table("orders").insert(payload).execute()
 
 
+def _upsert_litigation_parties(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
+    """Synchronizes eCourts petitioners and respondents into the matter's
+    litigation_parties table (migration 0013) so the Case Overview and AI
+    Case Analysis are immediately grounded with real party names without
+    manual re-entry. Idempotent across repeated syncs."""
+    existing_parties = (
+        sc.table("litigation_parties")
+        .select("*")
+        .eq("matter_id", matter["id"])
+        .execute()
+        .data
+        or []
+    )
+    existing_by_name = {
+        (p.get("party_name", "").strip().lower(), p.get("party_type", "").strip().lower()): p
+        for p in existing_parties
+    }
+
+    petitioner_adv = ", ".join(case_detail.petitioner_advocates) if case_detail.petitioner_advocates else None
+    for idx, pet in enumerate(case_detail.petitioners):
+        name = pet.strip()
+        if not name:
+            continue
+        key = (name.lower(), "petitioner")
+        if key not in existing_by_name:
+            sc.table("litigation_parties").insert(
+                {
+                    "matter_id": matter["id"],
+                    "party_type": "Petitioner",
+                    "party_name": name,
+                    "party_number": idx + 1,
+                    "advocate_name": petitioner_adv if idx == 0 else None,
+                }
+            ).execute()
+
+    respondent_adv = ", ".join(case_detail.respondent_advocates) if case_detail.respondent_advocates else None
+    for idx, resp in enumerate(case_detail.respondents):
+        name = resp.strip()
+        if not name:
+            continue
+        key = (name.lower(), "respondent")
+        if key not in existing_by_name:
+            sc.table("litigation_parties").insert(
+                {
+                    "matter_id": matter["id"],
+                    "party_type": "Respondent",
+                    "party_name": name,
+                    "party_number": idx + 1,
+                    "advocate_name": respondent_adv if idx == 0 else None,
+                }
+            ).execute()
+
+
+def _upsert_litigation_facts_and_evidence(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
+    """Populates the evidentiary timeline (public.litigation_facts_evidence,
+    migrations 0013 & 0014) from eCourts case milestones, FIR details,
+    interlocutory applications, and watermarked court order PDFs.
+
+    This bridges procedural court sync into the matter's Facts & Exhibits
+    tab, enabling the AI Case Analysis and Limitation Engine to reason over
+    ground-truth court documents and procedural milestones immediately.
+    Idempotent across repeated syncs."""
+    existing_facts = (
+        sc.table("litigation_facts_evidence")
+        .select("*")
+        .eq("matter_id", matter["id"])
+        .execute()
+        .data
+        or []
+    )
+
+    case_data = (case_detail.raw.get("data", {}) or {}).get("courtCaseData", {}) or {}
+
+    # 1. FIR Details
+    fir = case_data.get("firDetails")
+    if isinstance(fir, dict) and fir.get("caseNumber"):
+        case_no = str(fir.get("caseNumber")).strip()
+        ps = str(fir.get("policeStation") or "").strip()
+        yr = str(fir.get("year") or "").strip()
+        fir_doc_title = f"FIR No. {case_no}" + (f" ({ps})" if ps else "")
+        fir_summary = f"FIR No. {case_no} registered at Police Station {ps or 'N/A'}" + (f", Year {yr}" if yr else "")
+
+        match = next(
+            (
+                f
+                for f in existing_facts
+                if f.get("exhibit_number") == "Ex. FIR"
+                or (f.get("document_title") and case_no in f.get("document_title"))
+                or (f.get("fact_summary") and case_no in f.get("fact_summary") and "FIR" in f.get("fact_summary"))
+            ),
+            None,
+        )
+        payload = {
+            "matter_id": matter["id"],
+            "fact_summary": fir_summary,
+            "exhibit_number": "Ex. FIR",
+            "document_title": fir_doc_title,
+            "relevance_notes": "Underlying Police Station FIR recorded in eCourts metadata",
+        }
+        if match:
+            sc.table("litigation_facts_evidence").update(payload).eq("id", match["id"]).execute()
+        else:
+            sc.table("litigation_facts_evidence").insert(payload).execute()
+
+    # 2. Case Institution / Filing milestone
+    filing_date = case_data.get("filingDate")
+    case_type = case_data.get("caseTypeRaw") or case_data.get("caseType") or "Case"
+    reg_no = case_data.get("registrationNumber")
+    filing_no = case_data.get("filingNumber")
+    if filing_date:
+        filing_doc_title = f"Case Filing: {case_type} {reg_no or ''}".strip()
+        filing_summary = f"{case_type} instituted in {case_detail.court_name or 'Court'}" + (
+            f" (Filing No. {filing_no})" if filing_no else ""
+        ) + (f", Registered as {reg_no}" if reg_no else "")
+        match = next(
+            (
+                f
+                for f in existing_facts
+                if f.get("exhibit_number") == "Ex. Petition"
+                or (f.get("document_title") and f.get("document_title").startswith("Case Filing"))
+            ),
+            None,
+        )
+        payload = {
+            "matter_id": matter["id"],
+            "event_date": filing_date,
+            "fact_summary": filing_summary,
+            "exhibit_number": "Ex. Petition",
+            "document_title": filing_doc_title,
+            "relevance_notes": f"Case institution milestone recorded on eCourts (CNR: {cnr})",
+        }
+        if match:
+            sc.table("litigation_facts_evidence").update(payload).eq("id", match["id"]).execute()
+        else:
+            sc.table("litigation_facts_evidence").insert(payload).execute()
+
+    # 3. Interlocutory Applications (IAs)
+    for idx, ia in enumerate(case_detail.interlocutory_applications):
+        ia_num = ia.application_number
+        doc_title = f"Application {ia_num}"
+        summary = f"Interlocutory Application {ia_num} filed by {ia.filed_by}" + (
+            f" (Status: {ia.status_raw})" if ia.status_raw else ""
+        )
+        match = next(
+            (
+                f
+                for f in existing_facts
+                if (f.get("document_title") == doc_title)
+                or (f.get("fact_summary") and ia_num in f.get("fact_summary"))
+                or (f.get("exhibit_number") == f"Ex. IA-{idx + 1}")
+            ),
+            None,
+        )
+        payload = {
+            "matter_id": matter["id"],
+            "event_date": ia.filing_date,
+            "fact_summary": summary,
+            "exhibit_number": f"Ex. IA-{idx + 1}",
+            "document_title": doc_title,
+            "relevance_notes": f"Interlocutory application recorded on eCourts (Status: {ia.status_raw})",
+        }
+        if match:
+            sc.table("litigation_facts_evidence").update(payload).eq("id", match["id"]).execute()
+        else:
+            sc.table("litigation_facts_evidence").insert(payload).execute()
+
+    # 4. Court Orders & Judgments (with True Copy PDFs)
+    for idx, order in enumerate(case_detail.interim_orders):
+        order_date = order.get("order_date") or order.get("orderDate")
+        order_url = order.get("order_url") or order.get("orderUrl")
+        desc = order.get("description") or "Court Order"
+        doc_title = f"Court Order dated {order_date}" if order_date else "Court Order"
+        safe_file_name = order_url.rsplit("/", 1)[-1].split("?")[0] if order_url else None
+        order_summary = (
+            f"Court order passed by {case_detail.court_name or 'Court'}"
+            + (f" on {order_date}" if order_date else "")
+            + (f" ({desc})" if desc and desc != "Court Order" else "")
+        )
+
+        match = next(
+            (
+                f
+                for f in existing_facts
+                if (order_url and f.get("file_url") == order_url)
+                or (
+                    order_date
+                    and f.get("event_date") == order_date
+                    and (
+                        f.get("exhibit_number") == f"Ex. Order-{idx + 1}"
+                        or (f.get("document_title") or "").startswith("Court Order")
+                    )
+                )
+            ),
+            None,
+        )
+        payload = {
+            "matter_id": matter["id"],
+            "event_date": order_date,
+            "fact_summary": order_summary,
+            "exhibit_number": f"Ex. Order-{idx + 1}",
+            "document_title": doc_title,
+            "relevance_notes": "Official True Copy order downloaded and cached from eCourts",
+            "file_url": order_url,
+            "file_name": safe_file_name,
+            "mime_type": "application/pdf" if order_url else None,
+        }
+        if match:
+            sc.table("litigation_facts_evidence").update(payload).eq("id", match["id"]).execute()
+        else:
+            sc.table("litigation_facts_evidence").insert(payload).execute()
+
+    # 5. Filed Documents
+    for idx, doc in enumerate(case_detail.filed_documents):
+        if not isinstance(doc, dict):
+            continue
+        title = doc.get("document_title") or doc.get("title") or doc.get("fileName") or f"Filed Document {idx + 1}"
+        doc_url = doc.get("file_url") or doc.get("url") or doc.get("documentUrl")
+        match = next(
+            (
+                f
+                for f in existing_facts
+                if (doc_url and f.get("file_url") == doc_url) or f.get("document_title") == title
+            ),
+            None,
+        )
+        payload = {
+            "matter_id": matter["id"],
+            "fact_summary": f"Document filed in court: {title}",
+            "exhibit_number": f"Ex. Doc-{idx + 1}",
+            "document_title": title,
+            "relevance_notes": "Document filed on record in eCourts",
+            "file_url": doc_url,
+            "file_name": doc_url.rsplit("/", 1)[-1].split("?")[0] if doc_url else None,
+            "mime_type": "application/pdf" if doc_url else None,
+        }
+        if match:
+            sc.table("litigation_facts_evidence").update(payload).eq("id", match["id"]).execute()
+        else:
+            sc.table("litigation_facts_evidence").insert(payload).execute()
+
+
 def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     """Full sync for one matter. `sc` is a service_client() instance --
     the caller (scheduler script) is responsible for supplying it; this
@@ -437,7 +705,7 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
         case_detail = gateway.case_lookup(cnr)
         _log(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, operation="case_lookup", status="success")
         try:
-            _cache_ecourts_files_for_case(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, case_detail=case_detail)
+            _cache_ecourts_files_for_case(sc, organization_id=organization_id, matter_id=matter_id, cnr=cnr, case_detail=case_detail, gateway=gateway)
         except Exception:
             # File caching is a pure optimization -- never block persisting
             # the case_lookup result we already have if it fails.
@@ -446,12 +714,14 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
             _upsert_case_advocates(sc, matter=matter, cnr=cnr, case_detail=case_detail)
             _upsert_interlocutory_applications(sc, matter=matter, cnr=cnr, case_detail=case_detail)
             _upsert_ecourts_orders(sc, matter=matter, cnr=cnr, case_detail=case_detail)
+            _upsert_litigation_parties(sc, matter=matter, cnr=cnr, case_detail=case_detail)
+            _upsert_litigation_facts_and_evidence(sc, matter=matter, cnr=cnr, case_detail=case_detail)
         except Exception:
             # Same partial-success posture as the causelist_batch failure
-            # below: advocate/IA/order persistence failing must never discard
+            # below: advocate/IA/order/facts persistence failing must never discard
             # the case_lookup result we already have, or block the rest of
             # sync (hearing/causelist upserts, tracking row update).
-            logger.exception("court_sync: failed to persist advocates/interlocutory_applications/orders for matter_id=%s", matter_id)
+            logger.exception("court_sync: failed to persist advocates/IAs/orders/parties/facts for matter_id=%s", matter_id)
     except CourtDataNotConfiguredError:
         raise
     except CourtDataGatewayError as exc:

@@ -121,7 +121,13 @@ export default function CaseDetailsPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
               <div className="space-y-4 md:col-span-8">
-                <TimelineView hearings={hearings} orders={orders} causelist={causelist} />
+                <TimelineView
+                  hearings={hearings}
+                  orders={orders}
+                  causelist={causelist}
+                  tracking={tracking}
+                  applications={applications}
+                />
                 <OrdersSection orders={orders} onAddOrder={handleAddOrder} />
                 <FiledDocuments tracking={tracking} />
               </div>

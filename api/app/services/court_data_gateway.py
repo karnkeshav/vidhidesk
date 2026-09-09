@@ -290,13 +290,18 @@ class CourtDataGateway:
             )
 
         interim_orders: list[dict[str, Any]] = []
-        for o in case_data.get("interimOrders") or []:
+        raw_orders = (
+            (case_data.get("interimOrders") or [])
+            + (case_data.get("judgmentOrders") or [])
+            + (case_data.get("orders") or [])
+        )
+        for o in raw_orders:
             if isinstance(o, dict):
                 interim_orders.append(
                     {
-                        "order_date": o.get("orderDate"),
-                        "description": o.get("description"),
-                        "order_url": o.get("orderUrl"),
+                        "order_date": o.get("orderDate") or o.get("order_date"),
+                        "description": o.get("description") or o.get("orderType") or "Court Order",
+                        "order_url": o.get("orderUrl") or o.get("order_url"),
                     }
                 )
 
@@ -466,3 +471,11 @@ class CourtDataGateway:
             request_id=meta.get("request_id"),
             raw=body,
         )
+
+    def download_order(self, cnr: str, filename: str) -> bytes:
+        """GET /api/partner/case/{cnr}/order/{filename} -- download the
+        true-copy PDF bytes for a case order. Requires ECOURTS_API_KEY.
+        Confirmed 2026-09-08 against real CNRs (e.g. DLHC010163362026)."""
+        safe_name = filename.rsplit("/", 1)[-1].split("?")[0]
+        resp = self._request("GET", f"/api/partner/case/{cnr}/order/{safe_name}")
+        return resp.content

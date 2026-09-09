@@ -93,6 +93,9 @@ class _FakeGateway:
             raise self._causelist_raises
         return self._causelist
 
+    def download_order(self, cnr: str, filename: str) -> bytes:
+        return b"PDF-BYTES"
+
 
 def _matter(id_="m1", organization_id="org-1", user_id="u1", title="Test Matter"):
     return {"id": id_, "organization_id": organization_id, "user_id": user_id, "title": title, "case_number_formatted": None}
@@ -155,6 +158,9 @@ def _base_fake(*, org_status="active", access_enabled=True, tracking=None, matte
             "court_advocates": [],
             "case_advocate_links": [],
             "interlocutory_applications": [],
+            "orders": [],
+            "litigation_parties": [],
+            "litigation_facts_evidence": [],
         }
     )
     fake.storage = _FakeStorage()
@@ -594,14 +600,14 @@ def test_sync_persists_ecourts_orders_and_files(monkeypatch):
     order_rows = fake.table("orders").rows
     assert len(order_rows) == 1
     assert order_rows[0]["order_date"] == "2026-04-20"
-    assert order_rows[0]["file_url"] == "order-1.pdf"
+    assert order_rows[0]["file_url"] == "https://fake-supabase.test/storage/v1/object/public/ecourts-documents/org-1/m1/CNR1/order-1.pdf"
     assert order_rows[0]["source"] == "ecourts"
     assert order_rows[0]["court"] == "Delhi High Court"
 
     # Tracking table check
     tracking_row = fake.table("court_case_tracking").rows[0]
     assert len(tracking_row.get("interim_orders", [])) == 1
-    assert tracking_row["interim_orders"][0]["order_url"] == "order-1.pdf"
+    assert tracking_row["interim_orders"][0]["order_url"] == "https://fake-supabase.test/storage/v1/object/public/ecourts-documents/org-1/m1/CNR1/order-1.pdf"
 
 
 def test_sync_caches_absolute_url_file_to_supabase_storage(monkeypatch):
@@ -672,11 +678,10 @@ def test_sync_reuses_already_cached_file_without_redownloading(monkeypatch):
     assert tracking_row["interim_orders"][0]["order_url"] == cached_url
 
 
-def test_sync_leaves_bare_filename_untouched_no_download_attempted(monkeypatch):
-    """A bare filename with no scheme (real observed eCourts shape, e.g.
-    CNR DLHC010163362026, 2026-09-08) is not a fetchable URL -- must be
-    left exactly as-is, with no attempt to "fix" it by guessing a base
-    URL, and no wasted download attempt."""
+def test_sync_downloads_and_caches_bare_order_filename(monkeypatch):
+    """A bare filename from eCourts (e.g. 'order-1.pdf', CNR DLHC010163362026)
+    is fetched via the partner API's download_order endpoint and cached
+    in Supabase Storage; orders table and tracking row point at cached copy."""
     fake = _base_fake(tracking=_tracking())
     case_detail = _FakeCaseDetail(
         cnr="CNR1",
@@ -685,17 +690,16 @@ def test_sync_leaves_bare_filename_untouched_no_download_attempted(monkeypatch):
     gateway = _FakeGateway(case_detail=case_detail, causelist={})
     monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
 
-    def _fail_if_called(*a, **k):
-        raise AssertionError("must not attempt to download a bare filename")
-
-    monkeypatch.setattr(court_sync.httpx, "get", _fail_if_called)
-
     result = court_sync.sync_matter_court_data("m1", fake)
     assert result["status"] == "synced"
 
+    cached_url = "https://fake-supabase.test/storage/v1/object/public/ecourts-documents/org-1/m1/CNR1/order-1.pdf"
     tracking_row = fake.table("court_case_tracking").rows[0]
-    assert tracking_row["interim_orders"][0]["order_url"] == "order-1.pdf"
-    assert fake.storage.from_("ecourts-documents").uploaded == {}
+    assert tracking_row["interim_orders"][0]["order_url"] == cached_url
+    assert fake.storage.from_("ecourts-documents").uploaded["org-1/m1/CNR1/order-1.pdf"][0] == b"PDF-BYTES"
+
+    order_rows = fake.table("orders").rows
+    assert order_rows[0]["file_url"] == cached_url
 
 
 def test_sync_caches_filed_document_urls_generically(monkeypatch):
@@ -750,4 +754,90 @@ def test_file_caching_failure_does_not_break_sync(monkeypatch):
 
     tracking_row = fake.table("court_case_tracking").rows[0]
     assert tracking_row["interim_orders"][0]["order_url"] == "https://provider.example/files/order-1.pdf"
+
+
+def test_sync_populates_litigation_parties_and_facts(monkeypatch):
+    """Sync must automatically populate litigation_parties and litigation_facts_evidence
+    so that Case Overview, Facts & Exhibits, and AI Case Analysis are immediately ready."""
+    fake = _base_fake(tracking=_tracking())
+    case_detail = _FakeCaseDetail(
+        cnr="CNR1",
+        court_name="Delhi High Court",
+        petitioners=["Deepak"],
+        petitioner_advocates=["Ajay Kumar Yadav"],
+        respondents=["State (NCT of Delhi)"],
+        respondent_advocates=["APP Delhi"],
+        interlocutory_applications=[
+            _FakeIAEntry(
+                application_number="CRL.M.A./12140/2026",
+                filed_by="DEEPAK",
+                filing_date="2026-04-18",
+                status_raw="Pending",
+            )
+        ],
+        interim_orders=[
+            {
+                "order_date": "2026-04-20",
+                "description": "Notice issued",
+                "order_url": "https://provider.example/files/order-1.pdf",
+            }
+        ],
+        raw={
+            "data": {
+                "courtCaseData": {
+                    "filingDate": "2026-04-18",
+                    "registrationNumber": "1522/2026",
+                    "caseTypeRaw": "BAIL APPLN.",
+                    "firDetails": {
+                        "caseNumber": "48/2026",
+                        "policeStation": "GAZI PUR",
+                        "year": "2026",
+                    },
+                }
+            }
+        },
+    )
+    gateway = _FakeGateway(case_detail=case_detail, causelist={})
+    monkeypatch.setattr(court_sync, "CourtDataGateway", lambda: gateway)
+    monkeypatch.setattr(court_sync.httpx, "get", lambda *a, **k: _FakeHttpResponse())
+
+    result = court_sync.sync_matter_court_data("m1", fake)
+    assert result["status"] == "synced"
+
+    # Verify litigation_parties
+    parties = fake.table("litigation_parties").rows
+    assert len(parties) == 2
+    pet = next(p for p in parties if p["party_type"] == "Petitioner")
+    assert pet["party_name"] == "Deepak"
+    assert pet["advocate_name"] == "Ajay Kumar Yadav"
+
+    resp = next(p for p in parties if p["party_type"] == "Respondent")
+    assert resp["party_name"] == "State (NCT of Delhi)"
+    assert resp["advocate_name"] == "APP Delhi"
+
+    # Verify litigation_facts_evidence
+    facts = fake.table("litigation_facts_evidence").rows
+    assert len(facts) == 4  # FIR, Filing, IA, Order
+
+    fir_fact = next(f for f in facts if f["exhibit_number"] == "Ex. FIR")
+    assert "FIR No. 48/2026" in fir_fact["fact_summary"]
+    assert "GAZI PUR" in fir_fact["fact_summary"]
+
+    filing_fact = next(f for f in facts if f["exhibit_number"] == "Ex. Petition")
+    assert filing_fact["event_date"] == "2026-04-18"
+    assert "BAIL APPLN." in filing_fact["fact_summary"]
+
+    ia_fact = next(f for f in facts if f["exhibit_number"] == "Ex. IA-1")
+    assert "CRL.M.A./12140/2026" in ia_fact["fact_summary"]
+
+    order_fact = next(f for f in facts if f["exhibit_number"] == "Ex. Order-1")
+    assert order_fact["event_date"] == "2026-04-20"
+    assert order_fact["file_name"] == "order-1.pdf"
+    assert "fake-supabase.test" in order_fact["file_url"]
+
+    # Re-syncing should be idempotent (no duplicate rows)
+    court_sync.sync_matter_court_data("m1", fake)
+    assert len(fake.table("litigation_parties").rows) == 2
+    assert len(fake.table("litigation_facts_evidence").rows) == 4
+
 
