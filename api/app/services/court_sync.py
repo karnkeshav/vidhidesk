@@ -161,13 +161,15 @@ _IA_STATUS_MAP = {
 }
 
 
-def _normalize_ia_status(status_raw: str) -> str:
+def _normalize_ia_status(status_raw: str | None) -> str:
     """Only 'Pending' has been seen in a real response (see
     scripts/ecourts_spike.py output, 2026-09-07); the others are the
     plainest-possible guesses at what a resolved IA's status text might
     read, kept deliberately narrow. An unrecognized value defaults to
     PENDING (never crashes the whole sync over one status string) and is
     logged so a real example can correct this mapping later."""
+    if not status_raw or not isinstance(status_raw, str):
+        return "PENDING"
     normalized = _IA_STATUS_MAP.get(status_raw.strip().upper())
     if normalized is None:
         logger.warning("court_sync: unrecognized interlocutory_applications status %r, defaulting to PENDING", status_raw)
@@ -741,6 +743,52 @@ def _upsert_hearings_from_case_detail(sc, *, matter: dict[str, Any], cnr: str, c
             sc.table("hearings").insert(payload).execute()
 
 
+def _update_matter_overview(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
+    """Propagates structured court metadata (court_name, bench_name,
+    case_number_formatted, litigation_stage, court_category, jurisdiction_state)
+    directly to the matter row in public.matters so the Case Overview header
+    and matter cards are instantly populated."""
+    case_data = (case_detail.raw.get("data", {}) or {}).get("courtCaseData", {}) or {}
+    case_type = case_data.get("caseTypeRaw") or case_data.get("caseType") or ""
+    reg_no = case_data.get("registrationNumber") or ""
+    case_no_fmt = f"{case_type} {reg_no}".strip() if (case_type or reg_no) else None
+
+    court_raw = case_detail.court_name or case_data.get("courtName") or ""
+    court_name = "High Court of Delhi" if "DLHC" in court_raw.upper() else court_raw or None
+    bench_name = case_detail.judge or None
+    stage = case_data.get("stageOfCaseRaw") or case_data.get("stageOfCase") or case_detail.status or None
+
+    court_category = matter.get("court_category")
+    if not court_category and cnr:
+        if cnr.startswith("DLHC") or "HC" in cnr[:4]:
+            court_category = "High Court"
+
+    jurisdiction_state = matter.get("jurisdiction_state")
+    if not jurisdiction_state and cnr:
+        if cnr.startswith("DL"):
+            jurisdiction_state = "Delhi"
+
+    updates = {}
+    if case_no_fmt and not matter.get("case_number_formatted"):
+        updates["case_number_formatted"] = case_no_fmt
+    if court_name and not matter.get("court_name"):
+        updates["court_name"] = court_name
+    if bench_name and not matter.get("bench_name"):
+        updates["bench_name"] = bench_name
+    if stage and not matter.get("litigation_stage"):
+        updates["litigation_stage"] = stage
+    if court_category and not matter.get("court_category"):
+        updates["court_category"] = court_category
+    if jurisdiction_state and not matter.get("jurisdiction_state"):
+        updates["jurisdiction_state"] = jurisdiction_state
+
+    if updates:
+        try:
+            sc.table("matters").update(updates).eq("id", matter["id"]).execute()
+        except Exception:
+            logger.exception("court_sync: failed to update matters table with court overview for matter_id=%s", matter["id"])
+
+
 def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     """Full sync for one matter. `sc` is a service_client() instance --
     the caller (scheduler script) is responsible for supplying it; this
@@ -782,19 +830,20 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
             # File caching is a pure optimization -- never block persisting
             # the case_lookup result we already have if it fails.
             logger.exception("court_sync: failed to cache eCourts files for matter_id=%s", matter_id)
-        try:
-            _upsert_case_advocates(sc, matter=matter, cnr=cnr, case_detail=case_detail)
-            _upsert_interlocutory_applications(sc, matter=matter, cnr=cnr, case_detail=case_detail)
-            _upsert_ecourts_orders(sc, matter=matter, cnr=cnr, case_detail=case_detail)
-            _upsert_litigation_parties(sc, matter=matter, cnr=cnr, case_detail=case_detail)
-            _upsert_litigation_facts_and_evidence(sc, matter=matter, cnr=cnr, case_detail=case_detail)
-            _upsert_hearings_from_case_detail(sc, matter=matter, cnr=cnr, case_detail=case_detail)
-        except Exception:
-            # Same partial-success posture as the causelist_batch failure
-            # below: advocate/IA/order/facts/hearings persistence failing must never discard
-            # the case_lookup result we already have, or block the rest of
-            # sync (causelist upserts, tracking row update).
-            logger.exception("court_sync: failed to persist advocates/IAs/orders/parties/facts/hearings for matter_id=%s", matter_id)
+
+        for fn_name, fn in [
+            ("_upsert_case_advocates", _upsert_case_advocates),
+            ("_upsert_interlocutory_applications", _upsert_interlocutory_applications),
+            ("_upsert_ecourts_orders", _upsert_ecourts_orders),
+            ("_upsert_litigation_parties", _upsert_litigation_parties),
+            ("_upsert_litigation_facts_and_evidence", _upsert_litigation_facts_and_evidence),
+            ("_upsert_hearings_from_case_detail", _upsert_hearings_from_case_detail),
+            ("_update_matter_overview", _update_matter_overview),
+        ]:
+            try:
+                fn(sc, matter=matter, cnr=cnr, case_detail=case_detail)
+            except Exception:
+                logger.exception("court_sync: failed during %s for matter_id=%s", fn_name, matter_id)
     except CourtDataNotConfiguredError:
         raise
     except CourtDataGatewayError as exc:
