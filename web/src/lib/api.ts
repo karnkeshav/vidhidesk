@@ -46,6 +46,7 @@ const FETCH_TIMEOUT_MS = 12000;
 // aborting with a raw "signal is aborted without reason" before Render
 // ever gets a chance to respond.
 const COLD_START_TIMEOUT_MS = 70000;
+const LLM_GENERATION_TIMEOUT_MS = 180000;
 
 function isTransientFailure(status: number, bodyText: string): boolean {
   if (status >= 500) return true;
@@ -94,6 +95,9 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
       url,
       reason: timedOut ? "internal-timeout" : (err instanceof Error ? err.name : String(err)),
     });
+    if (timedOut) {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds.`);
+    }
     throw err;
   } finally {
     clearTimeout(timeoutId);
@@ -487,7 +491,7 @@ export function generateCaseAnalysis(
       method: "POST",
       body: JSON.stringify(payload),
     },
-    { retry: false }
+    { retry: false, timeoutMs: LLM_GENERATION_TIMEOUT_MS }
   );
 }
 
@@ -699,7 +703,7 @@ export function generateDraft(
       method: "POST",
       body: JSON.stringify(input),
     },
-    { retry: false }
+    { retry: false, timeoutMs: LLM_GENERATION_TIMEOUT_MS }
   );
 }
 
@@ -862,7 +866,7 @@ export function generatePleadingOutline(matterId: string, payload: { case_analys
       method: "POST",
       body: JSON.stringify(payload),
     },
-    { retry: false }
+    { retry: false, timeoutMs: LLM_GENERATION_TIMEOUT_MS }
   );
 }
 
@@ -877,7 +881,7 @@ export function generateClause(matterId: string, clauseType: string, payload: { 
       method: "POST",
       body: JSON.stringify(payload),
     },
-    { retry: false }
+    { retry: false, timeoutMs: LLM_GENERATION_TIMEOUT_MS }
   );
 }
 
