@@ -669,6 +669,78 @@ def _upsert_litigation_facts_and_evidence(sc, *, matter: dict[str, Any], cnr: st
             sc.table("litigation_facts_evidence").insert(payload).execute()
 
 
+def _upsert_hearings_from_case_detail(sc, *, matter: dict[str, Any], cnr: str, case_detail) -> None:
+    """Upserts scheduled and historical hearing entries into `hearings`
+    from case_detail (next_hearing_date, firstHearingDate, historyOfCaseHearings).
+    Ensures that the Hearing Docket and Calendar show scheduled court
+    appearances immediately upon sync without waiting for the 24-hour
+    causelist window. Idempotent across repeated syncs."""
+    case_data = (case_detail.raw.get("data", {}) or {}).get("courtCaseData", {}) or {}
+
+    hearing_candidates = []
+    if case_detail.next_hearing_date:
+        hearing_candidates.append(
+            {
+                "date": str(case_detail.next_hearing_date)[:10],
+                "title": f"Hearing — {matter.get('title', 'Matter')}",
+            }
+        )
+
+    first_date = case_data.get("firstHearingDate")
+    if first_date and str(first_date)[:10] != str(case_detail.next_hearing_date or "")[:10]:
+        hearing_candidates.append(
+            {
+                "date": str(first_date)[:10],
+                "title": f"First Hearing — {matter.get('title', 'Matter')}",
+            }
+        )
+
+    for h in case_data.get("historyOfCaseHearings") or []:
+        if isinstance(h, dict):
+            h_date = h.get("hearingDate") or h.get("date") or h.get("businessDate")
+            if h_date:
+                d_str = str(h_date)[:10]
+                if not any(c["date"] == d_str for c in hearing_candidates):
+                    hearing_candidates.append(
+                        {
+                            "date": d_str,
+                            "title": f"Hearing ({d_str}) — {matter.get('title', 'Matter')}",
+                        }
+                    )
+
+    for item in hearing_candidates:
+        date_str = item["date"]
+        if not date_str:
+            continue
+
+        existing = sc.table("hearings").select("*").eq("matter_id", matter["id"]).execute().data or []
+        match = next((h for h in existing if str(h.get("hearing_at", "")).startswith(date_str)), None)
+
+        if match and match.get("source") == "manual_override":
+            continue
+
+        payload = {
+            "matter_id": matter["id"],
+            "organization_id": matter["organization_id"],
+            "court": case_detail.court_name,
+            "bench": case_detail.judge,
+            "source": "ecourts",
+            "source_synced_at": _now_iso(),
+        }
+        if match:
+            sc.table("hearings").update(payload).eq("id", match["id"]).execute()
+        else:
+            payload.update(
+                {
+                    "user_id": matter["user_id"],
+                    "hearing_at": f"{date_str}T10:00:00+00:00",
+                    "title": item["title"],
+                    "case_no": matter.get("case_number_formatted"),
+                }
+            )
+            sc.table("hearings").insert(payload).execute()
+
+
 def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
     """Full sync for one matter. `sc` is a service_client() instance --
     the caller (scheduler script) is responsible for supplying it; this
@@ -716,12 +788,13 @@ def sync_matter_court_data(matter_id: str, sc) -> dict[str, Any]:
             _upsert_ecourts_orders(sc, matter=matter, cnr=cnr, case_detail=case_detail)
             _upsert_litigation_parties(sc, matter=matter, cnr=cnr, case_detail=case_detail)
             _upsert_litigation_facts_and_evidence(sc, matter=matter, cnr=cnr, case_detail=case_detail)
+            _upsert_hearings_from_case_detail(sc, matter=matter, cnr=cnr, case_detail=case_detail)
         except Exception:
             # Same partial-success posture as the causelist_batch failure
-            # below: advocate/IA/order/facts persistence failing must never discard
+            # below: advocate/IA/order/facts/hearings persistence failing must never discard
             # the case_lookup result we already have, or block the rest of
-            # sync (hearing/causelist upserts, tracking row update).
-            logger.exception("court_sync: failed to persist advocates/IAs/orders/parties/facts for matter_id=%s", matter_id)
+            # sync (causelist upserts, tracking row update).
+            logger.exception("court_sync: failed to persist advocates/IAs/orders/parties/facts/hearings for matter_id=%s", matter_id)
     except CourtDataNotConfiguredError:
         raise
     except CourtDataGatewayError as exc:

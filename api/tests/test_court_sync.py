@@ -763,6 +763,7 @@ def test_sync_populates_litigation_parties_and_facts(monkeypatch):
     case_detail = _FakeCaseDetail(
         cnr="CNR1",
         court_name="Delhi High Court",
+        next_hearing_date="2026-08-12",
         petitioners=["Deepak"],
         petitioner_advocates=["Ajay Kumar Yadav"],
         respondents=["State (NCT of Delhi)"],
@@ -788,6 +789,8 @@ def test_sync_populates_litigation_parties_and_facts(monkeypatch):
                     "filingDate": "2026-04-18",
                     "registrationNumber": "1522/2026",
                     "caseTypeRaw": "BAIL APPLN.",
+                    "firstHearingDate": "2026-04-20",
+                    "nextHearingDate": "2026-08-12",
                     "firDetails": {
                         "caseNumber": "48/2026",
                         "policeStation": "GAZI PUR",
@@ -835,9 +838,15 @@ def test_sync_populates_litigation_parties_and_facts(monkeypatch):
     assert order_fact["file_name"] == "order-1.pdf"
     assert "fake-supabase.test" in order_fact["file_url"]
 
+    # Verify hearings populated from next_hearing_date / firstHearingDate
+    hearings = fake.table("hearings").rows
+    assert len(hearings) >= 1
+    assert any("2026-04-20" in str(h.get("hearing_at")) for h in hearings)
+
     # Re-syncing should be idempotent (no duplicate rows)
     court_sync.sync_matter_court_data("m1", fake)
     assert len(fake.table("litigation_parties").rows) == 2
     assert len(fake.table("litigation_facts_evidence").rows) == 4
+    assert len(fake.table("hearings").rows) == len(hearings)
 
 
