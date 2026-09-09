@@ -822,40 +822,98 @@ export function bulkKeepBoilerplate(templateId: string): Promise<TemplateClause[
   );
 }
 
-// --- Litigation Pleading Workbench (Sprint 4) ---
+// --- Litigation Pleading Workbench (Sprint 3.6) ---
+
+export type PleadingOutlineSection = {
+  section: string;
+  content_plan: string;
+};
 
 export type PleadingOutline = {
   id: string;
+  matter_id: string;
+  case_analysis_id: string;
   version_no: number;
-  sections: Array<{
-    title: string;
-    section_type: string;
-    required_clauses: string[];
-    suggested_arguments: string[];
+  legal_issues: Array<{ issue: string; related_cause_of_action?: string | null }>;
+  applicable_statutes: Array<{
+    act: string;
+    section_no: string;
+    year?: number | null;
+    chunk_excerpt: string;
+    score: number;
   }>;
-  status: string;
+  applicable_case_law: Array<{
+    case_name: string;
+    note?: string | null;
+    status: string;
+    ik_url?: string | null;
+    court?: string | null;
+  }>;
+  cause_of_action: Array<{
+    title: string;
+    description: string;
+    supporting_facts: string[];
+    statutes_relied_upon: Array<{ act: string; section_no: string; grounded: boolean }>;
+  }>;
+  reliefs_sought: Array<{ relief: string; basis: string }>;
+  evidence_mapping: Array<{
+    exhibit_number?: string | null;
+    fact_summary: string;
+    supports: string[];
+    has_evidence_file: boolean;
+  }>;
+  pleading_outline: PleadingOutlineSection[];
   created_at: string;
+};
+
+export type ClauseGround = {
+  issue: string;
+  statute_refs: Array<{ act: string; section_no: string; grounded: boolean }>;
+  case_law_refs: Array<{ case_name: string; status: string; ik_url?: string | null; court?: string | null }>;
+  argument_note: string;
+  confidence: number;
+};
+
+export type ClauseContent = {
+  text: string;
+  bullet_items?: string[] | null;
+  grounds?: ClauseGround[] | null;
 };
 
 export type PleadingClause = {
   id: string;
+  matter_id: string;
+  pleading_outline_id: string;
   clause_type: string;
   version_no: number;
-  content: string;
-  review_status: "Needs Review" | "Approved" | "Rejected";
-  citations: unknown[];
+  content: ClauseContent | string;
+  statute_refs: Array<{ act: string; section_no: string; grounded: boolean }>;
+  case_law_refs: Array<{ case_name: string; status: string; ik_url?: string | null; court?: string | null }>;
+  confidence: number;
+  is_deterministic: boolean;
+  model_used?: string | null;
+  review_status: "pending" | "approved" | "rejected";
+  reviewed_at?: string | null;
+  generation_warning?: string | null;
   created_at: string;
 };
 
 export type PleadingDraft = {
   id: string;
+  matter_id: string;
+  pleading_outline_id: string;
   version_no: number;
   composed_sections: Array<{
     paragraph_no: number;
     clause_type: string;
     heading: string;
     text: string;
+    bullet_items?: string[] | null;
+    statute_refs?: Array<{ act: string; section_no: string; grounded: boolean }>;
+    case_law_refs?: Array<{ case_name: string; status: string; ik_url?: string | null; court?: string | null }>;
+    confidence?: number | null;
   }>;
+  missing_clauses?: string[];
   created_at: string;
 };
 
@@ -889,7 +947,7 @@ export function listClauses(matterId: string, pleadingOutlineId: string): Promis
   return authedFetch(`/api/matters/${matterId}/clauses?pleading_outline_id=${pleadingOutlineId}`);
 }
 
-export function reviewPleadingClause(matterId: string, clauseId: string, status: "Approved" | "Rejected"): Promise<PleadingClause> {
+export function reviewPleadingClause(matterId: string, clauseId: string, status: "approved" | "rejected"): Promise<PleadingClause> {
   return authedFetch(`/api/matters/${matterId}/clauses/${clauseId}/review`, {
     method: "POST",
     body: JSON.stringify({ review_status: status }),
