@@ -66,7 +66,7 @@ export default function ContractsPage() {
       .catch((err) => setError(friendlyLoadError(err)));
 
     listMatters()
-      .then(setMatters)
+      .then((rows) => setMatters(rows.filter((m) => m.module === "contracts")))
       .catch(() => {});
   }
 
