@@ -982,6 +982,7 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
               <div className="rounded-sm border border-[#E4E2DD] bg-white p-5">
                 <LitigationFactTimeline
                   facts={facts}
+                  matterId={matterId}
                   onAddFact={handleAddFact}
                   onUploadFile={handleUploadEvidenceFile}
                   onDeleteFact={handleDeleteFact}

@@ -20,6 +20,7 @@ export interface FactItem {
 
 interface LitigationFactTimelineProps {
   facts: FactItem[];
+  matterId?: string;
   onAddFact: (factData: {
     event_date?: string;
     fact_summary: string;
@@ -36,6 +37,7 @@ interface LitigationFactTimelineProps {
 
 export function LitigationFactTimeline({
   facts,
+  matterId,
   onAddFact,
   onUploadFile,
   onDeleteFact,
@@ -278,13 +280,17 @@ export function LitigationFactTimeline({
 
                   {fact.file_url && (
                     <a
-                      href={fact.file_url}
+                      href={
+                        fact.file_url.startsWith("http://") || fact.file_url.startsWith("https://")
+                          ? fact.file_url
+                          : `${process.env.NEXT_PUBLIC_API_URL || ""}/api/matters/${matterId || ""}/court-orders/${fact.file_url}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-[#081534] underline"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-[#081534] underline hover:text-[#1E2A4A]"
                     >
                       <Paperclip className="h-3 w-3" />
-                      {fact.file_name || "View uploaded file"}
+                      {fact.file_name || fact.document_title || "View order document"}
                     </a>
                   )}
                 </div>

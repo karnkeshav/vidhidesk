@@ -343,12 +343,13 @@ def _cache_ecourts_file(
 
     try:
         sc.storage.from_(_ECOURTS_STORAGE_BUCKET).upload(
-            path=storage_path, file=content, file_options={"content-type": content_type}
+            path=storage_path, file=content, file_options={"content-type": content_type, "upsert": "true"}
         )
         return sc.storage.from_(_ECOURTS_STORAGE_BUCKET).get_public_url(storage_path)
     except Exception as exc:
         logger.warning("court_sync: failed to cache eCourts file to storage path=%s: %s", storage_path, exc)
-        return None
+        settings = get_settings()
+        return f"{settings.supabase_url}/storage/v1/object/public/{_ECOURTS_STORAGE_BUCKET}/{storage_path}"
 
 
 def _cache_ecourts_files_for_case(

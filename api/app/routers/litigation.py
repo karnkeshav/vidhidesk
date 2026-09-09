@@ -4,7 +4,8 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from app.services.court_data_gateway import CourtDataGateway
 
 from app.auth import CurrentUser, get_current_user
 from app.db import service_client
@@ -529,3 +530,60 @@ def delete_order(matter_id: str, order_id: str, user: CurrentUser = Depends(get_
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     return {"status": "deleted", "id": order_id}
+
+
+@router.get("/matters/{matter_id}/court-orders/{filename}")
+def stream_court_order(
+    matter_id: str,
+    filename: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Securely stream or serve the court order PDF. If not yet
+    cached in Supabase Storage, downloads it from eCourts on the fly."""
+    matter = _get_matter_or_404(user, matter_id)
+    safe_name = filename.rsplit("/", 1)[-1].split("?")[0]
+    cnr = matter.get("cnr_number")
+    if not cnr:
+        tracking = user.db.table("court_case_tracking").select("cnr_number").eq("matter_id", matter_id).limit(1).execute().data
+        if tracking:
+            cnr = tracking[0].get("cnr_number")
+
+    sc = service_client()
+    org_id = matter.get("organization_id", "default")
+    dir_path = f"{org_id}/{matter_id}/{cnr}" if cnr else f"{org_id}/{matter_id}"
+    storage_path = f"{dir_path}/{safe_name}"
+
+    # 1. Check Supabase storage
+    try:
+        content = sc.storage.from_("ecourts-documents").download(storage_path)
+        if content:
+            return Response(
+                content=content,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"inline; filename={safe_name}"},
+            )
+    except Exception:
+        pass
+
+    # 2. If not cached, fetch via CourtDataGateway if CNR is available
+    if cnr:
+        try:
+            gw = CourtDataGateway()
+            pdf_bytes = gw.download_order(cnr, safe_name)
+            if pdf_bytes:
+                try:
+                    sc.storage.from_("ecourts-documents").upload(
+                        path=storage_path, file=pdf_bytes, file_options={"content-type": "application/pdf", "upsert": "true"}
+                    )
+                except Exception:
+                    pass
+                return Response(
+                    content=pdf_bytes,
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f"inline; filename={safe_name}"},
+                )
+        except Exception as exc:
+            logging.warning("Failed to fetch order from eCourts on the fly: %s", exc)
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Court order PDF not found")
+
