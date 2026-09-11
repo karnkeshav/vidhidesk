@@ -28,6 +28,8 @@ from supabase_auth.errors import AuthApiError
 from app.auth import CurrentUser, TRIAL_WINDOW, require_platform_owner
 from app.db import service_client
 from app.models.schemas import (
+    MatterDemoUpdate,
+    MatterOut,
     MembershipOut,
     OrganizationAccessUpdate,
     OrganizationDetailOut,
@@ -290,3 +292,30 @@ def update_organization_access(
     ).execute()
 
     return OrganizationOut(**updated)
+
+
+@router.patch("/matters/{matter_id}/shared-demo", response_model=MatterOut)
+def update_matter_shared_demo(
+    matter_id: str,
+    body: MatterDemoUpdate,
+    owner: CurrentUser = Depends(require_platform_owner),
+):
+    """Flags/unflags a matter as a shared, read-only demo visible to every
+    signed-in user across every organization -- see
+    0030_shared_demo_matter_and_ecourts_allowlist.sql for the RLS side of
+    this (additive SELECT-only policies on matters + its litigation
+    satellite tables). Owner-only: this is a deliberate, narrow hole in
+    tenant isolation, never something a matter's own organization can
+    flip for itself."""
+    sc = service_client()
+    rows = sc.table("matters").select("id").eq("id", matter_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Matter not found")
+    updated = (
+        sc.table("matters")
+        .update({"is_shared_demo": body.is_shared_demo})
+        .eq("id", matter_id)
+        .execute()
+        .data[0]
+    )
+    return MatterOut(**updated)

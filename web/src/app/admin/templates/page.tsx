@@ -52,8 +52,8 @@ export default function AdminTemplatesIndexPage() {
           {templates.map((t) => (
             <a key={t.id} href={`/admin/templates/${t.template_key}`} className="block">
               <Card className="transition hover:bg-accent">
-                <CardContent className="flex items-center justify-between py-4">
-                  <div>
+                <CardContent className="flex flex-wrap items-center justify-between gap-2 py-4">
+                  <div className="min-w-0">
                     <div className="font-medium">{t.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {t.reviewedCount}/{t.clauseCount} clauses reviewed

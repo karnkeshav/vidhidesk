@@ -136,6 +136,17 @@ def _teardown():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def _allow_ecourts_search(monkeypatch):
+    """Every existing test in this file predates the eCourts search
+    allowlist gate (2026-09-11) and exercises the underlying tracking/
+    sync/search behavior, not the gate itself -- default every test to
+    "allowed" so they keep testing what they always tested. The gate's
+    own allow/deny behavior is covered separately below
+    (test_ecourts_search_gate.py)."""
+    monkeypatch.setattr(court_tracking_router, "is_ecourts_search_allowed", lambda email: True)
+
+
 def test_get_tracking_creates_default_row_when_missing():
     db = FakeDB(matters=[_matter_row()])
     client = _client_with(db)

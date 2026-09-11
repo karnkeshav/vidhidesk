@@ -153,6 +153,11 @@ export type Matter = {
   litigation_stage?: string | null;
   court_name?: string | null;
   bench_name?: string | null;
+  // Read-only shared demo matter, visible to every signed-in user across
+  // every organization (0030_shared_demo_matter_and_ecourts_allowlist.sql)
+  // -- true for at most a handful of matters the platform owner has
+  // explicitly flagged via PATCH /api/platform/matters/{id}/shared-demo.
+  is_shared_demo?: boolean;
   created_at: string;
 };
 

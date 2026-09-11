@@ -43,6 +43,7 @@ class MatterOut(BaseModel):
     litigation_stage: str | None = None
     court_name: str | None = None
     bench_name: str | None = None
+    is_shared_demo: bool = False
     created_at: datetime
 
 
@@ -782,6 +783,10 @@ class OrganizationAccessUpdate(BaseModel):
     action: str = Field(pattern="^(mark_payment|enable|suspend|reactivate|extend_trial)$")
     reason: str | None = None
     extend_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class MatterDemoUpdate(BaseModel):
+    is_shared_demo: bool
 
 
 class OrganizationAccessEventOut(BaseModel):

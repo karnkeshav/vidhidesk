@@ -353,6 +353,14 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                   {matter.court_category} ({matter.jurisdiction_state || "India"})
                 </span>
               )}
+              {matter?.is_shared_demo && (
+                <span
+                  className="rounded-xs border border-[#C6C6CF] bg-[#F0EEE9] px-2 py-0.5 font-sans text-[10px] font-semibold text-[#45464E]"
+                  title="Shared read-only example with a real, verifiable eCourts CNR. Visible to every VidhiDesk user; only the platform owner can edit it."
+                >
+                  SHARED DEMO — READ ONLY
+                </span>
+              )}
             </div>
             <h1 className="mt-1 font-sans text-xl font-semibold tracking-tight text-[#081534]">
               {matter?.title || "Loading Matter..."}
@@ -384,11 +392,11 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
         {isLitigation ? (
           <div className="space-y-4">
             {/* Sub-Navigation Tabs */}
-            <div className="flex border-b border-[#E4E2DD] font-sans text-xs font-semibold">
+            <div className="flex overflow-x-auto border-b border-[#E4E2DD] font-sans text-xs font-semibold">
               <button
                 onClick={() => setActiveTab("overview")}
                 className={cn(
-                  "px-4 py-2 border-b-2 font-medium transition-colors",
+                  "shrink-0 px-4 py-2 border-b-2 font-medium transition-colors",
                   activeTab === "overview"
                     ? "border-[#081534] text-[#081534]"
                     : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"
@@ -399,7 +407,7 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
               <button
                 onClick={() => setActiveTab("facts")}
                 className={cn(
-                  "px-4 py-2 border-b-2 font-medium transition-colors",
+                  "shrink-0 px-4 py-2 border-b-2 font-medium transition-colors",
                   activeTab === "facts"
                     ? "border-[#081534] text-[#081534]"
                     : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"
@@ -410,7 +418,7 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
               <button
                 onClick={() => setActiveTab("hearings")}
                 className={cn(
-                  "px-4 py-2 border-b-2 font-medium transition-colors",
+                  "shrink-0 px-4 py-2 border-b-2 font-medium transition-colors",
                   activeTab === "hearings"
                     ? "border-[#081534] text-[#081534]"
                     : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"
@@ -421,7 +429,7 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
               <button
                 onClick={() => setActiveTab("analysis")}
                 className={cn(
-                  "flex items-center gap-1 px-4 py-2 border-b-2 font-medium transition-colors",
+                  "flex shrink-0 items-center gap-1 px-4 py-2 border-b-2 font-medium transition-colors",
                   activeTab === "analysis"
                     ? "border-[#081534] text-[#081534]"
                     : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"
@@ -433,7 +441,7 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
               <button
                 onClick={() => setActiveTab("chat")}
                 className={cn(
-                  "px-4 py-2 border-b-2 font-medium transition-colors",
+                  "shrink-0 px-4 py-2 border-b-2 font-medium transition-colors",
                   activeTab === "chat"
                     ? "border-[#081534] text-[#081534]"
                     : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"
@@ -444,7 +452,7 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
               <button
                 onClick={() => setActiveTab("pleading")}
                 className={cn(
-                  "flex items-center gap-1 px-4 py-2 border-b-2 font-medium transition-colors",
+                  "flex shrink-0 items-center gap-1 px-4 py-2 border-b-2 font-medium transition-colors",
                   activeTab === "pleading"
                     ? "border-[#081534] text-[#081534]"
                     : "border-transparent text-[#76777F] hover:text-[#1A1A1A]"

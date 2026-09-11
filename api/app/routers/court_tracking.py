@@ -28,8 +28,21 @@ from app.services.court_data_gateway import (
     CourtDataNotFoundError,
     CourtDataQuotaExceededError,
 )
+from app.services.ecourts_access import (
+    ECOURTS_SEARCH_RESTRICTED_DETAIL,
+    is_ecourts_search_allowed,
+)
 
 router = APIRouter(prefix="/api", tags=["court-tracking"])
+
+
+def _require_ecourts_search_access(user: CurrentUser) -> None:
+    """Raises 403 unless the caller is on the eCourts search allowlist
+    (app/services/ecourts_access.py). Call this at every point that can
+    trigger a live, billable eCourts call -- never gate the read of
+    already-cached/synced data, which costs nothing."""
+    if not is_ecourts_search_allowed(user.email):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=ECOURTS_SEARCH_RESTRICTED_DETAIL)
 
 
 def _get_matter_or_404(user: CurrentUser, matter_id: str) -> dict:
@@ -55,11 +68,18 @@ def update_court_tracking(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Set/edit the CNR and enable/disable tracking. Does not itself call
-    the provider -- see POST .../court-tracking/sync for that."""
+    the provider -- see POST .../court-tracking/sync for that -- but
+    setting a CNR or flipping tracking_enabled to true is still gated:
+    the scheduled sync job (.github/workflows/ecourts-sync.yml) picks up
+    any enabled-tracking row automatically and would otherwise bill the
+    owner for a search this endpoint never itself performed. Disabling
+    tracking (tracking_enabled=false) is always free and never gated."""
     matter = _get_matter_or_404(user, matter_id)
     update_data = payload.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields provided to update")
+    if "cnr_number" in update_data or update_data.get("tracking_enabled") is True:
+        _require_ecourts_search_access(user)
     return court_tracking.update_tracking(matter_id, matter["organization_id"], update_data, user.db)
 
 
@@ -71,8 +91,11 @@ def trigger_court_sync(matter_id: str, user: CurrentUser = Depends(get_current_u
     service-role privileges (writes court_sync_log, which has no
     authenticated-role policy at all) and would happily act on any
     matter_id it's given, so this router's own ownership check is what
-    actually enforces tenant isolation for this one endpoint, not RLS."""
+    actually enforces tenant isolation for this one endpoint, not RLS.
+    Always a live, billable eCourts call -- gated regardless of whether
+    the CNR is already known."""
     _get_matter_or_404(user, matter_id)
+    _require_ecourts_search_access(user)
     sc = service_client()
     try:
         court_sync.sync_matter_court_data(matter_id, sc)
@@ -267,6 +290,10 @@ def preview_court_case(cnr: str, user: CurrentUser = Depends(get_current_user)):
     if cached:
         return cached
 
+    # Only the live-provider fallback below is gated -- a cache hit above
+    # costs nothing and stays free for everyone.
+    _require_ecourts_search_access(user)
+
     try:
         gateway = CourtDataGateway()
         detail = gateway.case_lookup(normalized_cnr)
@@ -329,7 +356,11 @@ def search_court_cases(
     chosen CNR to actually attach it to a matter. See
     CourtDataGateway.case_search() for this endpoint's verification
     caveat -- unlike CNR-based lookups, its exact field names have not
-    been confirmed against a live provider response."""
+    been confirmed against a live provider response. Always a live,
+    billable eCourts call -- no cache-first path exists for a broad
+    search the way it does for a known-CNR preview -- so gated
+    unconditionally."""
+    _require_ecourts_search_access(user)
     if not any([query, advocates, case_numbers, court_codes, case_types]):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide at least one search filter")
     try:
