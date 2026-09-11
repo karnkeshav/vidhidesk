@@ -81,6 +81,26 @@ function isOrgAccessDisabledFailure(status: number, bodyText: string): boolean {
   return status === 403 && bodyText.includes("ORG_ACCESS_DISABLED");
 }
 
+// Self-heal for a specific race (found 2026-09-11 via a real user report --
+// a lawyer permanently stuck on "System Error" with no way to recover short
+// of a manual DB fix): authed-shell.tsx fires startSession() (which
+// provisions this user's organization/membership row via routers/auth.py::
+// _ensure_organization) and listMatters()/listTemplates() concurrently, not
+// sequentially. If startSession() is still in flight -- e.g. a Render cold
+// start, see COLD_START_TIMEOUT_MS above -- or its single fire-and-forget
+// attempt fails, every other authenticated call 403s with this exact
+// backend marker (app/auth.py::_check_organization_access) until something
+// re-runs provisioning. Nothing previously did: "Try Again" buttons across
+// the app (e.g. contracts/page.tsx's loadData) only retry the data fetch
+// itself, never startSession(), so a user who hit this was stuck
+// indefinitely with no self-service recovery. ensure_organization_membership
+// is idempotent (0024_tenant_foundation.sql Section 5b, an atomic upsert-if-
+// missing), so retrying it here is always safe, never creates a duplicate
+// organization.
+function isOrgMembershipRequiredFailure(status: number, bodyText: string): boolean {
+  return status === 403 && bodyText.includes("ORG_MEMBERSHIP_REQUIRED");
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   let timedOut = false;
@@ -193,6 +213,11 @@ async function authedFetch(path: string, init?: RequestInit, options?: { retry?:
   debugLog("request started", { url: `${API_URL}${path}`, authPresent: !!session });
   if (!session) throw new Error("Not signed in");
 
+  // Guards the org-membership self-heal below to exactly one attempt per
+  // call -- if provisioning itself keeps failing (not just racing), this
+  // must fall through to the normal error path below, never loop forever.
+  let orgHealAttempted = false;
+
   for (let attempt = 0; ; attempt++) {
     debugLog("attempt", { url: `${API_URL}${path}`, attempt });
     let res: Response;
@@ -248,6 +273,22 @@ async function authedFetch(path: string, init?: RequestInit, options?: { retry?:
     // detection stays where it already correctly lives: authed-shell.tsx's
     // onAuthStateChange/getSession() checks, driven by the Supabase SDK's
     // own authoritative state, not by one failed backend call.
+    if (
+      isOrgMembershipRequiredFailure(res.status, body) &&
+      !orgHealAttempted &&
+      path !== "/api/auth/session-start"
+    ) {
+      orgHealAttempted = true;
+      debugLog("retrying after organization self-heal", { url: `${API_URL}${path}`, attempt });
+      try {
+        await startSession();
+        continue;
+      } catch {
+        // Provisioning retry itself failed (not just a race) -- fall
+        // through and surface the original 403 rather than retry forever.
+      }
+    }
+
     if (isTrialExpiredFailure(res.status, body)) {
       // Deliberately no sign-out here -- the Supabase session stays valid,
       // and payment_received flipping to true should resume access with no
