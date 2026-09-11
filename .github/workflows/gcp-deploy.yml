@@ -75,10 +75,14 @@ jobs:
           # measured past 10 minutes when Docker's layer cache didn't
           # apply (confirmed via a real workflow_dispatch run that hit
           # exactly this "Run Command Timeout" mid-pip-install, not stuck
-          # -- just slow on a small shared 2-vCPU box). 20m budget on top
-          # of the script's own internal timeouts (60s health-gate,
-          # 600s lock wait) covers a full cold build with margin.
-          command_timeout: 20m
+          # -- just slow on a small shared 2-vCPU box). Raised again
+          # 2026-09-11: even 20m wasn't enough on a run where the box was
+          # under heavy resource pressure -- normally-instant Dockerfile
+          # steps (a bare ENV/EXPOSE) each measured 2+ minutes, and the
+          # build was killed by this timeout at step 16/17 (the
+          # HEALTHCHECK layer), one step short of finishing. 35m gives
+          # real margin over that observed worst case.
+          command_timeout: 35m
           # The script itself lives in the repo, checked out fresh on the
           # box by its own `git fetch` + `checkout --detach` -- this SSH
           # step only ever invokes it, never pastes deploy logic inline,
