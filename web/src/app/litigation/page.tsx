@@ -262,6 +262,8 @@ function LitigationContent() {
                   <option value="Tamil Nadu">Tamil Nadu</option>
                   <option value="UP">Uttar Pradesh</option>
                   <option value="Bihar">Bihar</option>
+                  <option value="Jharkhand">Jharkhand</option>
+                  <option value="Telangana">Telangana</option>
                   <option value="Other">Other</option>
                 </select>
               </div>

@@ -61,6 +61,38 @@ def test_forum_bihar_pecuniary_boundary_senior_division():
     assert "Senior Division" in rec["forum_name"]
 
 
+def test_forum_jharkhand_pecuniary_boundary_junior_division():
+    res = determine_forum(
+        suit_type="Civil Suit",
+        claim_value_inr=5_00_000.0,  # 5 Lakhs, inclusive upper bound
+        jurisdiction_state="Jharkhand",
+    )
+    rec = res["recommended_forum"]
+    assert rec["court_category"] == "District Courts"
+    assert "Munsif" in rec["forum_name"] or "Junior Division" in rec["forum_name"]
+
+
+def test_forum_jharkhand_pecuniary_boundary_senior_division():
+    res = determine_forum(
+        suit_type="Civil Suit",
+        claim_value_inr=10_00_000.0,  # 10 Lakhs
+        jurisdiction_state="Jharkhand",
+    )
+    rec = res["recommended_forum"]
+    assert "Senior Division" in rec["forum_name"]
+
+
+def test_forum_telangana_pecuniary_three_tiers():
+    junior = determine_forum(suit_type="Civil Suit", claim_value_inr=10_00_000.0, jurisdiction_state="Telangana")
+    assert "Junior Civil Judge" in junior["recommended_forum"]["forum_name"]
+
+    senior = determine_forum(suit_type="Civil Suit", claim_value_inr=30_00_000.0, jurisdiction_state="Telangana")
+    assert "Senior Civil Judge" in senior["recommended_forum"]["forum_name"]
+
+    district = determine_forum(suit_type="Civil Suit", claim_value_inr=75_00_000.0, jurisdiction_state="Telangana")
+    assert "District Judge" in district["recommended_forum"]["forum_name"]
+
+
 def test_forum_property_dispute_section_16_cpc():
     """Verify property dispute enforces property location under Section 16 CPC."""
     res = determine_forum(

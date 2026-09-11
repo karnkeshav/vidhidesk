@@ -120,6 +120,90 @@ STATE_PECUNIARY_LIMITS: dict[str, list[dict[str, Any]]] = {
             ),
         },
     ],
+    # Jharkhand (2026-09-11): same base statute lineage as Bihar/UP (the
+    # Bengal, Agra and Assam Civil Courts Act, 1887), amended for Jharkhand
+    # by the Bengal, Agra and Assam Civil Courts (Jharkhand Amendment) Act,
+    # 2018 (in force 2019) -- confirmed via an India Code entry
+    # (indiacode.nic.in/handle/123456789/10546, bot-blocked from direct
+    # fetch this session, so not read verbatim) and corroborated
+    # independently by multiple legal-affairs sites (LawTrend, LiveLaw):
+    # Munsif/Junior Division jurisdiction raised from Rs. 50,000 to Rs. 5
+    # Lakh. The Senior Division's own upper bound was not found stated
+    # explicitly anywhere this session -- inferred as unlimited above the
+    # Junior Division ceiling, the same structural pattern as every other
+    # state in this table (Maharashtra, Karnataka, DEFAULT); confirm before
+    # relying on that specific inference.
+    "Jharkhand": [
+        {
+            "forum_name": "Munsif / Civil Judge (Junior Division), Jharkhand",
+            "court_category": "District Courts",
+            "max_val": 5_00_000,  # Up to 5 Lakhs
+            "min_val": 0,
+            "provisions": [
+                "Bengal, Agra and Assam Civil Courts (Jharkhand Amendment) Act, 2018"
+            ],
+            "notes": "Pecuniary jurisdiction up to INR 5 Lakhs (raised from INR 50,000 by the 2018 amendment, in force 2019).",
+        },
+        {
+            "forum_name": "Civil Judge (Senior Division) / District Judge, Jharkhand",
+            "court_category": "District Courts",
+            "max_val": float("inf"),
+            "min_val": 5_00_001,
+            "provisions": [
+                "Bengal, Agra and Assam Civil Courts (Jharkhand Amendment) Act, 2018"
+            ],
+            "notes": (
+                "Pecuniary jurisdiction above INR 5 Lakhs. Upper-tier ceiling INFERRED "
+                "(unlimited), not directly confirmed against the amendment's own text -- "
+                "verify before relying on it."
+            ),
+        },
+    ],
+    # Telangana (2026-09-11): Telangana Civil Courts Act, 1972 (confirmed
+    # text on India Code, indiacode.nic.in/bitstream/123456789/8610/1/
+    # Atelan_1972.pdf). Figures below are the last-confirmed-enacted
+    # thresholds per PRS Legislative Research's bill-tracking summary
+    # (prsindia.org) of the Telangana Civil Courts (Amendment) Bill, 2024,
+    # introduced 31 July 2024 -- that bill PROPOSES lowering the Junior
+    # Civil Judge ceiling from <20L to <10L and the Senior Civil Judge
+    # floor from 20L to 10L, but this session found no confirmation the
+    # bill has actually been enacted/gazetted, so the figures below are
+    # the pre-bill (still-current, as far as verified) thresholds, not the
+    # bill's proposed ones. Re-check enactment status periodically.
+    "Telangana": [
+        {
+            "forum_name": "Junior Civil Judge, Telangana",
+            "court_category": "District Courts",
+            "max_val": 20_00_000,  # Up to 20 Lakhs
+            "min_val": 0,
+            "provisions": ["Telangana Civil Courts Act, 1972"],
+            "notes": (
+                "Pecuniary jurisdiction up to INR 20 Lakhs. A pending 2024 amendment "
+                "bill (unconfirmed as enacted) would lower this to INR 10 Lakhs -- "
+                "re-verify enactment status before relying on this."
+            ),
+        },
+        {
+            "forum_name": "Senior Civil Judge, Telangana",
+            "court_category": "District Courts",
+            "max_val": 50_00_000,  # 20 Lakhs to 50 Lakhs
+            "min_val": 20_00_001,
+            "provisions": ["Telangana Civil Courts Act, 1972"],
+            "notes": "Pecuniary jurisdiction between INR 20 Lakhs and INR 50 Lakhs.",
+        },
+        {
+            "forum_name": "District Judge / Principal District Judge, Telangana",
+            "court_category": "District Courts",
+            "max_val": float("inf"),
+            "min_val": 50_00_001,
+            "provisions": ["Telangana Civil Courts Act, 1972"],
+            "notes": (
+                "Pecuniary jurisdiction above INR 50 Lakhs. Upper-tier ceiling INFERRED "
+                "(unlimited) from the standard three-tier structure, not directly "
+                "confirmed against the Act's own text for this specific tier."
+            ),
+        },
+    ],
     "DEFAULT": [
         {
             "forum_name": "Civil Judge Junior Division",
