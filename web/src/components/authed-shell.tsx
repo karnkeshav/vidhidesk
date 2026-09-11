@@ -240,7 +240,7 @@ export function AuthedShell({
   return (
     <div className="min-h-screen bg-[#FBF9F4] font-sans text-[#1A1A1A]">
       {/* Top Header Navigation Bar */}
-      <header className="sticky top-0 z-30 flex h-16 flex-wrap items-center justify-between gap-4 border-b border-[#E4E2DD] bg-white px-4 md:px-8">
+      <header className="sticky top-0 z-30 flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-[#E4E2DD] bg-white px-4 py-2 md:px-8">
         <div className="flex items-center gap-3">
           <a href="/dashboard" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-[#081534] text-white">
