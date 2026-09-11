@@ -14,15 +14,19 @@ function debugLog(event: string, data?: Record<string, unknown>) {
   if (DEBUG_AUTH_FETCH) console.debug(`[authedFetch] ${event}`, data ?? "");
 }
 
-// Frontend resilience for transient upstream failures (2026-08-10): a real,
-// live incident showed the backend's own auth check occasionally getting a
-// 520 from Supabase's Cloudflare edge (Render <-> Supabase connectivity, not
+// Frontend resilience for transient upstream failures (2026-08-10, while the
+// backend was still on Render -- see docs/40_Operations/Deployment.md for
+// the 2026-09-05/06 cutover to a GCP Compute Engine VM): a real, live
+// incident showed the backend's own auth check occasionally getting a 520
+// from Supabase's Cloudflare edge (backend <-> Supabase connectivity, not
 // our code, not fixable here) — surfaced to the client as a 401 wrapping
 // "Invalid session: Server error '520' ...". Retrying the exact same
 // request a moment later succeeds, since the failure is transient at the
 // network/edge layer, not a genuinely dead session. This never changes what
 // counts as authenticated — a real invalid/expired session (no 5xx in the
-// wrapped message) is still rejected immediately, not retried.
+// wrapped message) is still rejected immediately, not retried. Kept as-is
+// post-cutover: this class of transient edge failure isn't specific to
+// Render and can still occur against Supabase from any backend host.
 const TRANSIENT_RETRY_DELAYS_MS = [600, 1500, 3000];
 
 // 2026-08-10, same day as the retry logic above: a real report of "stuck on
@@ -37,14 +41,18 @@ const TRANSIENT_RETRY_DELAYS_MS = [600, 1500, 3000];
 // (FETCH_TIMEOUT_MS + backoff) x 4 attempts, not an open-ended hang.
 const FETCH_TIMEOUT_MS = 12000;
 
-// Render's free tier spins the backend down after ~15 minutes idle;
-// waking it back up measured at 60.5s end-to-end this session. The two
-// calls most likely to BE that first request after idle -- session-start
-// (fires on every login) and create-matter (fires right after, often the
-// very next thing a user does) -- get this longer timeout instead of the
-// default above, so a cold start reads as "taking a while" rather than
-// aborting with a raw "signal is aborted without reason" before Render
-// ever gets a chance to respond.
+// Originally sized for Render's free tier, which spun the backend down
+// after ~15 minutes idle (waking it back up measured at 60.5s end-to-end).
+// The backend moved to an always-on GCP Compute Engine VM 2026-09-05/06
+// (docs/40_Operations/Deployment.md) -- no more idle spin-down -- but the
+// longer timeout is kept for the same two calls for a different reason now:
+// a fresh deploy's health-gated container swap measured ~25s cold start on
+// the GCP box (Deployment.md's "six bugs" section), and session-start
+// (fires on every login) / create-matter (fires right after, often the
+// very next thing a user does) are the calls most likely to land during
+// that window. This longer timeout instead of the default above lets that
+// read as "taking a while" rather than aborting with a raw "signal is
+// aborted without reason" before the backend ever gets a chance to respond.
 const COLD_START_TIMEOUT_MS = 70000;
 const LLM_GENERATION_TIMEOUT_MS = 180000;
 
@@ -86,9 +94,9 @@ function isOrgAccessDisabledFailure(status: number, bodyText: string): boolean {
 // of a manual DB fix): authed-shell.tsx fires startSession() (which
 // provisions this user's organization/membership row via routers/auth.py::
 // _ensure_organization) and listMatters()/listTemplates() concurrently, not
-// sequentially. If startSession() is still in flight -- e.g. a Render cold
-// start, see COLD_START_TIMEOUT_MS above -- or its single fire-and-forget
-// attempt fails, every other authenticated call 403s with this exact
+// sequentially. If startSession() is still in flight -- e.g. a deploy's
+// cold container start, see COLD_START_TIMEOUT_MS above -- or its single
+// fire-and-forget attempt fails, every other authenticated call 403s with this exact
 // backend marker (app/auth.py::_check_organization_access) until something
 // re-runs provisioning. Nothing previously did: "Try Again" buttons across
 // the app (e.g. contracts/page.tsx's loadData) only retry the data fetch

@@ -17,7 +17,7 @@
 | Layer | Choice |
 |---|---|
 | Frontend | Next.js 14 + TypeScript + Tailwind + shadcn/ui → Vercel (Hobby) |
-| Backend | Python 3.11 + FastAPI → Render free tier |
+| Backend | Python 3.11 + FastAPI → GCP Compute Engine VM (`gcp-ai-node-1`), behind Caddy/HTTPS. Migrated from Render free tier 2026-09-05/06 — see [`../40_Operations/Deployment.md`](../40_Operations/Deployment.md) |
 | DB / Auth / Storage / Vectors | Supabase free tier (Postgres + pgvector + Auth) |
 | Embeddings | sentence-transformers `BAAI/bge-small-en-v1.5`, run in backend |
 | Doc generation | Jinja2 → python-docx; PDF via LibreOffice headless |

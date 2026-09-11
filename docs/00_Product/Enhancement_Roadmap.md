@@ -13,7 +13,7 @@
 # VidhiDesk — Enhancement Roadmap
 
 **Date:** 26 August 2026
-**Context:** VidhiDesk is live at vidhidesk.vercel.app (Contracts, Litigation, RERA walkthroughs for all states, Consulting). Backend has migrated to Oracle; Render is being phased out. This document consolidates everything discussed in this session and proposes a single next step.
+**Context:** VidhiDesk is live at vidhidesk.vercel.app (Contracts, Litigation, RERA walkthroughs for all states, Consulting). This document consolidates everything discussed in this session and proposes a single next step. Note (2026-09-11): the Oracle migration mentioned below was later abandoned for capacity reasons and the backend instead cut over to a GCP Compute Engine VM on 2026-09-05/06 — see `docs/40_Operations/Deployment.md` for the authoritative, current hosting facts.
 
 ---
 

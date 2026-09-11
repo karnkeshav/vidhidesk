@@ -7,21 +7,23 @@ name: CI — Lint, Test, Verify, Deploy Gate
 # Verification -> Deployment -> Runtime Verification.
 #
 # Honesty note (read before assuming this fully gates production
-# deploys): Render and Vercel are currently configured to auto-deploy
-# directly from pushes to `main` via their own git integration, outside
-# of GitHub Actions entirely (docs/40_Operations/Deployment.md). That
-# means this workflow's `deploy_gate` job does NOT currently stop a bad
-# push from reaching production by itself — it can only do that once
-# either (a) branch protection on `main` is configured to require this
-# workflow's jobs to pass before merge (a repo settings change, not a
-# file change, and not something this workflow can configure itself), or
-# (b) Render/Vercel's auto-deploy-on-push is switched to a deploy hook
-# triggered only from this workflow's `deploy_gate` job, which needs a
-# `RENDER_DEPLOY_HOOK_URL` secret that does not exist yet. Both are
-# documented as explicit next steps in
-# docs/40_Operations/Deployment_Verification_Guide.md — this file
-# implements everything that CAN be automated without those two things,
-# and does not pretend to implement the parts that need them.
+# deploys, and before trusting the rest of this note as current — see
+# docs/40_Operations/Deployment.md for the authoritative, up-to-date
+# story): Vercel auto-deploys the frontend directly from pushes to
+# `main` via its own git integration, outside of GitHub Actions
+# entirely. The backend no longer lives on Render (migrated to a GCP
+# Compute Engine VM behind Caddy/HTTPS, 2026-09-05/06) and is deployed
+# by .github/workflows/gcp-deploy.yml, which triggers on this workflow
+# completing on `main` — so backend deploys ARE already gated on this
+# workflow's jobs passing. What is NOT yet closed: Vercel's frontend
+# auto-deploy is still independent of this workflow, so a bad frontend
+# push can still reach production regardless of what CI reports, unless
+# branch protection on `main` is configured to require this workflow's
+# jobs to pass before merge (a repo settings change, not a file change,
+# and not something this workflow can configure itself). See
+# docs/40_Operations/Deployment_Verification_Guide.md for detail — this
+# file implements everything that CAN be automated without that repo
+# settings change, and does not pretend to implement the part that needs it.
 
 on:
   push:
@@ -152,13 +154,14 @@ jobs:
       - name: Deployment
         run: |
           echo "All upstream verification jobs passed."
-          echo "NOTE: Render/Vercel currently auto-deploy from git push independently of this workflow."
-          echo "To make this job an actual deploy gate (not just a status marker), add a"
-          echo "RENDER_DEPLOY_HOOK_URL secret and curl it here, and/or add branch protection"
-          echo "on main requiring this workflow to pass before merge. See"
+          echo "NOTE: the GCP backend deploy (gcp-deploy.yml) is already gated on this"
+          echo "workflow succeeding on main. Vercel's frontend deploy still auto-deploys"
+          echo "from git push independently of this workflow."
+          echo "To close that remaining gap, add branch protection on main requiring this"
+          echo "workflow to pass before merge. See"
           echo "docs/40_Operations/Deployment_Verification_Guide.md for exact steps — not done"
-          echo "in this workflow file because neither the secret nor the repo-settings change"
-          echo "can be made from a file-only change."
+          echo "in this workflow file because the repo-settings change can't be made from a"
+          echo "file-only change."
 
   runtime_verification:
     needs: deploy_gate
@@ -173,5 +176,7 @@ jobs:
       - name: Verify the actual deployed backend responds correctly
         working-directory: api
         env:
-          RUNTIME_VERIFY_BASE_URL: https://vidhidesk.onrender.com
+          # GCP Compute Engine VM behind Caddy/HTTPS, migrated from Render
+          # 2026-09-05/06 -- see docs/40_Operations/Deployment.md.
+          RUNTIME_VERIFY_BASE_URL: https://vidhidesk-api.duckdns.org
         run: python scripts/verify_runtime.py

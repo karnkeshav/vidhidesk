@@ -120,9 +120,9 @@ Frontend at `http://localhost:3000`, backend at `http://localhost:8000`
 
 ## Known gaps in this doc
 
-- No CI/deployment setup documented yet — this covers local dev only
-  (Render/Vercel deploy config, if/when it exists, belongs in a separate
-  doc).
+- This doc covers local dev only — CI/deployment setup (GCP backend +
+  Vercel frontend deploy config) is documented separately in
+  `Deployment.md` and `Deployment_Verification_Guide.md`.
 - No guidance yet for running the Playwright-driven browser E2E tests
   under `api/tests/e2e/` in a sandboxed environment without normal audio
   library access — that workaround is sandbox-specific, not part of a

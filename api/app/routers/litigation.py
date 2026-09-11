@@ -42,8 +42,10 @@ router = APIRouter(prefix="/api", tags=["litigation"])
 
 # Evidence file uploads: same size/type ceiling family as profile.py's
 # avatar upload, widened for document exhibits (PDFs, scans) rather than
-# photo-only. 10MB keeps this comfortably inside Render/Supabase free-tier
-# request and storage limits for a single-user tool.
+# photo-only. 10MB keeps this comfortably inside Supabase's free-tier
+# request and storage limits for a single-user tool (the backend itself
+# moved off Render's free tier to a GCP Compute Engine VM 2026-09-05/06,
+# see docs/40_Operations/Deployment.md, but Supabase's limits still apply).
 _ALLOWED_EVIDENCE_TYPES = {
     "application/pdf",
     "image/jpeg",

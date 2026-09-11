@@ -26,8 +26,10 @@ real Supabase project stayed fast), so the exact mechanism is unconfirmed
 -- but it's the one variable changed in that path, and going back to a
 fresh client per call is essentially free (~30-500ms) next to the
 alternative. If auth.get_user() is still slow after this revert, that
-points at something external (Render's outbound path to Supabase, or
-Supabase's edge itself) rather than this client's lifecycle.
+points at something external (the backend's outbound path to Supabase —
+a GCP Compute Engine VM as of the 2026-09-05/06 cutover, see
+docs/40_Operations/Deployment.md; Render before that — or Supabase's
+edge itself) rather than this client's lifecycle.
 user_client() was never cached here in the first place: it's keyed by a
 per-request access token, and naively caching by token would grow
 unbounded over the process lifetime with no eviction for

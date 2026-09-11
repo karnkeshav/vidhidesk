@@ -47,8 +47,8 @@ _startup_logger = logging.getLogger("vidhidesk.startup")
 # 18-26s and an unrelated 4s auth timeout taking 70-260s to actually fire,
 # consistent with severe CPU starvation, not a code defect in either path.
 # Loading both here, synchronously, during startup means uvicorn only
-# reports "Application startup complete" (and Render only starts routing
-# traffic) once this one-time cost is already paid -- the first real
+# reports "Application startup complete" (and the host only starts
+# routing traffic) once this one-time cost is already paid -- the first real
 # request is fast, not the one holding the bag for a cold model load on top
 # of whatever else the instance is doing.
 #

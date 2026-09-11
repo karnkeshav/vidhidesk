@@ -3,7 +3,9 @@
 Unlike every other verify_*.py script, this one does not talk to
 Supabase/LLM providers/storage directly — it talks to a RUNNING instance
 of the VidhiDesk API itself (local `uvicorn` during development/CI, or
-the real deployed Render instance in production), the way an actual
+the real deployed instance in production — a GCP Compute Engine VM
+behind Caddy/HTTPS as of the 2026-09-05/06 cutover, see
+docs/40_Operations/Deployment.md; Render before that), the way an actual
 client would. This is the "is the deployed service actually healthy"
 check, distinct from "is the infrastructure it depends on healthy"
 (that's verify_database.py / verify_storage.py / verify_llm_providers.py).

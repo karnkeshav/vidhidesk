@@ -1,5 +1,14 @@
 # VIDHIDESK_AGENT_PROTOCOL.md
 
+> **Superseded (2026-09-11):** the Oracle migration this protocol plans
+> for was never carried out — a live audit found the target Oracle VM
+> lacked capacity, and the backend was instead cut over to a GCP Compute
+> Engine VM behind Caddy/HTTPS on 2026-09-05/06. Render is no longer the
+> live backend; nothing in production points at it. See
+> `docs/40_Operations/Deployment.md` for the authoritative, current
+> hosting facts. Everything below is left as-authored for historical
+> reference and is not an accurate description of current infrastructure.
+
 ## ChatGPT → Claude Code → Oracle VM Controlled Execution Protocol
 
 **Project:** VidhiDesk\

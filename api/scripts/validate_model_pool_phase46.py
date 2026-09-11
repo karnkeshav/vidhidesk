@@ -18,7 +18,9 @@ Safety, mirroring those existing scripts:
   - DRAFTS_DIR redirected to a throwaway dir under REPO_ROOT (must stay
     under REPO_ROOT -- contracts.py's docx_path.relative_to(REPO_ROOT)
     requirement), never the real generated_drafts/, cleaned up after.
-  - Never runs on Oracle; never touches Docker/Render/Vercel state.
+  - Never runs on GCP/Oracle; never touches Docker/Render/Vercel state
+    (the backend runs on a GCP Compute Engine VM as of 2026-09-05/06,
+    see docs/40_Operations/Deployment.md; Render was the prior host).
   - Never prints API key values -- only provider/model names and
     sanitized error text (llm_gateway.ProviderError messages already
     strip the raw response beyond a 300-char preview, no header/key

@@ -17,7 +17,7 @@
 | Layer | Platform | Evidence |
 |---|---|---|
 | Frontend | Next.js 14, deployed on Vercel (Hobby tier) | Build Tracker E15 |
-| Backend | Python 3.11 / FastAPI, deployed on Render (free tier) — live at `vidhidesk.onrender.com` | Build Tracker E15 |
+| Backend | Python 3.11 / FastAPI, deployed on a GCP Compute Engine VM (`gcp-ai-node-1`) behind Caddy/HTTPS — live at `https://vidhidesk-api.duckdns.org`. Migrated from Render (free tier) 2026-09-05/06 | Build Tracker E15; [`../40_Operations/Deployment.md`](../40_Operations/Deployment.md) for the cutover |
 | Database / Auth / Storage / Vectors | Supabase free tier (Postgres + pgvector + Auth + Storage) | Build Tracker throughout |
 | Judgment source | Indian Kanoon API (the one pre-procured paid dependency) | `CLAUDE.md` |
 
@@ -35,7 +35,7 @@ Browser (Next.js client)
 
 ## Cold-start posture
 
-Render's free tier cold-starts are accepted by design — this is a single-user tool, and availability target is ≥95% during working hours, not 24/7 hot infrastructure. See [`../20_Engineering/Technical_Standards.md`](../20_Engineering/Technical_Standards.md) for the full non-functional requirements table.
+Historically (through 2026-09-05/06), Render's free tier cold-starts were accepted by design — this is a single-user tool, and availability target is ≥95% during working hours, not 24/7 hot infrastructure. The backend now runs always-on on a GCP Compute Engine VM, so idle spin-down no longer applies; a fresh deploy's health-gated container swap still takes ~25s (see [`../40_Operations/Deployment.md`](../40_Operations/Deployment.md)). See [`../20_Engineering/Technical_Standards.md`](../20_Engineering/Technical_Standards.md) for the full non-functional requirements table.
 
 ## Document generation path
 
@@ -43,4 +43,4 @@ Render's free tier cold-starts are accepted by design — this is a single-user 
 
 ## What this document does not cover
 
-CI/CD pipeline configuration, deployment runbooks, and monitoring/alerting are not yet documented anywhere in this repository beyond the bare fact that Render and Vercel deployments exist and work. This is a real, acknowledged gap — see [`../40_Operations/Deployment.md`](../40_Operations/Deployment.md) and [`../40_Operations/Monitoring.md`](../40_Operations/Monitoring.md), both of which flag it rather than paper over it.
+CI/CD pipeline configuration, deployment runbooks, and monitoring/alerting are not yet documented anywhere in this repository beyond the bare fact that the GCP backend and Vercel frontend deployments exist and work. This is a real, acknowledged gap — see [`../40_Operations/Deployment.md`](../40_Operations/Deployment.md) and [`../40_Operations/Monitoring.md`](../40_Operations/Monitoring.md), both of which flag it rather than paper over it.

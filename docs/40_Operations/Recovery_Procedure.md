@@ -54,7 +54,7 @@ Current known instance: `CEREBRAS_API_KEY` returns `HTTP 401 Wrong API Key` — 
 **Symptom:** `verify_runtime.py` reports `GET /health` as `FAIL` with a connection error.
 
 - **Local:** the server isn't running. `cd api && uvicorn app.main:app --reload` in one terminal, then re-run the check in another (or just run `verify_project.py`, which starts and tears down its own instance automatically).
-- **Against a deployed target** (`RUNTIME_VERIFY_BASE_URL` pointed at Render): check the Render dashboard for a crashed/sleeping instance (free-tier cold starts are expected and can cause a single slow-but-not-failed first request — see `Runtime_Architecture.md`'s cold-start note; a genuine connection *refused*, not just slow, is the real failure signal).
+- **Against a deployed target** (`RUNTIME_VERIFY_BASE_URL` pointed at the GCP backend, `https://vidhidesk-api.duckdns.org` — migrated from Render 2026-09-05/06, see `Deployment.md`): SSH into `gcp-ai-node-1` and check `docker ps` / Caddy's logs for a crashed container or cert issue (a fresh deploy's health-gated container swap takes ~25s — see `Runtime_Architecture.md`'s cold-start note; a genuine connection *refused*, not just slow, is the real failure signal).
 
 ## Migrations: idempotency WARN/FAIL
 

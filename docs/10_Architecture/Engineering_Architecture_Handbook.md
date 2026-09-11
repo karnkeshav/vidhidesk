@@ -26,7 +26,8 @@ This handbook is the index. Detail lives in three companion documents, split alo
 Frontend (Next.js, Vercel)
         │ HTTPS/JSON
         ▼
-Backend (FastAPI, Render)
+Backend (FastAPI, GCP Compute Engine VM behind Caddy/HTTPS — migrated
+   from Render 2026-09-05/06, see ../40_Operations/Deployment.md)
    ├─ LLM Gateway ─────────► Gemini → Groq → SambaNova → Cerebras (failover)
    ├─ RAG Retriever ───────► pgvector + tsvector hybrid search over statute_chunks
    ├─ Citation Verifier ───► Indian Kanoon API, cache-first

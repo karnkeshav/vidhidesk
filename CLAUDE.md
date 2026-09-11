@@ -55,7 +55,12 @@ rule below). Read before major work:
 
 ## Stack (do not substitute without asking)
 - Frontend: Next.js 14 + TypeScript + Tailwind + shadcn/ui -> Vercel (Hobby)
-- Backend: Python 3.11 + FastAPI -> Render free tier
+- Backend: Python 3.11 + FastAPI -> GCP Compute Engine VM (`gcp-ai-node-1`),
+  Docker + Caddy (HTTPS via Let's Encrypt) at vidhidesk-api.duckdns.org.
+  Render's free tier was the original target but was replaced 2026-09-05/06
+  (OOM crash-looping under sentence-transformers/spacy/torch); its service
+  still exists but is no longer live — see
+  docs/40_Operations/Deployment.md for the full migration history.
 - DB/Auth/Storage/Vectors: Supabase free tier (Postgres + pgvector + Auth)
 - Embeddings: sentence-transformers BAAI/bge-small-en-v1.5, run in backend
 - Doc generation: Jinja2 -> python-docx; PDF via LibreOffice headless
