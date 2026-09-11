@@ -110,7 +110,9 @@ def compose_pleading(matter_id: str, pleading_outline_id: str, db) -> dict[str, 
     clause_versions: list[dict[str, Any]] = []
     missing_clauses: list[str] = []
 
-    for position, clause_type in enumerate(CLAUSE_TYPES, start=1):
+    position = 0
+    for clause_type in CLAUSE_TYPES:
+        position += 1
         clause = approved_by_type.get(clause_type)
         if clause is None:
             missing_clauses.append(clause_type)
@@ -120,6 +122,40 @@ def compose_pleading(matter_id: str, pleading_outline_id: str, db) -> dict[str, 
             "paragraph_no": position,
             "clause_type": clause_type,
             "heading": CLAUSE_HEADINGS[clause_type],
+            "text": content.get("text", ""),
+            "bullet_items": content.get("bullet_items"),
+            "statute_refs": clause.get("statute_refs") or [],
+            "case_law_refs": clause.get("case_law_refs") or [],
+            "confidence": clause.get("confidence"),
+        })
+        clause_versions.append({
+            "clause_type": clause_type,
+            "clause_id": clause["id"],
+            "version_no": clause["version_no"],
+            "model_used": clause.get("model_used"),
+            "prompt_version": clause.get("prompt_version"),
+        })
+
+    # Advocate-authored custom clauses (2026-09-11, clause_generator.py::
+    # add_custom_clause) -- any approved clause_type outside the fixed 14,
+    # appended after them in the order they were authored (created_at).
+    # Never counted toward missing_clauses (that list is specifically
+    # "which of the fixed 14 aren't ready yet" -- a custom clause has no
+    # baseline to be "missing" against).
+    custom_entries = sorted(
+        (
+            (ct, clause) for ct, clause in approved_by_type.items()
+            if ct not in CLAUSE_TYPES
+        ),
+        key=lambda item: item[1].get("created_at") or "",
+    )
+    for clause_type, clause in custom_entries:
+        position += 1
+        content = clause.get("content") or {}
+        composed_sections.append({
+            "paragraph_no": position,
+            "clause_type": clause_type,
+            "heading": content.get("heading") or CLAUSE_HEADINGS.get(clause_type, clause_type),
             "text": content.get("text", ""),
             "bullet_items": content.get("bullet_items"),
             "statute_refs": clause.get("statute_refs") or [],

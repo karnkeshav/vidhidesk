@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -1016,3 +1017,76 @@ def review_clause(clause_id: str, matter_id: str, review_status: str, db) -> dic
         .execute()
     )
     return updated.data[0] if updated.data else {**rows[0], "review_status": review_status}
+
+
+# --- Custom clauses (2026-09-11) ---------------------------------------------
+#
+# The 14 CLAUSE_TYPES above are a fixed, hand-built generation pipeline --
+# each has its own deterministic-or-LLM generator and cannot grow a 15th
+# entry without writing a whole new generator (the module docstring's
+# "no hallucinated structure" reasoning is exactly why this list is fixed
+# code, not config). What the owner asked for here is different: an
+# advocate authoring their own clause text by hand, for something the
+# fixed 14 don't cover on a specific matter -- never LLM-generated, never
+# added to the pipeline itself.
+#
+# litigation_pleading_clauses.clause_type is deliberately NOT an enum
+# (see 0018_pleading_clauses.sql's own comment: "clause_type is
+# intentionally NOT an enum... Application-level validation
+# (clause_generator.py::CLAUSE_TYPES) is the single source of truth for
+# the fixed 14-type list"), so a custom clause_type slides into the exact
+# same table, versioning, and review machinery as the fixed 14 with zero
+# schema changes -- prefixed "custom_" so it can never collide with a
+# real (present or future) fixed clause_type. list_clauses/review_clause
+# above already operate on any clause_type generically; only
+# document_composer.py needed a matching change to actually include it
+# in the assembled pleading (see that module's own comment).
+
+
+def _slugify_heading(heading: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", heading.strip().lower()).strip("_")
+    return slug or "clause"
+
+
+def add_custom_clause(
+    matter_id: str, pleading_outline_id: str, heading: str, text: str, db, clause_type: str | None = None
+) -> dict[str, Any]:
+    """Adds (or, if `clause_type` is given, adds a new version of) an
+    advocate-authored clause -- never touches the LLM, never affects any
+    other clause_type. Auto-approved (review_status='approved',
+    author='human'): the advocate wrote it themselves, there is nothing
+    left to review. `clause_type` is only ever a previously-returned
+    custom clause_type (from a prior call) -- passing one lets an
+    advocate revise their own custom clause's text as a new immutable
+    version, the same convention every other clause type already uses;
+    omit it to author a brand-new custom clause."""
+    if not heading.strip():
+        raise ClauseGeneratorError("heading is required")
+    if not text.strip():
+        raise ClauseGeneratorError("text is required")
+    if clause_type is not None and not clause_type.startswith("custom_"):
+        raise ClauseGeneratorError(f"clause_type must be a custom_* clause, got {clause_type!r}")
+
+    resolved_type = clause_type or f"custom_{_slugify_heading(heading)}"
+    version_no = _next_version_no(matter_id, pleading_outline_id, resolved_type, db)
+
+    row = {
+        "matter_id": matter_id,
+        "pleading_outline_id": pleading_outline_id,
+        "clause_type": resolved_type,
+        "version_no": version_no,
+        "content": {"text": text.strip(), "heading": heading.strip()},
+        "statute_refs": [],
+        "case_law_refs": [],
+        "confidence": 1.0,
+        "is_deterministic": False,
+        "model_used": None,
+        "model_routing": None,
+        "prompt_version": "v1",
+        "regenerated": version_no > 1,
+        "author": "human",
+        "review_status": "approved",
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    inserted = db.table("litigation_pleading_clauses").insert(row).execute()
+    return inserted.data[0]

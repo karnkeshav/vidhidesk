@@ -115,6 +115,15 @@ class FakeQuery:
                 r.update(self._payload)
             return FakeResponse(matches)
 
+        if self._op == "delete":
+            matches = [
+                r for r in self._table.rows
+                if all(r.get(c) == v for c, v in self._filters.items())
+            ]
+            for r in matches:
+                self._table.rows.remove(r)
+            return FakeResponse(matches)
+
         if self._op == "upsert":
             records = self._payload if isinstance(self._payload, list) else [self._payload]
             key_cols = (self._table.upsert_key or "id").split(",")
@@ -151,6 +160,9 @@ class FakeTable:
 
     def update(self, payload):
         return FakeQuery(self, "update", payload)
+
+    def delete(self):
+        return FakeQuery(self, "delete")
 
     def upsert(self, payload, on_conflict=None):
         self.upsert_key = on_conflict

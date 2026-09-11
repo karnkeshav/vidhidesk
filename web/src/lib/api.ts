@@ -876,6 +876,64 @@ export function bulkKeepBoilerplate(templateId: string): Promise<TemplateClause[
   );
 }
 
+// --- Per-matter clause customization (2026-09-11) ---
+// Every lawyer's own keep/modify/delete/add-custom decisions for THEIR
+// matter, layered on top of the shared template baseline above (never
+// written back to it, never visible to any other matter).
+
+export type MatterClauseCustomization = {
+  id: string;
+  matter_id: string;
+  template_clause_id: string | null;
+  decision: "kept" | "modified" | "deleted" | "custom";
+  heading: string | null;
+  custom_text: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export function listMatterClauseCustomizations(matterId: string): Promise<MatterClauseCustomization[]> {
+  return authedFetch(`/api/matters/${matterId}/clause-customizations`);
+}
+
+export function setMatterClauseDecision(
+  matterId: string,
+  templateClauseId: string,
+  input: { decision: "kept" | "modified" | "deleted"; custom_text?: string }
+): Promise<MatterClauseCustomization> {
+  return authedFetch(
+    `/api/matters/${matterId}/clause-customizations/template/${templateClauseId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
+}
+
+export function addMatterCustomClause(
+  matterId: string,
+  input: { heading: string; custom_text: string }
+): Promise<MatterClauseCustomization> {
+  return authedFetch(
+    `/api/matters/${matterId}/clause-customizations/custom`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    { retry: false }
+  );
+}
+
+export function deleteMatterClauseCustomization(matterId: string, customizationId: string): Promise<{ status: string }> {
+  return authedFetch(
+    `/api/matters/${matterId}/clause-customizations/${customizationId}`,
+    { method: "DELETE" },
+    { retry: false }
+  );
+}
+
 // --- Litigation Pleading Workbench (Sprint 3.6) ---
 
 export type PleadingOutlineSection = {
@@ -932,6 +990,10 @@ export type ClauseContent = {
   text: string;
   bullet_items?: string[] | null;
   grounds?: ClauseGround[] | null;
+  // Only set for an advocate-authored custom clause (see addCustomClause
+  // below) -- one of the 14 fixed clause types gets its heading from a
+  // static lookup instead.
+  heading?: string | null;
 };
 
 export type PleadingClause = {
@@ -1006,6 +1068,24 @@ export function reviewPleadingClause(matterId: string, clauseId: string, status:
     method: "POST",
     body: JSON.stringify({ review_status: status }),
   });
+}
+
+// Advocate-authored clause for something missing from the fixed 14
+// CLAUSE_TYPES -- never LLM-generated, auto-approved. Pass an existing
+// custom clause's `clause_type` (from a prior call's response) to revise
+// it as a new version; omit it to author a brand-new one.
+export function addCustomClause(
+  matterId: string,
+  payload: { pleading_outline_id: string; heading: string; text: string; clause_type?: string }
+): Promise<PleadingClause> {
+  return authedFetch(
+    `/api/matters/${matterId}/clauses/custom`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { retry: false }
+  );
 }
 
 export function composePleading(matterId: string, payload: { pleading_outline_id: string }): Promise<PleadingDraft> {

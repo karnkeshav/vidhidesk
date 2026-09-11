@@ -509,6 +509,10 @@ class ClauseContentOut(BaseModel):
     text: str
     bullet_items: list[str] | None = None
     grounds: list[ClauseGroundOut] | None = None
+    # Only ever set for a custom clause (clause_generator.py::
+    # add_custom_clause) -- one of the fixed 14 CLAUSE_TYPES gets its
+    # heading from CLAUSE_HEADINGS instead, this stays null for those.
+    heading: str | None = None
 
 
 class PleadingClauseOut(BaseModel):
@@ -536,6 +540,16 @@ class PleadingClauseOut(BaseModel):
 
 class ClauseReviewRequest(BaseModel):
     review_status: str = Field(pattern="^(approved|rejected)$")
+
+
+class CustomClauseRequest(BaseModel):
+    pleading_outline_id: str
+    heading: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1)
+    # Only set when revising an existing custom clause (a new version of
+    # the same clause_type, same convention as every other clause type) --
+    # omit to author a brand-new one.
+    clause_type: str | None = None
 
 
 class ComposePleadingRequest(BaseModel):

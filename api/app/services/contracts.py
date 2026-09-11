@@ -375,6 +375,31 @@ def generate_draft(
         )
         clauses = _applicable_clauses(all_clauses, form_data)
 
+        # Per-matter clause customization (2026-09-11): every lawyer's own
+        # keep/modify/delete/custom decisions for THIS matter, layered on
+        # top of the shared template baseline -- never written back to
+        # template_clauses, never visible to any other matter. See
+        # 0031_matter_clause_customizations.sql for the full rationale.
+        override_rows = (
+            db.table("matter_clause_customizations")
+            .select("*")
+            .eq("matter_id", matter_id)
+            .execute()
+            .data
+            or []
+        )
+        overrides_by_clause_id = {
+            r["template_clause_id"]: r for r in override_rows if r.get("template_clause_id")
+        }
+        custom_clauses = [r for r in override_rows if r["decision"] == "custom"]
+        # A deleted clause is dropped before Phase 1/2 even begin -- it
+        # never reaches the LLM (saves the call, not just the output) and
+        # never affects clause numbering for what remains.
+        clauses = [
+            c for c in clauses
+            if overrides_by_clause_id.get(c["id"], {}).get("decision") != "deleted"
+        ]
+
         mask_store = SupabaseMaskStore(db)
         mask_map = mask_store.load(matter_id)  # timed inside SupabaseMaskStore.load() (pii_mask.py)
         entities = _entities_from_form(form_data, matter)
@@ -585,11 +610,33 @@ def generate_draft(
             # loop even starts.
             rendered = unmask_text(rendered, mask_map)
 
+            # A 'modified' override replaces the just-computed render
+            # (Jinja or LLM output, whichever this clause_type used) with
+            # this matter's own lawyer-authored text, verbatim -- applied
+            # here, after generation, so a modified clause still costs
+            # nothing extra to determine (Phase 1/2 already ran normally)
+            # and still participates in numbering below like any other.
+            override = overrides_by_clause_id.get(clause["id"])
+            if override and override["decision"] == "modified" and override.get("custom_text"):
+                rendered = override["custom_text"]
+
             heading = clause.get("heading")
             if heading:
                 clause_number += 1
                 rendered = f"{clause_number}. {heading}\n\n{rendered}"
             final_clause_texts.append(rendered)
+
+        # Wholly custom clauses (decision='custom', not derived from any
+        # template_clauses row) are appended after every template clause,
+        # in this matter's own chosen order -- lawyer-authored text,
+        # never sent to the LLM, never Jinja-rendered.
+        for custom in sorted(custom_clauses, key=lambda r: r.get("display_order") or 0):
+            custom_text = custom.get("custom_text") or ""
+            custom_heading = custom.get("heading")
+            if custom_heading:
+                clause_number += 1
+                custom_text = f"{clause_number}. {custom_heading}\n\n{custom_text}"
+            final_clause_texts.append(custom_text)
 
         mask_store.save(mask_map)  # timed inside SupabaseMaskStore.save() (pii_mask.py)
 
@@ -885,3 +932,118 @@ def bulk_keep_boilerplate_clauses(template_id: str, db=None) -> list[dict]:
         review_clause(clause["id"], "keep", reviewer_notes=BULK_KEEP_REVIEWER_NOTES, db=db)
         for clause in clauses
     ]
+
+
+# ============================================================
+# Per-matter clause customization (2026-09-11) -- see
+# 0031_matter_clause_customizations.sql for the full rationale. Every
+# function below reads/writes matter_clause_customizations, never
+# template_clauses -- the shared reference baseline is never touched by
+# an individual lawyer's per-matter decision. Called with the caller's
+# own RLS-scoped user.db (not service_client()) -- these are matter-owned
+# writes, exactly what matter_clause_customizations_org_member_all exists
+# to enforce, unlike the global template_clauses review functions above.
+# ============================================================
+
+_VALID_CUSTOMIZATION_DECISIONS = {"kept", "modified", "deleted"}
+
+
+def list_matter_clause_customizations(matter_id: str, db) -> list[dict]:
+    res = (
+        db.table("matter_clause_customizations")
+        .select("*")
+        .eq("matter_id", matter_id)
+        .execute()
+    )
+    return res.data or []
+
+
+def upsert_matter_clause_decision(
+    matter_id: str,
+    template_clause_id: str,
+    decision: str,
+    custom_text: str | None,
+    db,
+) -> dict:
+    """Records this matter's own keep/modify/delete decision for one
+    template clause. Upserts on (matter_id, template_clause_id) -- the
+    partial unique index in 0031 -- so re-deciding an already-decided
+    clause updates the same row rather than accumulating conflicting
+    ones."""
+    if decision not in _VALID_CUSTOMIZATION_DECISIONS:
+        raise ValueError(
+            f"decision must be one of {sorted(_VALID_CUSTOMIZATION_DECISIONS)}, got {decision!r}"
+        )
+    if decision == "modified" and not (custom_text or "").strip():
+        raise ValueError("custom_text is required when decision is 'modified'")
+
+    clause_rows = db.table("template_clauses").select("id").eq("id", template_clause_id).execute().data
+    if not clause_rows:
+        raise ValueError(f"template clause {template_clause_id} not found")
+
+    existing = (
+        db.table("matter_clause_customizations")
+        .select("id")
+        .eq("matter_id", matter_id)
+        .eq("template_clause_id", template_clause_id)
+        .execute()
+        .data
+    )
+    payload = {
+        "matter_id": matter_id,
+        "template_clause_id": template_clause_id,
+        "decision": decision,
+        "custom_text": custom_text if decision == "modified" else None,
+    }
+    if existing:
+        updated = (
+            db.table("matter_clause_customizations")
+            .update(payload)
+            .eq("id", existing[0]["id"])
+            .execute()
+        )
+        return updated.data[0]
+    inserted = db.table("matter_clause_customizations").insert(payload).execute()
+    return inserted.data[0]
+
+
+def add_custom_matter_clause(matter_id: str, heading: str, custom_text: str, db) -> dict:
+    """Adds a wholly new, lawyer-authored clause to this matter's own
+    draft -- not derived from any template_clauses row, never affects any
+    other matter or the shared template. Appended after every template
+    clause in the order added (display_order = current custom-clause
+    count for this matter)."""
+    if not heading.strip():
+        raise ValueError("heading is required")
+    if not custom_text.strip():
+        raise ValueError("custom_text is required")
+
+    existing_custom = (
+        db.table("matter_clause_customizations")
+        .select("id")
+        .eq("matter_id", matter_id)
+        .eq("decision", "custom")
+        .execute()
+        .data
+        or []
+    )
+    payload = {
+        "matter_id": matter_id,
+        "template_clause_id": None,
+        "decision": "custom",
+        "heading": heading.strip(),
+        "custom_text": custom_text.strip(),
+        "display_order": len(existing_custom),
+    }
+    inserted = db.table("matter_clause_customizations").insert(payload).execute()
+    return inserted.data[0]
+
+
+def delete_matter_clause_customization(matter_id: str, customization_id: str, db) -> None:
+    """Removes one customization row -- for a 'custom' clause this
+    deletes it entirely (it has no template baseline to fall back to);
+    for a template-derived override this simply reverts that clause back
+    to the template's own current_text on the next draft generation."""
+    db.table("matter_clause_customizations").delete().eq("id", customization_id).eq(
+        "matter_id", matter_id
+    ).execute()

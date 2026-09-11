@@ -320,3 +320,103 @@ def bulk_keep_boilerplate(template_id: str, _user: CurrentUser = Depends(get_cur
     rows, same shape as the per-clause review endpoint, empty list if
     nothing qualified."""
     return contracts.bulk_keep_boilerplate_clauses(template_id)
+
+
+# ============================================================
+# Per-matter clause customization (2026-09-11) -- every lawyer's own
+# keep/modify/delete/add-custom decisions for THEIR matter, distinct from
+# the global template review above. Uses user.db (RLS-scoped, tenant
+# isolation enforced by matter_clause_customizations_org_member_all in
+# 0031_matter_clause_customizations.sql), never service_client() -- this
+# is matter-owned data, not shared reference data.
+# ============================================================
+class MatterClauseCustomizationOut(BaseModel):
+    id: str
+    matter_id: str
+    template_clause_id: str | None
+    decision: str
+    heading: str | None
+    custom_text: str | None
+    display_order: int
+    created_at: str
+    updated_at: str
+
+
+@router.get(
+    "/matters/{matter_id}/clause-customizations",
+    response_model=list[MatterClauseCustomizationOut],
+)
+def list_matter_clause_customizations(matter_id: str, user: CurrentUser = Depends(get_current_user)):
+    """This matter's own overrides -- pair with GET
+    /templates/{template_id}/clauses (the shared baseline) on the
+    frontend to render the full keep/modify/delete/custom picture for
+    this specific matter."""
+    _get_matter_or_404(user, matter_id)
+    return contracts.list_matter_clause_customizations(matter_id, user.db)
+
+
+class MatterClauseDecisionRequest(BaseModel):
+    decision: str
+    custom_text: str | None = None
+
+
+@router.put(
+    "/matters/{matter_id}/clause-customizations/template/{template_clause_id}",
+    response_model=MatterClauseCustomizationOut,
+)
+def set_matter_clause_decision(
+    matter_id: str,
+    template_clause_id: str,
+    body: MatterClauseDecisionRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Keep/modify/delete ONE template clause for this matter only --
+    never touches template_clauses (the shared baseline every other
+    matter still sees)."""
+    _get_matter_or_404(user, matter_id)
+    try:
+        return contracts.upsert_matter_clause_decision(
+            matter_id, template_clause_id, body.decision, body.custom_text, user.db
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class MatterCustomClauseRequest(BaseModel):
+    heading: str
+    custom_text: str
+
+
+@router.post(
+    "/matters/{matter_id}/clause-customizations/custom",
+    response_model=MatterClauseCustomizationOut,
+)
+def add_matter_custom_clause(
+    matter_id: str,
+    body: MatterCustomClauseRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Adds a wholly new, lawyer-authored clause to this matter's own
+    draft -- for any clause missing from the template that this lawyer
+    wants included. Only affects this matter; the shared template is
+    never modified."""
+    _get_matter_or_404(user, matter_id)
+    try:
+        return contracts.add_custom_matter_clause(matter_id, body.heading, body.custom_text, user.db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/matters/{matter_id}/clause-customizations/{customization_id}")
+def delete_matter_clause_customization(
+    matter_id: str,
+    customization_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Removes one customization -- for a custom clause this deletes it
+    outright; for a template-clause override this reverts that clause
+    back to the template's own current_text on the next draft
+    generation."""
+    _get_matter_or_404(user, matter_id)
+    contracts.delete_matter_clause_customization(matter_id, customization_id, user.db)
+    return {"status": "ok"}

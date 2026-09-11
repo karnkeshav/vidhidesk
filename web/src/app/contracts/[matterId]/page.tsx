@@ -6,6 +6,7 @@ import { AuthedShell } from "@/components/authed-shell";
 import { IntakeForm } from "@/components/intake-form";
 import { LegalDocumentSheet } from "@/components/legal-document-sheet";
 import { ContractAiAssistant } from "@/components/contract-ai-assistant";
+import { ClauseCustomizationPanel } from "@/components/clause-customization-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -393,7 +394,7 @@ export default function ContractMatterPage() {
             {/* Legal Document Sheet Canvas */}
             <div className="flex-1 overflow-y-auto">
               {mode === "form" ? (
-                <div className="p-6">
+                <div className="space-y-6 p-6">
                   <IntakeForm
                     schema={template.intake_schema}
                     initialValues={formValues}
@@ -401,6 +402,9 @@ export default function ContractMatterPage() {
                     onSubmit={handleGenerate}
                     onValuesChange={handleFormValuesChange}
                   />
+                  <div className="rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-4">
+                    <ClauseCustomizationPanel matterId={matterId} templateId={template.id} />
+                  </div>
                 </div>
               ) : (
                 <LegalDocumentSheet

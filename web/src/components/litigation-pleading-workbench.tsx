@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   PleadingOutline,
   PleadingClause,
@@ -12,6 +14,7 @@ import {
   generatePleadingOutline,
   listPleadingOutlines,
   generateClause,
+  addCustomClause,
   listClauses,
   reviewPleadingClause,
   composePleading,
@@ -30,7 +33,8 @@ import {
   RefreshCw,
   Check,
   X,
-  FileCheck2
+  FileCheck2,
+  Plus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -103,6 +107,10 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
   const [fetchedAnalysis, setFetchedAnalysis] = useState<CaseAnalysis | null>(null);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [isGeneratingClause, setIsGeneratingClause] = useState<string | null>(null);
+  const [showCustomClauseForm, setShowCustomClauseForm] = useState(false);
+  const [customHeading, setCustomHeading] = useState("");
+  const [customText, setCustomText] = useState("");
+  const [isAddingCustomClause, setIsAddingCustomClause] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; currentType: string } | null>(null);
   const [isComposing, setIsComposing] = useState(false);
@@ -213,6 +221,27 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
 
     setIsBatchGenerating(false);
     setBatchProgress(null);
+  }
+
+  async function handleAddCustomClause(heading: string, text: string) {
+    if (!outline || !heading.trim() || !text.trim()) return;
+    setIsAddingCustomClause(true);
+    setError(null);
+    try {
+      const cl = await addCustomClause(matterId, {
+        pleading_outline_id: outline.id,
+        heading: heading.trim(),
+        text: text.trim(),
+      });
+      setClauses(prev => [cl, ...prev]);
+      setCustomHeading("");
+      setCustomText("");
+      setShowCustomClauseForm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsAddingCustomClause(false);
+    }
   }
 
   async function handleReviewClause(clauseId: string, status: "approved" | "rejected") {
@@ -630,6 +659,116 @@ export function LitigationPleadingWorkbench({ matterId, latestCaseAnalysis }: Pl
                   </div>
                 );
               })}
+
+              {/* Custom clauses (2026-09-11): anything missing from the fixed
+                  14 above, authored directly by the advocate -- never
+                  LLM-generated, auto-approved (nothing to review, they wrote
+                  it themselves). Reuses the same approve/reject control as
+                  every other clause in case one needs to be pulled from the
+                  composed pleading without deleting it outright. */}
+              {clauses
+                .filter((c) => c.clause_type.startsWith("custom_"))
+                .sort((a, b) => a.created_at.localeCompare(b.created_at))
+                .map((clause) => {
+                  const textContent = getClauseText(clause.content);
+                  const heading =
+                    (typeof clause.content !== "string" && clause.content.heading) || clause.clause_type;
+                  return (
+                    <div key={clause.id} className="rounded-sm border border-[#E4E2DD] bg-white overflow-hidden shadow-2xs">
+                      <div className="bg-[#FBF9F4] border-b border-[#E4E2DD] px-4 py-2.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <h4 className="font-sans text-xs font-bold uppercase text-[#081534] tracking-wide">{heading}</h4>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-sans font-bold uppercase tracking-wider bg-[#EAE8E3] text-[#45464E]">
+                            Custom — Advocate Authored
+                          </span>
+                        </div>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-xs font-sans text-[10px] font-bold uppercase border",
+                          clause.review_status === "approved" ? "bg-[#D4EDDA] text-[#155724] border-[#C3E6CB]" :
+                          "bg-[#FFF5F5] text-[#7A2A2A] border-[#F8D7DA]"
+                        )}>
+                          {clause.review_status}
+                        </span>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        <div className="font-serif text-sm leading-relaxed text-[#1A1A1A] whitespace-pre-wrap bg-[#FCFCFA] p-3 rounded-xs border border-[#F0EEE9]">
+                          {textContent}
+                        </div>
+                        <div className="flex justify-end pt-2 border-t border-[#E4E2DD]">
+                          {clause.review_status === "approved" ? (
+                            <Button
+                              onClick={() => handleReviewClause(clause.id, "rejected")}
+                              variant="outline"
+                              className="h-7 text-xs text-[#76777F] border-[#E4E2DD] hover:bg-[#F0EEE9]"
+                            >
+                              Remove from Pleading
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => handleReviewClause(clause.id, "approved")}
+                              className="h-7 text-xs bg-[#155724] text-white hover:bg-[#0E3D19]"
+                            >
+                              <Check className="h-3 w-3 mr-1" /> Include in Pleading
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {showCustomClauseForm ? (
+                <div className="rounded-sm border border-[#E4E2DD] bg-[#FBF9F4] p-4 space-y-2.5">
+                  <h4 className="font-sans text-xs font-bold uppercase text-[#081534] tracking-wide">
+                    Add a Missing Clause
+                  </h4>
+                  <p className="font-serif text-xs text-[#45464E]">
+                    For anything this matter's pleading needs that the 14 standard sections above don't
+                    cover — written by you, included as-is.
+                  </p>
+                  <Input
+                    placeholder="Clause heading (e.g. Limitation Point)"
+                    value={customHeading}
+                    onChange={(e) => setCustomHeading(e.target.value)}
+                    className="text-xs bg-white"
+                  />
+                  <Textarea
+                    placeholder="Clause text"
+                    value={customText}
+                    onChange={(e) => setCustomText(e.target.value)}
+                    rows={4}
+                    className="font-serif text-xs bg-white"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      className="h-7 text-xs bg-[#081534] text-white hover:bg-[#1E2A4A]"
+                      disabled={isAddingCustomClause || !customHeading.trim() || !customText.trim()}
+                      onClick={() => handleAddCustomClause(customHeading, customText)}
+                    >
+                      <Check className="h-3 w-3 mr-1" /> {isAddingCustomClause ? "Adding..." : "Add Clause"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setShowCustomClauseForm(false);
+                        setCustomHeading("");
+                        setCustomText("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="h-8 text-xs bg-white border-[#E4E2DD] text-[#081534] hover:bg-[#F0EEE9]"
+                  onClick={() => setShowCustomClauseForm(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add a Missing Clause
+                </Button>
+              )}
             </div>
           </div>
 

@@ -13,6 +13,7 @@ from app.models.schemas import (
     CaseAnalysisGenerateRequest,
     CaseAnalysisOut,
     ClauseGenerateRequest,
+    CustomClauseRequest,
     ClauseReviewRequest,
     ComposePleadingRequest,
     ForumAdvisorRequest,
@@ -372,6 +373,31 @@ def list_clauses_endpoint(
     a given pleading outline, most recent first."""
     _get_matter_or_404(user, matter_id)
     return clause_generator.list_clauses(matter_id, pleading_outline_id, user.db)
+
+
+@router.post(
+    "/matters/{matter_id}/clauses/custom",
+    response_model=PleadingClauseOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_custom_clause_endpoint(
+    matter_id: str,
+    payload: CustomClauseRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Adds an advocate-authored clause for something missing from the
+    fixed 14 CLAUSE_TYPES (see clause_generator.py::add_custom_clause) --
+    e.g. a matter-specific procedural point the standard pleading
+    sections don't cover. Never LLM-generated, auto-approved (the
+    advocate wrote it), only affects this matter."""
+    _get_matter_or_404(user, matter_id)
+    try:
+        return clause_generator.add_custom_clause(
+            matter_id, payload.pleading_outline_id, payload.heading, payload.text,
+            db=user.db, clause_type=payload.clause_type,
+        )
+    except clause_generator.ClauseGeneratorError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/matters/{matter_id}/clauses/{clause_id}/review", response_model=PleadingClauseOut)

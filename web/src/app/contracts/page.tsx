@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { createMatter, listTemplates, listMatters, Matter, Template, ApiError } from "@/lib/api";
-import { Search, Plus, FolderOpen, FileText, AlertCircle, RotateCcw, Lock } from "lucide-react";
-import { TemplateReviewGateDialog } from "@/components/template-review-gate-dialog";
+import { Search, Plus, FolderOpen, FileText, AlertCircle, RotateCcw } from "lucide-react";
 
 // Friendlier copy for the common failure shapes -- authedFetch (lib/api.ts)
 // already retries a transient upstream hiccup automatically before this is
@@ -49,13 +48,14 @@ export default function ContractsPage() {
   const [selected, setSelected] = useState<Template | null>(null);
   const [clientName, setClientName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [gatedTemplate, setGatedTemplate] = useState<Template | null>(null);
 
   function handleSelectTemplate(t: Template) {
-    if (t.review_status !== "reviewed") {
-      setGatedTemplate(t);
-      return;
-    }
+    // No longer blocked on t.review_status (2026-09-11): a template stuck
+    // on "beta" no longer stops a lawyer from drafting with it -- review
+    // is now each lawyer's own per-matter choice (keep/modify/delete/add
+    // custom clauses, see the clause customization panel on the matter
+    // workspace), not a single owner-gated decision for everyone. The
+    // "Beta" badge elsewhere on this page stays purely informational.
     setSelected(t);
   }
 
@@ -118,10 +118,6 @@ export default function ContractsPage() {
   async function handleStart(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
-    if (selected.review_status !== "reviewed") {
-      setGatedTemplate(selected);
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -316,11 +312,8 @@ export default function ContractsPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Badge variant={t.review_status === "reviewed" ? "default" : "secondary"}>
-                      {t.review_status === "reviewed" ? "Reviewed" : "Beta — pending clause review"}
+                      {t.review_status === "reviewed" ? "Reviewed" : "Beta — not yet centrally reviewed"}
                     </Badge>
-                    {t.review_status !== "reviewed" && (
-                      <Lock className="h-3 w-3 text-[#76777F]" aria-label="Locked until clause review is complete" />
-                    )}
                   </div>
                 </div>
               </Card>
@@ -364,12 +357,6 @@ export default function ContractsPage() {
           )}
         </div>
       </div>
-      <TemplateReviewGateDialog
-        template={gatedTemplate}
-        onOpenChange={(open) => {
-          if (!open) setGatedTemplate(null);
-        }}
-      />
     </AuthedShell>
   );
 }
