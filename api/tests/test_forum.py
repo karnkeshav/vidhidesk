@@ -34,6 +34,33 @@ def test_forum_delhi_pecuniary_boundary_district_court():
     assert "District Court" in rec["forum_name"]
 
 
+def test_forum_bihar_pecuniary_boundary_junior_division():
+    """Suit at/below 10 Lakhs in Bihar routes to Civil Judge (Junior
+    Division) per the reported (see forum.py's own sourcing caveat)
+    Bihar Civil Courts Act, 2026 threshold."""
+    res = determine_forum(
+        suit_type="Civil Suit",
+        claim_value_inr=10_00_000.0,  # 10 Lakhs, inclusive upper bound
+        jurisdiction_state="Bihar",
+    )
+    rec = res["recommended_forum"]
+    assert rec["court_category"] == "District Courts"
+    assert "Junior Division" in rec["forum_name"]
+
+
+def test_forum_bihar_pecuniary_boundary_senior_division():
+    """Suit above 10 Lakhs in Bihar routes to Civil Judge (Senior
+    Division) / District Judge."""
+    res = determine_forum(
+        suit_type="Civil Suit",
+        claim_value_inr=15_00_000.0,  # 15 Lakhs
+        jurisdiction_state="Bihar",
+    )
+    rec = res["recommended_forum"]
+    assert rec["court_category"] == "District Courts"
+    assert "Senior Division" in rec["forum_name"]
+
+
 def test_forum_property_dispute_section_16_cpc():
     """Verify property dispute enforces property location under Section 16 CPC."""
     res = determine_forum(

@@ -74,6 +74,52 @@ STATE_PECUNIARY_LIMITS: dict[str, list[dict[str, Any]]] = {
             "notes": "Pecuniary jurisdiction above INR 10 Lakhs.",
         },
     ],
+    # Bihar (2026-09-11): the Bengal, Agra and Assam Civil Courts Act, 1887
+    # (as amended by the Bihar Amendment Act, 2013) was Bihar's governing
+    # civil-courts statute for over a century -- as late as 08.05.2026 a
+    # real Patna High Court posting notification (No. 391A) still cites it.
+    # News reporting (ETV Bharat) and a legal-affairs blog (BiharWatch)
+    # both independently describe a new Bihar Civil Courts Act, 2026,
+    # passed by the Bihar Legislative Assembly, assented to 16 June 2026,
+    # and gazetted 30 June 2026 -- repealing the 1887 Act, with Junior
+    # Division jurisdiction up to Rs. 10 Lakh (extendable to Rs. 50 Lakh by
+    # HC notification) and Senior Division above Rs. 10 Lakh. NOT yet
+    # confirmed against the Act's own text or an India Code / official
+    # Bihar Gazette copy -- neither surfaced in this session's research.
+    # Flagged here rather than silently trusted (Product_Constitution.md's
+    # "silence is safer than confident error"): verify against the actual
+    # gazetted Act text before relying on this for a real filing, and
+    # re-check whether the 1887 Act's old thresholds (which may still
+    # govern via a transition/savings clause) apply to any pending matter
+    # filed before the new Act's commencement date.
+    "Bihar": [
+        {
+            "forum_name": "Civil Judge (Junior Division), Bihar",
+            "court_category": "District Courts",
+            "max_val": 10_00_000,  # Up to 10 Lakhs
+            "min_val": 0,
+            "provisions": ["Section 3, Bihar Civil Courts Act, 2026 (UNVERIFIED -- see note above)"],
+            "notes": (
+                "Pecuniary jurisdiction up to INR 10 Lakhs under the reported new Bihar "
+                "Civil Courts Act, 2026 (replacing the Bengal, Agra and Assam Civil Courts "
+                "Act, 1887). UNVERIFIED against the Act's own text -- confirm before filing."
+            ),
+        },
+        {
+            "forum_name": "Civil Judge (Senior Division) / District Judge, Bihar",
+            "court_category": "District Courts",
+            "max_val": float("inf"),
+            "min_val": 10_00_001,
+            "provisions": ["Section 3, Bihar Civil Courts Act, 2026 (UNVERIFIED -- see note above)"],
+            "notes": (
+                "Pecuniary jurisdiction above INR 10 Lakhs under the reported new Bihar "
+                "Civil Courts Act, 2026. UNVERIFIED against the Act's own text -- confirm "
+                "before filing. Note: the High Court may also enhance a specific Junior "
+                "Division judge's ceiling up to INR 50 Lakhs by gazette notification, which "
+                "this generic state-wide table does not attempt to track per-judge."
+            ),
+        },
+    ],
     "DEFAULT": [
         {
             "forum_name": "Civil Judge Junior Division",

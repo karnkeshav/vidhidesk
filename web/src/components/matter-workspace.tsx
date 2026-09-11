@@ -534,6 +534,28 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                       </a>
                     </div>
 
+                    {matter?.court_category === "Supreme Court" ? (
+                      // eCourtsIndia (the CNR provider behind this panel) covers
+                      // District Courts and High Courts only -- the Supreme
+                      // Court runs its own separate case-status system with no
+                      // partner API integrated here yet. Showing the CNR
+                      // search form anyway would just produce a confusing
+                      // "CNR not found" for every attempt, as if the CNR were
+                      // wrong rather than the court being unsupported.
+                      <p className="font-serif text-[10px] text-[#45464E]">
+                        Automated case tracking isn&apos;t available for the Supreme Court yet. Verify
+                        status manually at{" "}
+                        <a
+                          href="https://main.sci.gov.in/case-status"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#081534] underline underline-offset-2"
+                        >
+                          main.sci.gov.in/case-status
+                        </a>
+                        .
+                      </p>
+                    ) : (
                     <form onSubmit={handleSearchCnr} className="space-y-2">
                       <label className="font-semibold text-[#081534]">CNR Number</label>
                       <div className="flex gap-1.5">
@@ -562,8 +584,9 @@ export function MatterWorkspace({ matterId }: { matterId: string }) {
                         </Button>
                       </div>
                     </form>
+                    )}
 
-                    {cnrPreviewError && (
+                    {matter?.court_category !== "Supreme Court" && cnrPreviewError && (
                       <p className="font-serif text-[10px] text-[#7A2A2A]">{cnrPreviewError}</p>
                     )}
 
